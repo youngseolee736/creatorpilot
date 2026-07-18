@@ -79,6 +79,7 @@ function makeApiServices(config, fetchImpl) {
         projectId: project.id,
         transcript: project.transcript,
         targetDurationSeconds: project.duration,
+        analysisLanguage: project.language,
       });
     },
     generateScript(project) {

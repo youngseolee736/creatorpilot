@@ -73,7 +73,12 @@ Errors: `400 INVALID_YOUTUBE_URL`; `404 VIDEO_NOT_FOUND` or `TRANSCRIPT_UNAVAILA
 
 Purpose: derive abstract hook, pacing, retention, and structural patterns without reproducing long source excerpts. Responsible agent: Script Analyst Agent. Consumed by: Reference Analysis screen.
 
-Required: `projectId`, `transcript`, `targetDurationSeconds`. Optional: `analysisLanguage`. Loading UI: “Mapping hook, pacing, and structure.” Retry: user-triggered for network/`429`/`5xx`; validation failures require corrected transcript data.
+Required: `projectId`, `transcript`, `targetDurationSeconds`. Optional:
+`analysisLanguage`. `targetDurationSeconds` is an integer from 15 through 180.
+Transcript text is limited to 100,000 characters in Phase 2. Loading UI: “Mapping
+hook, pacing, and structure.” Retry: user-triggered only for network, `429`,
+retryable provider errors, invalid model output, or timeouts; validation and
+configuration failures require corrected input or server configuration.
 
 Request:
 
@@ -82,8 +87,12 @@ Request:
   "projectId": "project_01JZ8P",
   "transcript": {
     "transcriptId": "tr_01JZ8Q",
+    "source": "youtube_captions",
+    "title": null,
     "language": "en",
     "text": "Most people think the future of coastal cities is higher sea walls...",
+    "wordCount": 92,
+    "estimatedDuration": 58,
     "segments": [{ "start": 0, "end": 4.8, "text": "Most people think the future..." }]
   },
   "targetDurationSeconds": 60,
@@ -98,13 +107,21 @@ Success (`200`):
   "requestId": "req_analysis_01",
   "data": {
     "analysisId": "an_01JZ8R",
+    "summary": "A concise explainer built around an expectation reversal and delayed resolution.",
     "hookType": "Counter-intuitive claim",
     "hookDuration": 5,
+    "hookPurpose": "Challenge the expected answer and create curiosity.",
     "targetAudience": "Curious general audience interested in cities and technology",
     "tone": "Urgent, informed, optimistic",
+    "contentPromise": "Explain how an overlooked mechanism changes the familiar problem.",
     "pacing": "Fast opening, measured evidence, decisive close",
     "retentionTechniques": ["Expectation reversal", "Concrete visual examples", "Open-loop question"],
+    "openLoops": ["Delay the full implication of the opening reframe until the conclusion."],
+    "transitions": ["Move from familiar assumption to mechanism, tension, and resolution."],
     "callToAction": "Invite the viewer to reconsider the obvious solution",
+    "reusablePatterns": ["Open with an expectation reversal", "Escalate from one example to system-level stakes"],
+    "doNotCopy": ["Reference-specific examples", "Distinctive analogies", "Original sentence sequences"],
+    "confidence": 0.88,
     "estimatedOriginalDuration": 58,
     "structure": [
       { "label": "Hook", "start": 0, "end": 5, "note": "Contradicts the expected solution" },
@@ -115,7 +132,15 @@ Success (`200`):
 }
 ```
 
-Errors: `400 INVALID_TRANSCRIPT`; `404 PROJECT_NOT_FOUND`; `409 ANALYSIS_ALREADY_RUNNING`; `422 TRANSCRIPT_TOO_SHORT`; `429 MODEL_RATE_LIMITED`; `502 MODEL_PROVIDER_ERROR`; `504 ANALYSIS_TIMEOUT`.
+The response retains the Phase 1 frontend fields and adds the Phase 2 analytical
+detail. The backend generates `analysisId` and `safety`, removes unknown model
+fields, validates section order and duration consistency, and never returns the
+raw provider response.
+
+Errors: `400 INVALID_ANALYSIS_REQUEST`; `413 TRANSCRIPT_TOO_LARGE`; `422
+TRANSCRIPT_NOT_ANALYZABLE`; `429 LLM_RATE_LIMITED`; `500 LLM_NOT_CONFIGURED` or
+`ANALYSIS_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or `INVALID_LLM_RESPONSE`;
+`504 LLM_TIMEOUT`.
 
 ## `POST /api/scripts/generate`
 

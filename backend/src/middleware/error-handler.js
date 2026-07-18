@@ -17,6 +17,8 @@ function errorHandler(error, req, res, next) { // eslint-disable-line no-unused-
   let normalized = error;
   if (error instanceof SyntaxError && error.status === 400 && "body" in error) {
     normalized = new AppError(400, "INVALID_JSON", "The request body must contain valid JSON.", false);
+  } else if (error && error.type === "entity.too.large") {
+    normalized = new AppError(413, "TRANSCRIPT_TOO_LARGE", "The analysis request is too large.", false);
   }
 
   if (!(normalized instanceof AppError)) {

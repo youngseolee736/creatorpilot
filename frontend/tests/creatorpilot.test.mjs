@@ -19,6 +19,7 @@ import {
   reviewOriginality,
 } from "../mock-services.mjs";
 import { createServices, getServiceConfig } from "../service-client.mjs";
+import { errorNotice } from "../components.mjs";
 
 globalThis.location = { search: "?fast=1" };
 
@@ -88,6 +89,8 @@ test("the complete mock service chain returns a production package", async () =>
   assert.equal(updates.length, 6);
   assert.equal(project.render.progress, 100);
   assert.equal(project.render.completed, true);
+  assert.equal(project.analysis.safety.longSourceExcerptsIncluded, false);
+  assert.ok(project.analysis.confidence > 0 && project.analysis.confidence <= 1);
 });
 
 test("mock services expose retryable named failures", async () => {
@@ -147,6 +150,61 @@ test("mixed mode calls only transcript through the API", async () => {
   assert.equal(calls[0], "http://127.0.0.1:8787/api/transcripts/extract");
   assert.equal(transcript.source, "youtube_captions");
   assert.equal(analysis.structure.length, 6);
+});
+
+test("Phase 2 mixed mode uses API transcript and analysis while later agents stay mocked", async () => {
+  const calls = [];
+  const services = createServices(
+    {
+      services: { transcript: "api", analysis: "api", script: "mock", review: "mock", storyboard: "mock", video: "mock" },
+      apiBaseUrl: "http://127.0.0.1:8787",
+    },
+    async (url, options) => {
+      calls.push({ url, body: JSON.parse(options.body) });
+      if (url.endsWith("/api/transcripts/extract")) {
+        return { ok: true, json: async () => ({ data: {
+          transcriptId: "tr_live",
+          source: "youtube_captions",
+          title: null,
+          text: "A normalized transcript with enough text for a real analysis request.",
+          language: "en",
+          wordCount: 11,
+          estimatedDuration: 60,
+          segments: [],
+        } }) };
+      }
+      return { ok: true, json: async () => ({ data: {
+        analysisId: "analysis_mixed",
+        hookType: "Question",
+        hookDuration: 4,
+        targetAudience: "General audience",
+        tone: "Confident",
+        pacing: "Fast",
+        retentionTechniques: ["Open loop"],
+        callToAction: "Invite reflection",
+        estimatedOriginalDuration: 60,
+        structure: [{ label: "Hook", start: 0, end: 4, note: "Create curiosity" }, { label: "Body", start: 4, end: 60, note: "Resolve the question" }],
+        safety: { longSourceExcerptsIncluded: false, maxQuotedWords: 0 },
+      } }) };
+    },
+  );
+  const project = createProject({ id: "project-phase-2", referenceUrl: "https://youtu.be/jNQXAC9IVRw", language: "Korean", topic: "A new topic" });
+  project.transcript = await services.extractTranscript(project);
+  project.analysis = await services.analyzeReference(project);
+  project.generatedScript = await services.generateScript(project);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].url, "http://127.0.0.1:8787/api/analysis/reference");
+  assert.equal(calls[1].body.analysisLanguage, "Korean");
+  assert.equal(project.generatedScript.version, 1);
+});
+
+test("analysis errors distinguish permanent configuration failures from retryable failures", () => {
+  const permanent = errorNotice({ code: "LLM_NOT_CONFIGURED", message: "Configure the provider.", retryable: false }, "retry-analysis");
+  assert.match(permanent, /not configured/);
+  assert.doesNotMatch(permanent, />Retry</);
+  const retryable = errorNotice({ code: "LLM_TIMEOUT", message: "Timed out.", retryable: true }, "retry-analysis");
+  assert.match(retryable, /analysis took too long/);
+  assert.match(retryable, />Retry</);
 });
 
 let failures = 0;

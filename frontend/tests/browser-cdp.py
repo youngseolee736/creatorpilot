@@ -13,6 +13,7 @@ from pathlib import Path
 
 
 expect_api_transcript = os.environ.get("CREATORPILOT_EXPECT_API_TRANSCRIPT") == "1"
+expect_api_analysis = os.environ.get("CREATORPILOT_EXPECT_API_ANALYSIS") == "1"
 expect_transcript_error = os.environ.get("CREATORPILOT_EXPECT_TRANSCRIPT_ERROR") == "1"
 test_youtube_url = os.environ.get(
     "CREATORPILOT_TEST_YOUTUBE_URL",
@@ -119,6 +120,13 @@ browser.command("Runtime.enable")
 browser.command("Log.enable")
 browser.command("Page.enable")
 browser.command("Accessibility.enable")
+if expect_api_analysis:
+    browser.command("Page.addScriptToEvaluateOnNewDocument", {
+        "source": "Object.defineProperty(window, 'CREATORPILOT_CONFIG', {"
+        "configurable: false, get() { return Object.freeze({"
+        "services: {transcript:'api',analysis:'api',script:'mock',review:'mock',storyboard:'mock',video:'mock'},"
+        "apiBaseUrl:'http://127.0.0.1:8787',renderPollIntervalMs:1500}); }, set() {} });"
+    })
 browser.command("Emulation.setDeviceMetricsOverride", {
     "width": 1280, "height": 900, "deviceScaleFactor": 1, "mobile": False,
 })
@@ -211,6 +219,11 @@ capture("analysis-1280")
 check(evaluate("document.querySelectorAll('.pipeline-completed').length >= 2"), "transcript and analyst pipeline stages complete")
 expected_transcript_label = "extracted transcript" if expect_api_transcript else "mock transcript"
 check(evaluate(f"document.querySelector('.transcript-disclosure').textContent.includes({json.dumps(expected_transcript_label)})"), "transcript preview is available")
+if expect_api_analysis:
+    check(evaluate("document.body.textContent.includes('88% confidence')"), "real analysis confidence renders")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].analysis.analysisId.startsWith('analysis_')"), "real normalized analysis persists")
+    check(not evaluate("document.body.textContent.includes('Return one JSON object only')"), "system prompt is not displayed")
+    check(evaluate("document.body.textContent.includes('Transcript + analyst connected')"), "hybrid service state is labeled accurately")
 
 click("[data-action='generate-script']")
 wait_for("document.querySelectorAll('[data-script-section]').length === 7", "original script generates")

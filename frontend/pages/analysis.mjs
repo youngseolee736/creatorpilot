@@ -8,6 +8,7 @@ export function renderAnalysis(project) {
     return `${pageHeading("Script Analyst Agent", "Reading the reference like an editor.", "Hook, pacing, audience, and retention techniques are analyzed before any new writing begins.")}${loadingPanel(project.transcript ? "Script Analyst Agent" : "Transcript extraction", message)}`;
   }
   const analysis = project.analysis;
+  const confidence = Number.isFinite(Number(analysis.confidence)) ? `${Math.round(Number(analysis.confidence) * 100)}% confidence` : "";
   return `${pageHeading("Script Analyst Agent · Complete", "The structure behind the story.", "The analysis captures production mechanics, not source wording.", `<button class="button button-primary" type="button" data-action="generate-script">Generate original script ${icon("arrow")}</button>`)}
     <div class="analysis-layout">
       <section class="analysis-main">
@@ -22,8 +23,11 @@ export function renderAnalysis(project) {
         </section>
       </section>
       <aside class="analysis-aside">
+        ${analysis.summary ? `<section><p class="eyebrow">Analysis summary${confidence ? ` · ${escapeHtml(confidence)}` : ""}</p><p>${escapeHtml(analysis.summary)}</p></section>` : ""}
+        ${analysis.hookPurpose || analysis.contentPromise ? `<section><p class="eyebrow">Hook and promise</p>${analysis.hookPurpose ? `<p>${escapeHtml(analysis.hookPurpose)}</p>` : ""}${analysis.contentPromise ? `<p>${escapeHtml(analysis.contentPromise)}</p>` : ""}</section>` : ""}
         <section><p class="eyebrow">Retention techniques</p><ul class="technique-list">${analysis.retentionTechniques.map((item) => `<li>${icon("spark", 16)}${escapeHtml(item)}</li>`).join("")}</ul></section>
         <section><p class="eyebrow">Call to action</p><p>${escapeHtml(analysis.callToAction)}</p></section>
+        ${analysis.reusablePatterns?.length ? `<section><p class="eyebrow">Reusable patterns</p><ul class="technique-list">${analysis.reusablePatterns.map((item) => `<li>${icon("spark", 16)}${escapeHtml(item)}</li>`).join("")}</ul></section>` : ""}
         <section><p class="eyebrow">Output brief</p>${projectFormat(project)}</section>
         <section class="transcript-disclosure"><details><summary>${project.transcript.source === "mock" ? "View mock transcript" : "View extracted transcript"}</summary><p>${escapeHtml(project.transcript.text)}</p></details></section>
       </aside>

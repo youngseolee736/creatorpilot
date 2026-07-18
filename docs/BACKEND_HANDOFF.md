@@ -1,14 +1,15 @@
 # CreatorPilot Backend Handoff Map
 
-Status: Phase 1 transcript backend implemented; later workflow services remain mocked.
+Status: Phase 2 transcript extraction and Script Analyst backend implemented;
+Scriptwriter and later workflow services remain mocked.
 
 ## Runtime boundary
 
 - `frontend/config.js` is public runtime configuration and defaults to `useMockServices: true`.
 - `frontend/service-client.mjs` is the only service selector imported by `frontend/app.js`.
 - Mock mode delegates to `frontend/mock-services.mjs` unchanged.
-- Per-service mode can route transcript extraction through the Phase 1 Express API
-  while analysis, script, review, storyboard, and video remain mocked.
+- Per-service mode can route transcript extraction and reference analysis through
+  the Express API while script, review, storyboard, and video remain mocked.
 - No API key, provider credential, or private configuration may be added to `config.js` or any browser bundle.
 - The browser's local storage key remains `creatorpilot:v1`; project cloud persistence is not yet wired into the store.
 
@@ -26,11 +27,22 @@ Example public API-mode configuration (not enabled in this repository):
 
 ```js
 window.CREATORPILOT_CONFIG = Object.freeze({
-  useMockServices: false,
-  apiBaseUrl: "https://api.creatorpilot.example",
+  services: {
+    transcript: "api",
+    analysis: "api",
+    script: "mock",
+    review: "mock",
+    storyboard: "mock",
+    video: "mock",
+  },
+  apiBaseUrl: "http://127.0.0.1:8787",
   renderPollIntervalMs: 1500,
 });
 ```
+
+The backend selects `LLM_PROVIDER=openai-compatible`. `LLM_API_BASE_URL`,
+`LLM_API_KEY`, and `LLM_MODEL` are required only when the real analysis endpoint
+is called. `LLM_TIMEOUT_MS` defaults to 30000. These variables are server-only.
 
 ## Service summary
 
@@ -65,19 +77,30 @@ The UI stores it as `project.transcript`, replaces `project.referenceTitle`, and
 
 ### `analyzeReference(project)`
 
-Current input argument is unused in the mock. API mode sends `projectId`, the stored transcript, and target duration.
+The mock accepts the project only to create a stable mock ID. API mode sends
+`projectId`, the stored normalized transcript, `targetDurationSeconds`, and
+`analysisLanguage`.
 
 Current response:
 
 ```json
 {
+  "analysisId": "analysis_project_01JZ8P",
+  "summary": "A concise explainer built around an expectation reversal and delayed resolution.",
   "hookType": "Counter-intuitive claim",
   "hookDuration": 5,
+  "hookPurpose": "Challenge the expected answer and create curiosity.",
   "targetAudience": "Curious general audience interested in cities and technology",
   "tone": "Urgent, informed, optimistic",
+  "contentPromise": "Explain how an overlooked mechanism changes the familiar problem.",
   "pacing": "Fast opening, measured evidence, decisive close",
   "retentionTechniques": ["Expectation reversal", "Concrete visual examples", "Open-loop question", "Future-facing payoff"],
+  "openLoops": ["Delay the opening implication until the conclusion."],
+  "transitions": ["Move from assumption to mechanism, tension, and resolution."],
   "callToAction": "Invite the viewer to reconsider the obvious solution",
+  "reusablePatterns": ["Open with an expectation reversal", "Escalate from example to system stakes"],
+  "doNotCopy": ["Reference-specific examples", "Distinctive analogies", "Original sentence sequences"],
+  "confidence": 0.88,
   "estimatedOriginalDuration": 58,
   "structure": [
     { "label": "Hook", "start": 0, "end": 5, "note": "Contradicts the expected solution" },
@@ -86,11 +109,18 @@ Current response:
     { "label": "Reframe", "start": 27, "end": 39, "note": "Expands one building into a city system" },
     { "label": "Tension", "start": 39, "end": 51, "note": "Acknowledges cost and risk" },
     { "label": "Conclusion", "start": 51, "end": 60, "note": "Returns to the future stakes" }
-  ]
+  ],
+  "safety": { "longSourceExcerptsIncluded": false, "maxQuotedWords": 0 }
 }
 ```
 
-The UI consumes every named summary field and each structure item. The backend should add `analysisId` and safety metadata without removing these fields. It must output abstract mechanics rather than long source excerpts. Analysis is reusable only for the exact transcript/model-contract version.
+The UI consumes the original summary fields and each structure item, then shows
+the optional summary, hook purpose, reusable patterns, and confidence without a
+layout redesign. The backend generates `analysisId` and safety metadata, rejects
+long source excerpts, validates timeline consistency, strips unknown fields, and
+makes at most one JSON repair attempt. The transcript is sent to the configured
+LLM but is not stored by this backend. Analysis is reusable only for the exact
+transcript/model-contract version.
 
 ### `generateScript(project)`
 
@@ -222,7 +252,10 @@ The current “Send back to Scriptwriter” action returns the user to the edito
 - A failed service stores `{ message, code }`, renders an alert, focuses it, and offers the stage-specific Retry action.
 - Successful prior stages remain in local state and are not repeated on retry.
 - API errors are normalized in `service-client.mjs` to `message`, `code`, `status`, `retryable`, and `details`.
-- The current UI shows Retry for every service error. Before launch, use `retryable` to suppress Retry for permanent validation/access errors and route the user to the field/source that must change.
+- The UI preserves `retryable` from API errors. It suppresses Retry for permanent
+  configuration and validation failures and shows analysis-specific guidance for
+  timeout, rate limit, invalid model response, provider failure, and transcript
+  size/analyzability errors.
 
 ## Backend acceptance checklist
 

@@ -22,25 +22,37 @@ export async function extractTranscript(project) {
   await wait(420);
   maybeFail("extractTranscript");
   return {
+    transcriptId: `tr_mock_${project.id}`,
     source: "mock",
     title: project.referenceTitle === "Reference video" ? "How coastal cities could move onto the water" : project.referenceTitle,
     text: referenceTranscript,
+    language: project.language,
     wordCount: 92,
     estimatedDuration: 58,
+    segments: [],
   };
 }
 
-export async function analyzeReference() {
+export async function analyzeReference(project = {}) {
   await wait(520);
   maybeFail("analyzeReference");
   return {
+    analysisId: `analysis_${project.id || "mock"}`,
+    summary: "A concise explainer that opens with a reframe, develops the mechanism, and resolves with future stakes.",
     hookType: "Counter-intuitive claim",
     hookDuration: 5,
+    hookPurpose: "Challenge the expected solution and create curiosity.",
     targetAudience: "Curious general audience interested in cities and technology",
     tone: "Urgent, informed, optimistic",
+    contentPromise: "Explain how an overlooked approach could change a familiar problem.",
     pacing: "Fast opening, measured evidence, decisive close",
     retentionTechniques: ["Expectation reversal", "Concrete visual examples", "Open-loop question", "Future-facing payoff"],
+    openLoops: ["Delay the full implications of the opening reframe until the conclusion."],
+    transitions: ["Move from a familiar assumption to mechanism, tension, and resolution."],
     callToAction: "Invite the viewer to reconsider the obvious solution",
+    reusablePatterns: ["Open with an expectation reversal", "Escalate from one example to system-level stakes"],
+    doNotCopy: ["Reference-specific examples", "Distinctive analogies", "Original sentence sequences"],
+    confidence: 0.92,
     estimatedOriginalDuration: 58,
     structure: [
       { label: "Hook", start: 0, end: 5, note: "Contradicts the expected solution" },
@@ -50,6 +62,7 @@ export async function analyzeReference() {
       { label: "Tension", start: 39, end: 51, note: "Acknowledges cost and risk" },
       { label: "Conclusion", start: 51, end: 60, note: "Returns to the future stakes" },
     ],
+    safety: { longSourceExcerptsIncluded: false, maxQuotedWords: 0 },
   };
 }
 

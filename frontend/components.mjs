@@ -1,4 +1,15 @@
 import { PIPELINE_STEPS, STATUS_LABELS, escapeHtml, routeFor } from "./core.mjs";
+import { serviceConfig } from "./service-client.mjs";
+
+function studioConnectionLabel() {
+  const services = serviceConfig.services || {};
+  const apiServices = Object.entries(services).filter(([, mode]) => mode === "api").map(([name]) => name);
+  if (!apiServices.length) return { mode: "Mock studio", detail: "No AI backend connected" };
+  if (services.transcript === "api" && services.analysis === "api") {
+    return { mode: "Hybrid studio", detail: "Transcript + analyst connected" };
+  }
+  return { mode: "Hybrid studio", detail: `${apiServices.length} API service${apiServices.length === 1 ? "" : "s"} connected` };
+}
 
 export function icon(name, size = 18) {
   const paths = {
@@ -36,6 +47,7 @@ export function pipeline(project, { compact = false } = {}) {
 
 export function appShell({ content, route, project = null }) {
   const inWorkspace = Boolean(project);
+  const connection = studioConnectionLabel();
   return `<div class="app-frame">
     <a class="skip-link" href="#page-content">Skip to main content</a>
     <aside class="app-sidebar" aria-label="Primary navigation">
@@ -47,7 +59,7 @@ export function appShell({ content, route, project = null }) {
         <a class="${route.name === "dashboard" ? "is-active" : ""}" href="${routeFor("dashboard")}">${icon("dashboard")}<span>Dashboard</span></a>
         <a class="${route.name === "new" ? "is-active" : ""}" href="${routeFor("new")}">${icon("plus")}<span>New project</span></a>
       </nav>
-      <div class="sidebar-foot"><span class="mock-dot"></span><span>Mock studio</span><small>No AI backend connected</small></div>
+      <div class="sidebar-foot"><span class="mock-dot"></span><span>${escapeHtml(connection.mode)}</span><small>${escapeHtml(connection.detail)}</small></div>
     </aside>
     <div class="app-column">
       <header class="app-topbar">
@@ -69,7 +81,20 @@ export function pageHeading(eyebrow, title, description, action = "") {
 
 export function errorNotice(error, retryAction) {
   if (!error) return "";
-  return `<div class="notice notice-error" role="alert" tabindex="-1" id="service-error"><div><strong>The agent stopped before completing this stage.</strong><p>${escapeHtml(error.message || error)}</p></div><button class="button button-secondary button-small" type="button" data-action="${escapeHtml(retryAction)}">${icon("retry")}Retry</button></div>`;
+  const titles = {
+    LLM_NOT_CONFIGURED: "The Script Analyst is not configured.",
+    LLM_TIMEOUT: "The analysis took too long.",
+    LLM_RATE_LIMITED: "The Script Analyst is temporarily busy.",
+    INVALID_LLM_RESPONSE: "The model response could not be validated.",
+    TRANSCRIPT_TOO_LARGE: "This transcript is too large to analyze.",
+    TRANSCRIPT_NOT_ANALYZABLE: "This transcript cannot be analyzed reliably.",
+    LLM_PROVIDER_ERROR: "The Script Analyst provider is unavailable.",
+  };
+  const title = titles[error.code] || "The agent stopped before completing this stage.";
+  const action = error.retryable === false
+    ? "<small>Update the configuration or reference before trying again.</small>"
+    : `<button class="button button-secondary button-small" type="button" data-action="${escapeHtml(retryAction)}">${icon("retry")}Retry</button>`;
+  return `<div class="notice notice-error" role="alert" tabindex="-1" id="service-error"><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(error.message || error)}</p></div>${action}</div>`;
 }
 
 export function loadingPanel(agent, message) {

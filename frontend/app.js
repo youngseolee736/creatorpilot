@@ -72,7 +72,12 @@ async function runTask(key, callback) {
 
 function failProject(project, stepId, error) {
   store.updateProject(project.id, {
-    error: { message: error.message, code: error.code || "UNKNOWN" },
+    error: {
+      message: error.message,
+      code: error.code || "UNKNOWN",
+      retryable: error.retryable ?? true,
+      details: error.details || null,
+    },
     pipeline: updatePipeline(project, stepId, "failed", "Agent stopped — retry available"),
   });
   render({ preserveFocus: true });
