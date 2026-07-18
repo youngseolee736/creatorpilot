@@ -3,6 +3,10 @@ const http = require("http");
 const AbortController = require("abort-controller");
 const { createApp } = require("../src/app");
 const { TranscriptService } = require("../src/services/transcript-service");
+const { LocalYouTubeTranscriptProvider } = require("../src/services/transcript/local-youtube-transcript-provider");
+const { HostedTranscriptProvider } = require("../src/services/transcript/hosted-transcript-provider");
+const { normalizeSegments } = require("../src/services/transcript/normalize-transcript");
+const { AppError } = require("../src/middleware/error-handler");
 const { extractYouTubeVideo } = require("../src/utils/youtube-url");
 
 const tests = [];
@@ -18,10 +22,25 @@ function response(status, body) {
 
 function serviceWith(fetchImpl, timeoutMs = 50) {
   return new TranscriptService({
-    apiUrl: "https://provider.example/transcript",
-    fetchImpl,
-    timeoutMs,
-    AbortControllerImpl: AbortController,
+    providerName: "hosted",
+    hostedProvider: new HostedTranscriptProvider({
+      apiUrl: "https://provider.example/transcript",
+      fetchImpl,
+      timeoutMs,
+      AbortControllerImpl: AbortController,
+    }),
+  });
+}
+
+function localService(fetchTranscriptImpl, timeoutMs = 50) {
+  return new TranscriptService({
+    providerName: "local",
+    localProvider: new LocalYouTubeTranscriptProvider({
+      fetchTranscriptImpl,
+      fetchImpl: async () => response(200, {}),
+      timeoutMs,
+      AbortControllerImpl: AbortController,
+    }),
   });
 }
 
@@ -172,6 +191,116 @@ test("rejects a browser origin outside the configured frontend", async () => {
   const result = await request(app, "/api/transcripts/extract", validRequest, { Origin: "https://untrusted.example" });
   assert.equal(result.status, 403);
   assert.equal(result.body.error.code, "ORIGIN_NOT_ALLOWED");
+});
+
+test("extracts and normalizes a successful local-library transcript", async () => {
+  let receivedVideoId;
+  const app = createApp({ transcriptService: localService(async (videoId) => {
+    receivedVideoId = videoId;
+    return [
+      { offset: 1200, duration: 2160, text: "All right, so here we are.", lang: "en" },
+      { offset: 3360, duration: 1800, text: "These elephants have long trunks.", lang: "en" },
+    ];
+  }) });
+  const result = await request(app, "/api/transcripts/extract", validRequest);
+  assert.equal(result.status, 200);
+  assert.equal(receivedVideoId, "jNQXAC9IVRw");
+  assert.equal(result.body.data.text, "All right, so here we are. These elephants have long trunks.");
+  assert.equal(result.body.data.language, "en");
+  assert.equal(result.body.data.title, null);
+  assert.deepEqual(result.body.data.segments[0], { start: 1.2, end: 3.36, text: "All right, so here we are." });
+});
+
+test("normalizes segment end from start plus duration", () => {
+  assert.deepEqual(normalizeSegments([{ start: 2.4, duration: 3.6, text: "A complete transcript segment." }]), [
+    { start: 2.4, end: 6, text: "A complete transcript segment." },
+  ]);
+});
+
+test("concatenates local transcript segment text", async () => {
+  const result = await localService(async () => [
+    { start: 0, duration: 1, text: "First useful sentence." },
+    { start: 1, duration: 1, text: "Second useful sentence." },
+  ]).extract({ videoId: "jNQXAC9IVRw" });
+  assert.equal(result.text, "First useful sentence. Second useful sentence.");
+});
+
+test("uses null when local transcript language metadata is missing", async () => {
+  const result = await localService(async () => [
+    { start: 0, duration: 2, text: "Transcript without language metadata." },
+  ]).extract({ videoId: "jNQXAC9IVRw" });
+  assert.equal(result.language, null);
+});
+
+for (const failure of [
+  ["captions disabled", "Transcript is disabled on this video", 404, "TRANSCRIPT_UNAVAILABLE", false],
+  ["no transcript found", "No transcripts are available for this video", 404, "TRANSCRIPT_UNAVAILABLE", false],
+  ["video unavailable", "The video is no longer available", 404, "VIDEO_NOT_FOUND", false],
+  ["YouTube request blocked", "YouTube request blocked with status code 403", 502, "TRANSCRIPT_PROVIDER_ERROR", true],
+]) {
+  test(`maps local-library ${failure[0]}`, async () => {
+    const app = createApp({ transcriptService: localService(async () => { throw new Error(failure[1]); }) });
+    const result = await request(app, "/api/transcripts/extract", validRequest);
+    assert.equal(result.status, failure[2]);
+    assert.equal(result.body.error.code, failure[3]);
+    assert.equal(result.body.error.retryable, failure[4]);
+  });
+}
+
+test("rejects an unexpected local-library result shape", async () => {
+  const app = createApp({ transcriptService: localService(async () => ({ unexpected: true })) });
+  const result = await request(app, "/api/transcripts/extract", validRequest);
+  assert.equal(result.status, 502);
+  assert.equal(result.body.error.code, "TRANSCRIPT_PROVIDER_ERROR");
+  assert.equal(result.body.error.retryable, true);
+});
+
+for (const requestField of ["url", "video_url"]) {
+  test(`hosted provider supports the ${requestField} adapter schema`, async () => {
+    let requestBody;
+    const provider = new HostedTranscriptProvider({
+      requestField,
+      fetchImpl: async (url, options) => {
+        requestBody = JSON.parse(options.body);
+        return response(200, { transcript: [{ start: 0, duration: 2, text: "Hosted adapter transcript works." }] });
+      },
+      AbortControllerImpl: AbortController,
+    });
+    const result = await provider.extract({ videoId: "jNQXAC9IVRw", canonicalUrl: validRequest.youtubeUrl });
+    assert.deepEqual(requestBody, { [requestField]: validRequest.youtubeUrl });
+    assert.equal(result.text, "Hosted adapter transcript works.");
+  });
+}
+
+test("selects the configured transcript provider", async () => {
+  const calls = [];
+  const localProvider = { extract: async () => { calls.push("local"); return { source: "local" }; } };
+  const hostedProvider = { extract: async () => { calls.push("hosted"); return { source: "hosted" }; } };
+  assert.deepEqual(await new TranscriptService({ providerName: "local", localProvider, hostedProvider }).extract({}), { source: "local" });
+  assert.deepEqual(await new TranscriptService({ providerName: "hosted", localProvider, hostedProvider }).extract({}), { source: "hosted" });
+  assert.deepEqual(calls, ["local", "hosted"]);
+});
+
+test("keeps hosted fallback disabled by default", async () => {
+  let hostedCalls = 0;
+  const failure = new AppError(502, "TRANSCRIPT_PROVIDER_ERROR", "temporary", true);
+  const service = new TranscriptService({
+    providerName: "local",
+    localProvider: { extract: async () => { throw failure; } },
+    hostedProvider: { extract: async () => { hostedCalls += 1; } },
+  });
+  await assert.rejects(service.extract({}), (error) => error === failure);
+  assert.equal(hostedCalls, 0);
+});
+
+test("uses hosted fallback only when explicitly enabled", async () => {
+  const service = new TranscriptService({
+    providerName: "local",
+    fallbackEnabled: true,
+    localProvider: { extract: async () => { throw new AppError(502, "TRANSCRIPT_PROVIDER_ERROR", "temporary", true); } },
+    hostedProvider: { extract: async () => ({ source: "hosted-fallback" }) },
+  });
+  assert.deepEqual(await service.extract({}), { source: "hosted-fallback" });
 });
 
 let failures = 0;

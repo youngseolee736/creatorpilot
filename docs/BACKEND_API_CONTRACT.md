@@ -46,6 +46,9 @@ Request:
 
 Success (`200`):
 
+`title` and `language` may be `null` when the selected caption provider does not
+return that metadata. Transcript text and normalized segments remain required.
+
 ```json
 {
   "requestId": "req_extract_01",

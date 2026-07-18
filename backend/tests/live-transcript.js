@@ -14,6 +14,30 @@ const payload = JSON.stringify({
   targetLanguage: process.env.LIVE_TARGET_LANGUAGE || "English",
 });
 
+function isNormalizedTranscript(data) {
+  return Boolean(
+    data
+    && typeof data.transcriptId === "string"
+    && data.transcriptId.length > 0
+    && data.source === "youtube_captions"
+    && typeof data.text === "string"
+    && data.text.trim().length > 0
+    && Number.isInteger(data.wordCount)
+    && data.wordCount > 0
+    && Number.isFinite(data.estimatedDuration)
+    && data.estimatedDuration > 0
+    && Array.isArray(data.segments)
+    && data.segments.length > 0
+    && data.segments.every((segment) => (
+      Number.isFinite(segment.start)
+      && Number.isFinite(segment.end)
+      && segment.end >= segment.start
+      && typeof segment.text === "string"
+      && segment.text.trim().length > 0
+    ))
+  );
+}
+
 const request = http.request({
   hostname: backendUrl.hostname,
   port: backendUrl.port || 80,
@@ -29,9 +53,21 @@ const request = http.request({
   response.setEncoding("utf8");
   response.on("data", (chunk) => { body += chunk; });
   response.on("end", () => {
-    const parsed = JSON.parse(body);
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      console.error(`Live transcript check returned invalid JSON (${response.statusCode}).`);
+      process.exitCode = 1;
+      return;
+    }
     if (response.statusCode !== 200) {
       console.error(`Live transcript check failed (${response.statusCode}):`, parsed.error);
+      process.exitCode = 1;
+      return;
+    }
+    if (!isNormalizedTranscript(parsed.data)) {
+      console.error("Live transcript check returned an invalid normalized transcript response.");
       process.exitCode = 1;
       return;
     }

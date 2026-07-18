@@ -2,6 +2,7 @@ import {
   createProject,
   createStore,
   parseRoute,
+  referenceTitleFromTranscript,
   routeFor,
   updatePipeline,
   wordCount,
@@ -92,7 +93,7 @@ async function ensureAnalysis(project) {
         const transcript = await extractTranscript(current);
         current = store.updateProject(project.id, {
           transcript,
-          referenceTitle: transcript.title,
+          referenceTitle: referenceTitleFromTranscript(transcript, current.referenceTitle),
           pipeline: updatePipeline(current, "transcript", "completed", `${transcript.wordCount} words extracted`),
         });
       }

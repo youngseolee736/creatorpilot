@@ -22,6 +22,10 @@ export const STATUS_LABELS = {
   passed: "Passed",
 };
 
+export function referenceTitleFromTranscript(transcript, fallback = "Reference video") {
+  return String(transcript?.title || "").trim() || fallback;
+}
+
 function pipelineState(overrides = {}) {
   return Object.fromEntries(
     PIPELINE_STEPS.map((step) => [

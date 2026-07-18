@@ -5,6 +5,7 @@ import {
   createProject,
   createStore,
   parseRoute,
+  referenceTitleFromTranscript,
   routeFor,
   updatePipeline,
   wordCount,
@@ -54,6 +55,11 @@ test("pipeline updates preserve every other agent state", () => {
   const pipeline = updatePipeline(project, "analyst", "in_progress", "Mapping structure");
   assert.equal(pipeline.analyst.status, "in_progress");
   assert.equal(pipeline.writer.status, "waiting");
+});
+
+test("missing transcript metadata preserves the existing reference title", () => {
+  assert.equal(referenceTitleFromTranscript({ title: null }, "Reference video"), "Reference video");
+  assert.equal(referenceTitleFromTranscript({ title: "  Live reference  " }, "Reference video"), "Live reference");
 });
 
 test("hash routes round-trip project workspaces", () => {

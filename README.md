@@ -37,6 +37,19 @@ Expected response:
 `backend/.env.example` documents the public integration configuration. Do not
 commit a real `.env` or place provider credentials in frontend files.
 
+Transcript extraction uses the local `youtube-transcript` adapter by default.
+The hosted HTTP adapter is retained only as an explicit compatibility option:
+
+```dotenv
+TRANSCRIPT_PROVIDER=local
+TRANSCRIPT_HTTP_FALLBACK_ENABLED=false
+```
+
+Set `TRANSCRIPT_PROVIDER=hosted` to use `TRANSCRIPT_API_URL` directly, or set
+`TRANSCRIPT_HTTP_FALLBACK_ENABLED=true` to try that endpoint only after a
+retryable local-provider failure. Keep fallback disabled unless the configured
+endpoint is trusted and its request and response contract has been verified.
+
 ## Frontend setup
 
 ```sh
@@ -113,18 +126,24 @@ console errors.
 
 ## Transcript provider limitations
 
-CreatorPilot Phase 1 integrates the unofficial
-`youtube-transcript-api-tau-one.vercel.app` service from the backend only. The
-provider documents a five-request-per-minute rate limit, and its availability and
-response format are not guaranteed. Some public, private, age-restricted, or
+CreatorPilot Phase 1 uses the unofficial `youtube-transcript` package from the
+backend only. It reads YouTube caption endpoints without an official YouTube API
+contract, so upstream markup, response formats, blocking behavior, and transcript
+availability can change without notice. Some public, private, age-restricted, or
 caption-disabled videos do not expose transcripts. Auto-generated captions may
-contain transcription and timing errors. Access public transcripts responsibly
-and do not treat transcript availability as permission to republish source text.
+contain transcription and timing errors. The local adapter currently returns
+`null` for the video title because caption extraction does not provide title
+metadata.
 
-During validation on 2026-07-18, the provider returned the same unsupported
-stream-like placeholder for two different captioned public videos. CreatorPilot
-correctly rejected those responses with `502 TRANSCRIPT_PROVIDER_ERROR`; retry the
-optional live check later rather than weakening response validation.
+The optional hosted adapter defaults to
+`youtube-transcript-api-tau-one.vercel.app` when explicitly enabled. During
+validation on 2026-07-18, that endpoint returned the same unsupported stream-like
+placeholder for two different captioned public videos. CreatorPilot correctly
+rejected those responses with `502 TRANSCRIPT_PROVIDER_ERROR`; do not enable the
+hosted adapter or fallback without verifying the endpoint first.
+
+Access public transcripts responsibly and do not treat transcript availability
+as permission to republish source text.
 
 The backend does not store transcripts in Phase 1, does not log transcript bodies,
 rejects malformed provider output, and maps provider timeouts, rate limits, and
