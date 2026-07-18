@@ -62,5 +62,8 @@ if (!video) {
   });
 })().catch((error) => {
   console.error("Live Script Analyst test failed:", error.code || error.name || "ERROR", error.message);
+  if (Array.isArray(error.details)) {
+    console.error("Validation details:", JSON.stringify(error.details));
+  }
   process.exitCode = 1;
 });

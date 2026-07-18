@@ -39,6 +39,15 @@ class OpenAICompatibleProvider extends LLMProvider {
     let response;
 
     try {
+      const requestBody = {
+        model: this.model,
+        messages,
+        response_format: { type: "json_object" },
+      };
+      if (options.temperature !== undefined) {
+        requestBody.temperature = options.temperature;
+      }
+
       response = await this.fetchImpl(this.endpoint(), {
         method: "POST",
         headers: {
@@ -46,12 +55,7 @@ class OpenAICompatibleProvider extends LLMProvider {
           Authorization: `Bearer ${this.apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model: this.model,
-          messages,
-          temperature: options.temperature ?? 0.1,
-          response_format: { type: "json_object" },
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
       const rawBody = await response.text();

@@ -16,7 +16,7 @@ class ScriptAnalyst {
 
   async providerComplete(messages) {
     try {
-      return await this.provider.complete(messages, { temperature: 0.1 });
+      return await this.provider.complete(messages);
     } catch (error) {
       throw mapLLMError(error);
     }

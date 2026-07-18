@@ -230,6 +230,24 @@ test("maps provider authentication failure without exposing details", async () =
   assert.doesNotMatch(result.body.error.message, /secret detail|test-only-key/);
 });
 
+test("omits temperature by default for reasoning-model compatibility", async () => {
+  let requestBody;
+  const provider = new OpenAICompatibleProvider({
+    apiBaseUrl: "https://llm.example/v1",
+    apiKey: "test-only-key",
+    model: "test-model",
+    fetchImpl: async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return { ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: "{}" } }] }) };
+    },
+    AbortControllerImpl: AbortController,
+  });
+
+  await provider.complete([{ role: "user", content: "Return JSON." }]);
+  assert.equal(Object.prototype.hasOwnProperty.call(requestBody, "temperature"), false);
+  assert.deepEqual(requestBody.response_format, { type: "json_object" });
+});
+
 test("returns a clear error when provider configuration is missing", async () => {
   const provider = new OpenAICompatibleProvider({ apiBaseUrl: "", apiKey: "", model: "" });
   const result = await request(createApp({ scriptAnalyst: new ScriptAnalyst({ provider }) }), "/api/analysis/reference", validRequest());
