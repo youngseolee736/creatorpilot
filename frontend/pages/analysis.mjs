@@ -25,7 +25,7 @@ export function renderAnalysis(project) {
         <section><p class="eyebrow">Retention techniques</p><ul class="technique-list">${analysis.retentionTechniques.map((item) => `<li>${icon("spark", 16)}${escapeHtml(item)}</li>`).join("")}</ul></section>
         <section><p class="eyebrow">Call to action</p><p>${escapeHtml(analysis.callToAction)}</p></section>
         <section><p class="eyebrow">Output brief</p>${projectFormat(project)}</section>
-        <section class="transcript-disclosure"><details><summary>View mock transcript</summary><p>${escapeHtml(project.transcript.text)}</p></details></section>
+        <section class="transcript-disclosure"><details><summary>${project.transcript.source === "mock" ? "View mock transcript" : "View extracted transcript"}</summary><p>${escapeHtml(project.transcript.text)}</p></details></section>
       </aside>
     </div>
     <div class="sticky-action"><span><strong>Analysis complete</strong><small>The Scriptwriter will adapt the mechanics to “${escapeHtml(project.topic)}.”</small></span><button class="button button-primary" type="button" data-action="generate-script">Generate original script ${icon("arrow")}</button></div>`;

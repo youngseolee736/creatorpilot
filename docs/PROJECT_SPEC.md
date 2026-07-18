@@ -21,6 +21,7 @@ whether revision is required, and what action advances the production.
 ## MVP scope
 
 - Professional creator dashboard and project empty state.
+- Backend-mediated public YouTube transcript extraction with mock fallback.
 - One complete, navigable mock production workflow.
 - Editable generated script and persistent browser-local project state.
 - Originality estimate with careful non-legal language.
@@ -30,16 +31,18 @@ whether revision is required, and what action advances the production.
 
 ## Out of scope
 
-- Real transcript extraction, AI generation, stock-footage search, narration,
-  rendering, export, authentication, payments, and cloud persistence.
+- Real AI analysis/generation, stock-footage search, narration, rendering, export,
+  authentication, payments, and cloud persistence.
 - Copyright clearance or legal guarantees.
 - Copying wording, branding, graphics, or full layouts from reference products.
 
 ## Technical direction
 
-- No framework or runtime dependency is introduced.
+- The frontend introduces no framework or runtime dependency; the Phase 1 backend
+  uses Express as its isolated integration layer.
 - Hash routes provide refresh-safe navigation on the existing static server.
 - Project data is stored in versioned local storage for the prototype.
-- Mock services return asynchronous results and expose retryable error states.
+- Transcript extraction can use the Phase 1 Express API; later services remain
+  asynchronous mocks with retryable error states.
 - UI meaning never relies on color alone; focus, keyboard flow, and status text are
   required.

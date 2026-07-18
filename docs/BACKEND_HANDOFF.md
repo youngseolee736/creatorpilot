@@ -1,13 +1,14 @@
 # CreatorPilot Backend Handoff Map
 
-Status: frontend frozen in working mock mode. No real backend is included.
+Status: Phase 1 transcript backend implemented; later workflow services remain mocked.
 
 ## Runtime boundary
 
 - `frontend/config.js` is public runtime configuration and defaults to `useMockServices: true`.
 - `frontend/service-client.mjs` is the only service selector imported by `frontend/app.js`.
 - Mock mode delegates to `frontend/mock-services.mjs` unchanged.
-- API mode sends JSON to the endpoints below and normalizes `{ requestId, data }` responses for the existing UI.
+- Per-service mode can route transcript extraction through the Phase 1 Express API
+  while analysis, script, review, storyboard, and video remain mocked.
 - No API key, provider credential, or private configuration may be added to `config.js` or any browser bundle.
 - The browser's local storage key remains `creatorpilot:v1`; project cloud persistence is not yet wired into the store.
 

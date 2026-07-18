@@ -64,7 +64,7 @@ Success (`200`):
 }
 ```
 
-Errors: `400 INVALID_YOUTUBE_URL`; `404 VIDEO_NOT_FOUND`; `409 TRANSCRIPT_UNAVAILABLE`; `422 VIDEO_NOT_PUBLIC`; `429 PROVIDER_RATE_LIMITED`; `502 TRANSCRIPT_PROVIDER_ERROR`; `504 TRANSCRIPT_TIMEOUT`. Every error uses the common envelope.
+Errors: `400 INVALID_YOUTUBE_URL`; `404 VIDEO_NOT_FOUND` or `TRANSCRIPT_UNAVAILABLE`; `422 VIDEO_NOT_PUBLIC`; `429 PROVIDER_RATE_LIMITED`; `502 TRANSCRIPT_PROVIDER_ERROR`; `504 TRANSCRIPT_TIMEOUT`. Every error uses the common envelope. Phase 1 uses `404 TRANSCRIPT_UNAVAILABLE` rather than the earlier proposed `409` because absence of captions is a missing upstream resource and the approved Phase 1 requirements explicitly standardize that state as `404`.
 
 ## `POST /api/analysis/reference`
 

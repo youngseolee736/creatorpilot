@@ -93,6 +93,14 @@ test("mock services expose retryable named failures", async () => {
 test("service configuration defaults safely to mock mode", () => {
   assert.deepEqual(getServiceConfig(), {
     useMockServices: true,
+    services: {
+      transcript: "mock",
+      analysis: "mock",
+      script: "mock",
+      review: "mock",
+      storyboard: "mock",
+      video: "mock",
+    },
     apiBaseUrl: "",
     renderPollIntervalMs: 1500,
   });
@@ -111,6 +119,28 @@ test("API mode maps transcript extraction to the documented endpoint", async () 
   assert.equal(calls[0].url, "https://api.example.test/api/transcripts/extract");
   assert.equal(JSON.parse(calls[0].options.body).projectId, "project-api");
   assert.equal(result.text, "Transcript");
+});
+
+test("mixed mode calls only transcript through the API", async () => {
+  const calls = [];
+  const services = createServices(
+    {
+      services: { transcript: "api", analysis: "mock", script: "mock", review: "mock", storyboard: "mock", video: "mock" },
+      apiBaseUrl: "http://127.0.0.1:8787",
+    },
+    async (url) => {
+      calls.push(url);
+      return { ok: true, json: async () => ({ data: { source: "youtube_captions", title: "Live reference", text: "A real normalized transcript." } }) };
+    },
+  );
+  const project = createProject({ id: "project-mixed", referenceUrl: "https://youtu.be/jNQXAC9IVRw", language: "English" });
+  const transcript = await services.extractTranscript(project);
+  project.transcript = transcript;
+  const analysis = await services.analyzeReference(project);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0], "http://127.0.0.1:8787/api/transcripts/extract");
+  assert.equal(transcript.source, "youtube_captions");
+  assert.equal(analysis.structure.length, 6);
 });
 
 let failures = 0;

@@ -6,10 +6,19 @@ const DEFAULT_CONFIG = Object.freeze({
   renderPollIntervalMs: 1500,
 });
 
+const SERVICE_KEYS = ["transcript", "analysis", "script", "review", "storyboard", "video"];
+
 export function getServiceConfig(runtimeConfig = globalThis.CREATORPILOT_CONFIG) {
   const config = { ...DEFAULT_CONFIG, ...(runtimeConfig || {}) };
+  const legacyMode = config.useMockServices === false ? "api" : "mock";
+  const requestedServices = config.services && typeof config.services === "object" ? config.services : {};
+  const services = Object.fromEntries(SERVICE_KEYS.map((key) => [
+    key,
+    requestedServices[key] === "api" || requestedServices[key] === "mock" ? requestedServices[key] : legacyMode,
+  ]));
   return {
-    useMockServices: config.useMockServices !== false,
+    useMockServices: SERVICE_KEYS.every((key) => services[key] === "mock"),
+    services,
     apiBaseUrl: String(config.apiBaseUrl || "").replace(/\/$/, ""),
     renderPollIntervalMs: Math.max(250, Number(config.renderPollIntervalMs) || 1500),
   };
@@ -142,7 +151,18 @@ function makeApiServices(config, fetchImpl) {
 
 export function createServices(runtimeConfig, fetchImpl = globalThis.fetch?.bind(globalThis)) {
   const config = getServiceConfig(runtimeConfig);
-  return config.useMockServices ? mockServices : makeApiServices(config, fetchImpl);
+  const needsApi = SERVICE_KEYS.some((key) => config.services[key] === "api");
+  const apiServices = needsApi ? makeApiServices(config, fetchImpl) : null;
+  const select = (key, mockService, apiService) => config.services[key] === "api" ? apiService : mockService;
+  return {
+    extractTranscript: select("transcript", mockServices.extractTranscript, apiServices?.extractTranscript),
+    analyzeReference: select("analysis", mockServices.analyzeReference, apiServices?.analyzeReference),
+    generateScript: select("script", mockServices.generateScript, apiServices?.generateScript),
+    reviseScript: select("script", (project) => mockServices.generateScript(project), apiServices?.reviseScript),
+    reviewOriginality: select("review", mockServices.reviewOriginality, apiServices?.reviewOriginality),
+    generateStoryboard: select("storyboard", mockServices.generateStoryboard, apiServices?.generateStoryboard),
+    renderVideo: select("video", mockServices.renderVideo, apiServices?.renderVideo),
+  };
 }
 
 export const serviceConfig = getServiceConfig();

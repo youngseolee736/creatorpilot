@@ -12,6 +12,14 @@ import urllib.request
 from pathlib import Path
 
 
+expect_api_transcript = os.environ.get("CREATORPILOT_EXPECT_API_TRANSCRIPT") == "1"
+expect_transcript_error = os.environ.get("CREATORPILOT_EXPECT_TRANSCRIPT_ERROR") == "1"
+test_youtube_url = os.environ.get(
+    "CREATORPILOT_TEST_YOUTUBE_URL",
+    "https://youtube.com/watch?v=creatorpilot-demo",
+)
+
+
 def target_socket_url():
     with urllib.request.urlopen("http://127.0.0.1:9222/json/list") as response:
         targets = json.load(response)
@@ -162,7 +170,7 @@ def capture(name):
 
 
 browser.command("Page.navigate", {"url": "http://127.0.0.1:4173/?fast=1#/dashboard"})
-wait_for("document.body.textContent.includes('CreatorPilot')", "application bootstraps")
+wait_for("Boolean(document.body?.textContent.includes('CreatorPilot'))", "application bootstraps")
 evaluate("localStorage.removeItem('creatorpilot:v1')")
 browser.command("Page.reload", {"ignoreCache": True})
 wait_for("document.querySelectorAll('.project-row').length === 2", "dashboard renders seeded projects")
@@ -186,15 +194,23 @@ wait_for("document.querySelectorAll('.project-row').length === 2", "dashboard re
 click("a[href='#/projects/new']")
 wait_for("Boolean(document.querySelector('#reference-form'))", "new project route opens")
 capture("new-project-1280")
-set_value("#reference-url", "https://youtube.com/watch?v=creatorpilot-demo")
+set_value("#reference-url", test_youtube_url)
 set_value("#project-topic", "Why the United States cannot abandon Taiwan")
 set_value("#language", "English")
 click("#reference-form button[type='submit']")
 
+if expect_transcript_error:
+    wait_for("Boolean(document.querySelector('#service-error'))", "transcript failure is shown in the existing error UI")
+    check(evaluate("document.querySelector('#service-error').textContent.includes('transcript is not available')"), "transcript error is user-friendly")
+    check(evaluate("document.querySelector('#service-error [data-action=\"retry-analysis\"]') !== null"), "transcript error offers retry")
+    print("CreatorPilot transcript error browser check passed.")
+    raise SystemExit(0)
+
 wait_for("document.querySelectorAll('.structure-timeline li').length === 6", "reference analysis completes")
 capture("analysis-1280")
 check(evaluate("document.querySelectorAll('.pipeline-completed').length >= 2"), "transcript and analyst pipeline stages complete")
-check(evaluate("document.querySelector('.transcript-disclosure').textContent.includes('mock transcript')"), "transcript preview is available")
+expected_transcript_label = "extracted transcript" if expect_api_transcript else "mock transcript"
+check(evaluate(f"document.querySelector('.transcript-disclosure').textContent.includes({json.dumps(expected_transcript_label)})"), "transcript preview is available")
 
 click("[data-action='generate-script']")
 wait_for("document.querySelectorAll('[data-script-section]').length === 7", "original script generates")

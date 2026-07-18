@@ -1,0 +1,22 @@
+{
+  "name": "creatorpilot-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CreatorPilot backend integration layer",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test": "node tests/run-tests.js",
+    "test:live": "node tests/live-transcript.js"
+  },
+  "engines": {
+    "node": ">=14.15"
+  },
+  "dependencies": {
+    "abort-controller": "3.0.0",
+    "dotenv": "16.4.7",
+    "express": "4.22.2",
+    "node-fetch": "2.7.0"
+  }
+}

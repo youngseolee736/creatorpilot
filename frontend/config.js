@@ -2,6 +2,14 @@
 // Deployment environments may replace this object without rebuilding the frontend.
 window.CREATORPILOT_CONFIG = Object.freeze({
   useMockServices: true,
-  apiBaseUrl: "",
+  services: {
+    transcript: "mock",
+    analysis: "mock",
+    script: "mock",
+    review: "mock",
+    storyboard: "mock",
+    video: "mock",
+  },
+  apiBaseUrl: "http://127.0.0.1:8787",
   renderPollIntervalMs: 1500,
 });
