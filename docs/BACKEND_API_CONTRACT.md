@@ -469,6 +469,9 @@ Success when complete (`200`):
 }
 ```
 
+`productionPackageUrl` is optional because composition providers such as
+Shotstack return the rendered media URL but not a public JSON-package URL.
+
 Errors: `404 RENDER_NOT_FOUND`; `429 RENDER_CAPACITY_LIMITED`; `500
 RENDER_NOT_CONFIGURED`; `502 RENDER_PROVIDER_ERROR` or
 `INVALID_RENDER_RESPONSE`; `504 RENDER_TIMEOUT`. A terminal provider failure is

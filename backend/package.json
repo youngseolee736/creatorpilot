@@ -15,6 +15,7 @@
     "test:live-reviewer": "node tests/live-reviewer.js",
     "test:live-storyboard": "node tests/live-storyboard.js",
     "test:live-render": "node tests/live-render.js",
+    "test:live-shotstack": "node tests/live-shotstack.js",
     "dev:browser-fixture": "node tests/browser-fixture-server.js"
   },
   "engines": {

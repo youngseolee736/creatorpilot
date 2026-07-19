@@ -577,7 +577,7 @@ Terminal output schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["renderId", "status", "stage", "progress", "completed", "source", "format", "duration", "voice", "captionStyle", "music", "completedAt", "videoUrl", "productionPackageUrl"],
+  "required": ["renderId", "status", "stage", "progress", "completed", "source", "format", "duration", "voice", "captionStyle", "music", "completedAt", "videoUrl"],
   "properties": {
     "renderId": { "type": "string" },
     "status": { "const": "completed" },

@@ -18,8 +18,11 @@ function renderProgress(project) {
 function finalResult(project) {
   const render = project.render;
   const providerRender = render.source === "provider" && render.videoUrl;
+  const packageAction = render.productionPackageUrl
+    ? `<a class="button button-secondary" href="${escapeHtml(render.productionPackageUrl)}" target="_blank" rel="noopener">${icon("download")}Production package</a>`
+    : "";
   const deliveryActions = providerRender
-    ? `<a class="button button-primary" href="${escapeHtml(render.videoUrl)}" target="_blank" rel="noopener">${icon("external")}Open rendered video</a><a class="button button-secondary" href="${escapeHtml(render.productionPackageUrl)}" target="_blank" rel="noopener">${icon("download")}Production package</a>`
+    ? `<a class="button button-primary" href="${escapeHtml(render.videoUrl)}" target="_blank" rel="noopener">${icon("external")}Open rendered video</a>${packageAction}`
     : `<button class="button button-primary" type="button" data-action="export-video">${icon("download")}Export mock package</button><button class="button button-secondary" type="button" data-action="regenerate-video">${icon("retry")}Regenerate video</button>`;
   return `${pageHeading("Video Producer Agent · Complete", "Your production package is ready.", providerRender ? "The configured provider completed this render. Use the signed delivery links to inspect the media and package." : "Review the mock vertical-video result and the settings used to assemble it.", statusBadge("completed"))}
     <div class="final-layout"><section class="final-player"><div class="video-frame is-complete" role="img" aria-label="${providerRender ? "Provider render delivery" : "Mock vertical video preview"} for ${escapeHtml(project.title)}"><div class="frame-grid"></div><span class="video-kicker">CreatorPilot · ${providerRender ? "Provider render" : "Demo render"}</span><div class="video-title"><small>01:00 EXPLAINER</small><strong>${escapeHtml(project.title)}</strong></div>${providerRender ? "" : `<button class="preview-play" type="button" data-action="toggle-preview" aria-label="Play mock video preview">${icon("play", 25)}</button>`}<div class="video-caption">Today's choice shapes tomorrow</div><div class="video-controls"><span>0:00</span><i><b></b></i><span>1:00</span></div></div><p>${providerRender ? "The provider reported this render complete; CreatorPilot does not proxy or autoplay the delivered media." : "This poster-style player represents the completed mock render; no real video file was generated."}</p></section>

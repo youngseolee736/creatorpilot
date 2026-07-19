@@ -11,7 +11,10 @@ const { extractYouTubeVideo } = require("../src/utils/youtube-url");
 const missingVariables = ["ANALYST", "SCRIPTWRITER", "REVIEWER", "STORYBOARD"]
   .filter((scope) => !hasLLMConfiguration(scope))
   .map((scope) => `${scope}_LLM_* (or shared LLM_*)`);
-for (const name of ["LIVE_SCRIPT_TOPIC", "RENDER_API_BASE_URL", "RENDER_API_KEY"]) {
+const renderVariables = String(process.env.RENDER_PROVIDER || "http").toLowerCase() === "shotstack"
+  ? ["SHOTSTACK_API_URL", "SHOTSTACK_API_KEY"]
+  : ["RENDER_API_BASE_URL", "RENDER_API_KEY"];
+for (const name of ["LIVE_SCRIPT_TOPIC", ...renderVariables]) {
   if (!String(process.env[name] || "").trim()) missingVariables.push(name);
 }
 if (missingVariables.length) {

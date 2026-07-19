@@ -2,6 +2,8 @@ const assert = require("assert");
 const http = require("http");
 const { VideoProducer } = require("../src/agents/video-producer/video-producer");
 const { HttpRenderProvider } = require("../src/services/render/http-render-provider");
+const { createRenderProvider } = require("../src/services/render");
+const { ShotstackRenderProvider, toShotstackEdit } = require("../src/services/render/shotstack-render-provider");
 const { createApp } = require("../src/app");
 
 const tests = [];
@@ -168,6 +170,18 @@ test("normalizes running and completed provider states", async () => {
   assert.equal(provider.statusCalls.length, 2);
 });
 
+test("accepts completed provider media without an optional package URL", async () => {
+  const provider = queuedProvider([{
+    status: "completed",
+    videoUrl: "https://cdn.shotstack.io/example/render.mp4",
+  }]);
+  const producer = producerWith(provider);
+  const started = await producer.start(validInput());
+  const completed = await producer.status(started.renderId);
+  assert.equal(completed.videoUrl, "https://cdn.shotstack.io/example/render.mp4");
+  assert.equal(Object.prototype.hasOwnProperty.call(completed, "productionPackageUrl"), false);
+});
+
 test("normalizes failed jobs without exposing provider diagnostics", async () => {
   const provider = queuedProvider([{ status: "failed", progress: 42, error: { message: "private vendor stack" } }]);
   const producer = producerWith(provider);
@@ -321,6 +335,60 @@ test("sends provider credentials and idempotency only on the server", async () =
   assert.equal(call.options.headers.Authorization, "Bearer server-secret");
   assert.match(call.options.headers["Idempotency-Key"], /^[a-f0-9]{64}$/);
   assert.doesNotMatch(call.options.body, /server-secret/);
+});
+
+test("converts the approved storyboard into a portrait Shotstack timeline", () => {
+  const edit = toShotstackEdit({ storyboard: approvedRecord().storyboard, format: "9:16" });
+  assert.equal(edit.timeline.tracks[0].clips.length, 2);
+  assert.deepEqual(edit.timeline.tracks[0].clips.map(({ start, length }) => ({ start, length })), [
+    { start: 0, length: 30 }, { start: 30, length: 30 },
+  ]);
+  assert.match(edit.timeline.tracks[0].clips[0].asset.text, /First approved scene/);
+  assert.deepEqual(edit.output.size, { width: 720, height: 1280 });
+  assert.equal(edit.output.format, "mp4");
+});
+
+test("uses Shotstack authentication and normalizes its asynchronous states", async () => {
+  const calls = [];
+  const responses = [
+    { success: true, response: { id: "shotstack-job", message: "Render Successfully Queued" } },
+    { success: true, response: { id: "shotstack-job", status: "rendering" } },
+    {
+      success: true,
+      response: {
+        id: "shotstack-job", status: "done", updated: "2026-07-19T03:00:00Z",
+        url: "https://cdn.shotstack.io/example/render.mp4",
+      },
+    },
+  ];
+  const provider = new ShotstackRenderProvider({
+    apiUrl: "http://127.0.0.1:9999/edit/stage/render",
+    apiKey: "shotstack-stage-key",
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      const body = responses.shift();
+      return { ok: true, text: async () => JSON.stringify(body) };
+    },
+  });
+  const started = await provider.startRender({ storyboard: approvedRecord().storyboard, format: "9:16" });
+  const running = await provider.getStatus(started.jobId);
+  const completed = await provider.getStatus(started.jobId);
+  assert.equal(started.status, "queued");
+  assert.equal(running.status, "running");
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.videoUrl, "https://cdn.shotstack.io/example/render.mp4");
+  assert.equal(calls[0].options.headers["x-api-key"], "shotstack-stage-key");
+  assert.equal(calls[0].options.headers.Authorization, undefined);
+  assert.equal(calls[1].url, "http://127.0.0.1:9999/edit/stage/render/shotstack-job?data=false");
+  assert.doesNotMatch(calls[0].options.body, /shotstack-stage-key/);
+});
+
+test("selects Shotstack independently from the LLM provider", () => {
+  const provider = createRenderProvider({
+    providerName: "shotstack",
+    shotstackOptions: { apiUrl: "https://api.shotstack.io/edit/stage/render", apiKey: "stage-key" },
+  });
+  assert.ok(provider instanceof ShotstackRenderProvider);
 });
 
 test("returns 404 for an unknown render job", async () => {

@@ -73,7 +73,7 @@ function normalizeStatus(raw, job) {
     };
   }
   if (status === "completed") {
-    return {
+    const completed = {
       ...base,
       status: "completed",
       stage: "Final video ready",
@@ -86,8 +86,9 @@ function normalizeStatus(raw, job) {
       music: job.input.productionSettings.music,
       completedAt: completedAt(raw.completedAt),
       videoUrl: safeUrl(raw.videoUrl),
-      productionPackageUrl: safeUrl(raw.productionPackageUrl),
     };
+    if (raw.productionPackageUrl) completed.productionPackageUrl = safeUrl(raw.productionPackageUrl);
+    return completed;
   }
   if (status === "failed") {
     return {

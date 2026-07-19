@@ -105,6 +105,32 @@ RENDER_TIMEOUT_MS=30000
 Without complete render configuration, the API returns
 `RENDER_NOT_CONFIGURED`; mock video mode remains available independently.
 
+Shotstack is supported as the concrete final-composition provider. Start with
+the watermarked Stage endpoint and Stage key shown in the Shotstack dashboard:
+
+```dotenv
+RENDER_PROVIDER=shotstack
+SHOTSTACK_API_URL=https://api.shotstack.io/edit/stage/render
+SHOTSTACK_API_KEY=replace-with-stage-key
+SHOTSTACK_TIMEOUT_MS=30000
+```
+
+The adapter converts approved Storyboard timing and captions into a portrait
+Shotstack Edit timeline, authenticates with `x-api-key`, and normalizes queued,
+fetching, preprocessing, rendering, saving, done, and failed statuses. The
+initial Stage integration renders caption-based scene cards and does not invoke
+paid AI image, video, or text-to-speech assets. Supplying real scene media and
+narration audio is a separate asset-generation step. Use the Production URL and
+key only after the Stage workflow is approved.
+
+After saving the Stage variables, verify only the Shotstack connection with a
+two-second watermarked title render (no LLM chain or AI asset request):
+
+```sh
+cd backend
+npm run test:live-shotstack
+```
+
 ## Frontend setup
 
 ```sh

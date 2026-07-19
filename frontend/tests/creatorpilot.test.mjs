@@ -53,6 +53,18 @@ test("the local store adds and updates projects", () => {
   assert.equal(store.getState().activeProjectId, project.id);
 });
 
+test("the local store deletes a single project", () => {
+  const store = createStore(memoryStorage());
+  const keep = createProject({ id: "project-keep", topic: "Keep this" });
+  const drop = createProject({ id: "project-drop", topic: "Drop this" });
+  store.addProject(keep);
+  store.addProject(drop);
+  store.deleteProject(drop.id);
+  assert.equal(store.getProject(drop.id), null);
+  assert.equal(store.getProject(keep.id).topic, "Keep this");
+  assert.equal(store.getState().activeProjectId, null);
+});
+
 test("pipeline updates preserve every other agent state", () => {
   const project = createProject();
   const pipeline = updatePipeline(project, "analyst", "in_progress", "Mapping structure");
@@ -461,6 +473,23 @@ test("the completed production screen exposes provider delivery without mock cla
   assert.match(html, /https:\/\/media\.example\.test\/package\.json/);
   assert.doesNotMatch(html, /no real video file was generated/i);
   assert.doesNotMatch(html, /data-action="export-video"/);
+});
+
+test("provider delivery remains usable when no package URL is supplied", () => {
+  const project = createProject();
+  project.storyboard = [{
+    id: "scene-1", number: 1, start: 0, end: 60, duration: 60,
+    narration: "Narration", caption: "Caption", visual: "Visual", searchQuery: "Query", transition: "Fade up",
+  }];
+  project.render = {
+    source: "provider", status: "completed", completed: true, progress: 100,
+    videoUrl: "https://cdn.shotstack.io/render.mp4", format: "9:16", duration: 60,
+    voice: "Sora — Warm documentary", captionStyle: "Editorial high contrast", music: false,
+  };
+  const html = renderProduction(project);
+  assert.match(html, /Open rendered video/);
+  assert.doesNotMatch(html, /Production package<\/a>/);
+  assert.doesNotMatch(html, /href="undefined"/);
 });
 
 test("analysis errors distinguish permanent configuration failures from retryable failures", () => {

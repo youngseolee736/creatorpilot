@@ -48,7 +48,12 @@ Each Agent first reads its `ANALYST_LLM_*`, `SCRIPTWRITER_LLM_*`,
 `REVIEWER_LLM_*`, or `STORYBOARD_LLM_*` override and falls back field-by-field
 to the shared `LLM_*` values. These variables are server-only. Video API mode is
 deliberately isolated from all LLM settings and requires `RENDER_API_BASE_URL`,
-`RENDER_API_KEY`, and optionally `RENDER_TIMEOUT_MS`.
+`RENDER_API_KEY`, and optionally `RENDER_TIMEOUT_MS` for the generic adapter.
+Set `RENDER_PROVIDER=shotstack` to use `SHOTSTACK_API_URL`,
+`SHOTSTACK_API_KEY`, and `SHOTSTACK_TIMEOUT_MS` instead. The Shotstack Stage
+adapter currently produces a real watermarked, caption-card MP4 from the
+approved timeline without invoking paid AI assets; media and TTS acquisition
+remain separate upstream responsibilities.
 
 ## Service summary
 
