@@ -6,6 +6,9 @@ function studioConnectionLabel() {
   const apiServices = Object.entries(services).filter(([, mode]) => mode === "api").map(([name]) => name);
   if (!apiServices.length) return { mode: "Mock studio", detail: "No AI backend connected" };
   if (services.transcript === "api" && services.analysis === "api") {
+    if (services.script === "api" && services.review === "api" && services.storyboard === "api" && services.video === "api") {
+      return { mode: "Provider studio", detail: "All 6 production services connected" };
+    }
     if (services.script === "api" && services.review === "api" && services.storyboard === "api") {
       return { mode: "Hybrid studio", detail: "5 production services connected" };
     }
@@ -101,6 +104,12 @@ export function errorNotice(error, retryAction, agentLabel = "Script Analyst") {
     LLM_PROVIDER_ERROR: `The ${agentLabel} provider is unavailable.`,
     REVIEW_NOT_FOUND: "The approved review is no longer available on this server.",
     SCRIPT_NOT_APPROVED: "This script does not have a matching passed review.",
+    STORYBOARD_NOT_APPROVED: "This storyboard no longer matches the approved script.",
+    RENDER_NOT_CONFIGURED: "The render provider is not configured.",
+    RENDER_TIMEOUT: "The render provider took too long.",
+    RENDER_CAPACITY_LIMITED: "The render provider is currently at capacity.",
+    RENDER_PROVIDER_ERROR: "The render provider is unavailable.",
+    INVALID_RENDER_RESPONSE: "The render provider returned an invalid response.",
   };
   const title = titles[error.code] || "The agent stopped before completing this stage.";
   const validationReason = error.details?.[0]?.reason;

@@ -517,7 +517,10 @@ The agent orchestrator must transform this object into the scene array returned 
 
 ## 6. Video Producer Agent
 
-Role: validate an approved production package and coordinate asset, narration, caption, composition, and render tools. It must receive only a script with a matching `passed` review. This is enforced both by schema (`status: const passed`) and by backend authorization; frontend gating alone is insufficient.
+Role: validate an approved production package and coordinate an external render
+tool. The HTTP boundary receives `approvedReviewId` and exact Storyboard scenes;
+the implemented orchestrator resolves the matching passed review, canonical
+script, and Storyboard record from server registries before provider use.
 
 Input schema:
 
@@ -526,20 +529,10 @@ Input schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["projectId", "approvedReview", "script", "storyboard", "productionSettings", "format", "durationSeconds"],
+  "required": ["projectId", "approvedReviewId", "storyboard", "productionSettings", "format", "durationSeconds"],
   "properties": {
     "projectId": { "type": "string" },
-    "approvedReview": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["reviewId", "scriptId", "status"],
-      "properties": {
-        "reviewId": { "type": "string" },
-        "scriptId": { "type": "string" },
-        "status": { "const": "passed" }
-      }
-    },
-    "script": { "type": "object", "required": ["scriptId", "version", "sections"] },
+    "approvedReviewId": { "type": "string" },
     "storyboard": { "type": "array", "minItems": 1, "items": { "type": "object" } },
     "productionSettings": {
       "type": "object",
@@ -564,13 +557,14 @@ Initial output schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["renderId", "status", "stage", "progress", "completed", "statusUrl"],
+  "required": ["renderId", "status", "stage", "progress", "completed", "source", "statusUrl"],
   "properties": {
     "renderId": { "type": "string" },
     "status": { "enum": ["queued", "running"] },
     "stage": { "type": "string" },
     "progress": { "type": "integer", "minimum": 0, "maximum": 100 },
     "completed": { "const": false },
+    "source": { "const": "provider" },
     "statusUrl": { "type": "string" }
   }
 }
@@ -583,13 +577,14 @@ Terminal output schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["renderId", "status", "stage", "progress", "completed", "format", "duration", "voice", "captionStyle", "music", "completedAt", "videoUrl", "productionPackageUrl"],
+  "required": ["renderId", "status", "stage", "progress", "completed", "source", "format", "duration", "voice", "captionStyle", "music", "completedAt", "videoUrl", "productionPackageUrl"],
   "properties": {
     "renderId": { "type": "string" },
     "status": { "const": "completed" },
     "stage": { "const": "Final video ready" },
     "progress": { "const": 100 },
     "completed": { "const": true },
+    "source": { "const": "provider" },
     "format": { "enum": ["9:16", "1:1", "16:9"] },
     "duration": { "type": "number" },
     "voice": { "type": "string" },
@@ -608,8 +603,7 @@ Example input/output:
 {
   "input": {
     "projectId": "project_01JZ8P",
-    "approvedReview": { "reviewId": "rv_01JZ8T", "scriptId": "sc_01JZ8S", "status": "passed" },
-    "script": { "scriptId": "sc_01JZ8S", "version": 1, "sections": [{ "id": "hook", "text": "The most important line..." }] },
+    "approvedReviewId": "rv_01JZ8T",
     "storyboard": [{ "id": "scene-1", "start": 0, "end": 5, "narration": "The most important line...", "visual": "Animated maritime map" }],
     "productionSettings": { "voice": "Min — Clear explainer", "captions": "Editorial high contrast", "music": false },
     "format": "9:16",
@@ -621,6 +615,7 @@ Example input/output:
     "stage": "Preparing production",
     "progress": 2,
     "completed": false,
+    "source": "provider",
     "statusUrl": "/api/videos/render_01JZ8W/status"
   }
 }

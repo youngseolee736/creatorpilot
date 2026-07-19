@@ -17,6 +17,7 @@ expect_api_analysis = os.environ.get("CREATORPILOT_EXPECT_API_ANALYSIS") == "1"
 expect_api_script = os.environ.get("CREATORPILOT_EXPECT_API_SCRIPT") == "1"
 expect_api_review = os.environ.get("CREATORPILOT_EXPECT_API_REVIEW") == "1"
 expect_api_storyboard = os.environ.get("CREATORPILOT_EXPECT_API_STORYBOARD") == "1"
+expect_api_video = os.environ.get("CREATORPILOT_EXPECT_API_VIDEO") == "1"
 expect_transcript_error = os.environ.get("CREATORPILOT_EXPECT_TRANSCRIPT_ERROR") == "1"
 test_youtube_url = os.environ.get(
     "CREATORPILOT_TEST_YOUTUBE_URL",
@@ -124,12 +125,12 @@ browser.command("Runtime.enable")
 browser.command("Log.enable")
 browser.command("Page.enable")
 browser.command("Accessibility.enable")
-if expect_api_analysis or expect_api_script or expect_api_review or expect_api_storyboard:
+if expect_api_analysis or expect_api_script or expect_api_review or expect_api_storyboard or expect_api_video:
     browser.command("Page.addScriptToEvaluateOnNewDocument", {
         "source": "Object.defineProperty(window, 'CREATORPILOT_CONFIG', {"
         "configurable: false, get() { return Object.freeze({"
-        f"services: {{transcript:'api',analysis:'api',script:'{'api' if expect_api_script else 'mock'}',review:'{'api' if expect_api_review else 'mock'}',storyboard:'{'api' if expect_api_storyboard else 'mock'}',video:'mock'}},"
-        f"apiBaseUrl:{json.dumps(api_base_url)},renderPollIntervalMs:1500}}); }}, set() {{}} }});"
+        f"services: {{transcript:'api',analysis:'api',script:'{'api' if expect_api_script else 'mock'}',review:'{'api' if expect_api_review else 'mock'}',storyboard:'{'api' if expect_api_storyboard else 'mock'}',video:'{'api' if expect_api_video else 'mock'}'}},"
+        f"apiBaseUrl:{json.dumps(api_base_url)},renderPollIntervalMs:{250 if expect_api_video else 1500},renderPollLimit:20}}); }}, set() {{}} }});"
     })
 browser.command("Emulation.setDeviceMetricsOverride", {
     "width": 1280, "height": 900, "deviceScaleFactor": 1, "mobile": False,
@@ -229,7 +230,9 @@ if expect_api_analysis:
     check(evaluate("document.body.textContent.includes('88% confidence')"), "real analysis confidence renders")
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].analysis.analysisId.startsWith('analysis_')"), "real normalized analysis persists")
     check(not evaluate("document.body.textContent.includes('Return one JSON object only')"), "system prompt is not displayed")
-    if expect_api_storyboard:
+    if expect_api_video:
+        connection_label = "All 6 production services connected"
+    elif expect_api_storyboard:
         connection_label = "5 production services connected"
     elif expect_api_review:
         connection_label = "Transcript + analyst + writer + reviewer connected"
@@ -278,11 +281,16 @@ check(evaluate("document.body.textContent.includes('Search query')"), "storyboar
 set_value("[data-project-setting='voice']", "Min — Clear explainer")
 click("[data-project-setting='music']")
 click("[data-action='render-video']")
-wait_for("Boolean(document.querySelector('.final-player'))", "mock video render reaches final result", timeout=5)
-check(evaluate("document.querySelector('[data-action=\"export-video\"]') !== null"), "export action is available")
-evaluate("window.__exportDownload = null; HTMLAnchorElement.prototype.click = function () { window.__exportDownload = this.download; }")
-click("[data-action='export-video']")
-check(evaluate("window.__exportDownload.endsWith('-creatorpilot-package.json')"), "production package export is triggered")
+wait_for("Boolean(document.querySelector('.final-player'))", f"{'provider' if expect_api_video else 'mock'} video render reaches final result", timeout=8)
+if expect_api_video:
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].render.source === 'provider'"), "provider render result persists")
+    check(evaluate("document.querySelectorAll('.delivery-actions a[href*=" + json.dumps("media.example.test") + "]').length === 2"), "provider delivery links are available")
+    check(not evaluate("document.body.textContent.includes('no real video file was generated')"), "provider result is not labeled as a mock")
+else:
+    check(evaluate("document.querySelector('[data-action=\"export-video\"]') !== null"), "export action is available")
+    evaluate("window.__exportDownload = null; HTMLAnchorElement.prototype.click = function () { window.__exportDownload = this.download; }")
+    click("[data-action='export-video']")
+    check(evaluate("window.__exportDownload.endsWith('-creatorpilot-package.json')"), "production package export is triggered")
 check(evaluate("document.querySelector('.delivery-panel').textContent.includes('Min — Clear explainer')"), "voice selection carries into the final package")
 check(evaluate("document.querySelector('.delivery-panel').textContent.includes('Off')"), "music setting carries into the final package")
 check(evaluate("document.querySelector('.pipeline-completed:last-child') !== null"), "producer pipeline stage completes")

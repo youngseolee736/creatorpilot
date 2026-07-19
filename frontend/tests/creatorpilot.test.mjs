@@ -114,6 +114,7 @@ test("service configuration defaults safely to mock mode", () => {
     },
     apiBaseUrl: "",
     renderPollIntervalMs: 1500,
+    renderPollLimit: 240,
   });
 });
 
@@ -372,6 +373,65 @@ test("Phase 5 mixed mode sends approval, duration, and constraints to Storyboard
   assert.equal(scenes[0].id, "scene-1");
 });
 
+test("Phase 6 mixed mode starts and polls a provider render", async () => {
+  const calls = [];
+  const updates = [];
+  const services = createServices(
+    {
+      services: { transcript: "mock", analysis: "mock", script: "mock", review: "mock", storyboard: "mock", video: "api" },
+      apiBaseUrl: "http://127.0.0.1:8787",
+      renderPollIntervalMs: 1,
+      renderPollLimit: 2,
+    },
+    async (url, options = {}) => {
+      calls.push({ url, options });
+      if (options.method === "POST") return { ok: true, json: async () => ({ data: {
+        renderId: "render_api", status: "queued", stage: "Planning scenes", progress: 5, completed: false, source: "provider",
+      } }) };
+      return { ok: true, json: async () => ({ data: {
+        renderId: "render_api", status: "completed", stage: "Rendering final video", progress: 100, completed: true, source: "provider",
+        videoUrl: "https://media.example.test/render.mp4", productionPackageUrl: "https://media.example.test/package.json",
+        format: "9:16", duration: 60, voice: "Sora — Warm documentary", captionStyle: "Editorial high contrast", music: true,
+      } }) };
+    },
+  );
+  const project = createProject({ id: "project-phase-6", duration: 60, format: "9:16" });
+  project.originalityReview = { reviewId: "review-approved", status: "passed" };
+  project.storyboard = [{
+    id: "scene-1", number: 1, start: 0, end: 60, duration: 60,
+    narration: "Exact narration.", caption: "Exact evidence", visual: "Vertical evidence.", searchQuery: "licensed evidence", transition: "Fade up",
+  }];
+  const render = await services.renderVideo(project, (progress) => updates.push(progress));
+  assert.equal(calls[0].url, "http://127.0.0.1:8787/api/videos/render");
+  assert.equal(JSON.parse(calls[0].options.body).approvedReviewId, "review-approved");
+  assert.equal(JSON.parse(calls[0].options.body).storyboard[0].id, "scene-1");
+  assert.equal(calls[1].url, "http://127.0.0.1:8787/api/videos/render_api/status");
+  assert.equal(updates.length, 2);
+  assert.equal(render.source, "provider");
+  assert.equal(render.videoUrl, "https://media.example.test/render.mp4");
+});
+
+test("Phase 6 polling stops at the configured status deadline", async () => {
+  const services = createServices(
+    {
+      services: { transcript: "mock", analysis: "mock", script: "mock", review: "mock", storyboard: "mock", video: "api" },
+      apiBaseUrl: "http://127.0.0.1:8787",
+      renderPollIntervalMs: 1,
+      renderPollLimit: 1,
+    },
+    async (_url, options = {}) => ({ ok: true, json: async () => ({ data: {
+      renderId: "render_slow", status: options.method === "POST" ? "queued" : "running", stage: "Combining scenes", progress: 80, completed: false, source: "provider",
+    } }) }),
+  );
+  const project = createProject({ id: "project-slow-render" });
+  project.originalityReview = { reviewId: "review-approved", status: "passed" };
+  project.storyboard = [{ id: "scene-1", number: 1, start: 0, end: 60, duration: 60 }];
+  await assert.rejects(
+    services.renderVideo(project),
+    (error) => error.code === "RENDER_STATUS_TIMEOUT" && error.retryable === true,
+  );
+});
+
 test("the production board identifies the Storyboard Agent before rendering", () => {
   const project = createProject();
   project.originalityReview = { status: "passed" };
@@ -383,6 +443,24 @@ test("the production board identifies the Storyboard Agent before rendering", ()
   }];
   const ready = renderProduction(project);
   assert.match(ready, /Storyboard Agent · Plan ready/);
+});
+
+test("the completed production screen exposes provider delivery without mock claims", () => {
+  const project = createProject();
+  project.storyboard = [{
+    id: "scene-1", number: 1, start: 0, end: 60, duration: 60,
+    narration: "Narration", caption: "Caption", visual: "Visual", searchQuery: "Query", transition: "Fade up",
+  }];
+  project.render = {
+    renderId: "render-provider", source: "provider", status: "completed", completed: true, progress: 100,
+    videoUrl: "https://media.example.test/render.mp4", productionPackageUrl: "https://media.example.test/package.json",
+    format: "9:16", duration: 60, voice: "Sora — Warm documentary", captionStyle: "Editorial high contrast", music: true,
+  };
+  const html = renderProduction(project);
+  assert.match(html, /Open rendered video/);
+  assert.match(html, /https:\/\/media\.example\.test\/package\.json/);
+  assert.doesNotMatch(html, /no real video file was generated/i);
+  assert.doesNotMatch(html, /data-action="export-video"/);
 });
 
 test("analysis errors distinguish permanent configuration failures from retryable failures", () => {

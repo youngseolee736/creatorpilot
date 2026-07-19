@@ -13,7 +13,8 @@ without presenting those agents as a chatbot.
 2. Extract and analyze the reference transcript and storytelling structure.
 3. Generate and edit an original script.
 4. Review potential phrase overlap, clarity, duration, hook, and structure.
-5. Approve a storyboard and render a clearly labeled mock video result.
+5. Approve a storyboard and either submit it to a configured render provider or
+   render a clearly labeled mock result.
 
 Users must always know which agent is active, what has completed, what is waiting,
 whether revision is required, and what action advances the production.
@@ -27,14 +28,15 @@ whether revision is required, and what action advances the production.
 - One complete, navigable mock production workflow.
 - Editable generated script and persistent browser-local project state.
 - Originality estimate with careful non-legal language.
-- Server-validated seven-to-ten-scene storyboard and mock rendering lifecycle.
+- Server-validated seven-to-ten-scene storyboard and provider-aware rendering
+  lifecycle with a mock fallback.
 - Responsive, accessible HTML, CSS, and native JavaScript modules.
 - Async service interfaces ready to replace with future backend adapters.
 
 ## Out of scope
 
-- Research/fact retrieval, stock-footage search, narration, rendering, export,
-  authentication, payments, and cloud persistence.
+- Research/fact retrieval, stock-footage search/licensing, a vendor-specific
+  render implementation, authentication, payments, and cloud persistence.
 - Copyright clearance or legal guarantees.
 - Copying wording, branding, graphics, or full layouts from reference products.
 
@@ -45,7 +47,7 @@ whether revision is required, and what action advances the production.
 - Hash routes provide refresh-safe navigation on the existing static server.
 - Project data is stored in versioned local storage for the prototype.
 - Transcript extraction, analysis, script generation/revision, originality
-  review, and storyboarding can use the Express API; rendering remains an
-  asynchronous mock with retryable errors.
+  review, storyboarding, and rendering orchestration can use the Express API;
+  actual media generation requires an adapter-compatible provider.
 - UI meaning never relies on color alone; focus, keyboard flow, and status text are
   required.

@@ -4,6 +4,7 @@ const DEFAULT_CONFIG = Object.freeze({
   useMockServices: true,
   apiBaseUrl: "",
   renderPollIntervalMs: 1500,
+  renderPollLimit: 240,
 });
 
 const SERVICE_KEYS = ["transcript", "analysis", "script", "review", "storyboard", "video"];
@@ -21,6 +22,7 @@ export function getServiceConfig(runtimeConfig = globalThis.CREATORPILOT_CONFIG)
     services,
     apiBaseUrl: String(config.apiBaseUrl || "").replace(/\/$/, ""),
     renderPollIntervalMs: Math.max(250, Number(config.renderPollIntervalMs) || 1500),
+    renderPollLimit: Math.max(1, Number(config.renderPollLimit) || 240),
   };
 }
 
@@ -136,10 +138,16 @@ function makeApiServices(config, fetchImpl) {
         durationSeconds: project.duration,
       });
       onProgress(started);
+      if (started.status === "failed") {
+        const error = new Error(started.error?.message || "Video rendering failed.");
+        error.code = started.error?.code || "RENDER_FAILED";
+        error.retryable = started.error?.retryable ?? true;
+        throw error;
+      }
       if (started.completed) return started;
       if (!started.renderId) throw new Error("The render API did not return a renderId.");
 
-      while (true) {
+      for (let pollCount = 0; pollCount < config.renderPollLimit; pollCount += 1) {
         await wait(config.renderPollIntervalMs);
         const status = await request(`/api/videos/${encodeURIComponent(started.renderId)}/status`);
         onProgress(status);
@@ -151,6 +159,10 @@ function makeApiServices(config, fetchImpl) {
         }
         if (status.completed || status.status === "completed") return status;
       }
+      const error = new Error("CreatorPilot stopped polling after the render status deadline.");
+      error.code = "RENDER_STATUS_TIMEOUT";
+      error.retryable = true;
+      throw error;
     },
   };
 }

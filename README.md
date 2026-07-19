@@ -8,7 +8,8 @@ Phase 1 adds real YouTube transcript extraction. Phase 2 adds a configurable,
 LLM-powered Script Analyst that converts a transcript into validated abstract
 storytelling mechanics. Phase 3 adds real initial and revision Scriptwriter
 flows. Phase 4 adds a real, conservative Originality Reviewer. Phase 5 adds a
-server-authorized Storyboard Agent. Video production remains mocked.
+server-authorized Storyboard Agent. Phase 6 adds a server-verified Video
+Producer boundary for an adapter-compatible asynchronous render provider.
 
 ## Requirements
 
@@ -69,6 +70,19 @@ The backend and mock-only frontend work without these values. Calling any real
 LLM endpoint without complete configuration returns `LLM_NOT_CONFIGURED`.
 Never add an LLM key to `frontend/config.js`.
 
+The Video Producer uses a generic server-side HTTP provider contract. The base
+URL must expose `POST /renders` and `GET /renders/:providerJobId`. HTTPS is
+required outside localhost, and credentials never enter the browser bundle:
+
+```dotenv
+RENDER_API_BASE_URL=https://render-provider.example/v1
+RENDER_API_KEY=replace-with-server-side-key
+RENDER_TIMEOUT_MS=30000
+```
+
+Without complete render configuration, the API returns
+`RENDER_NOT_CONFIGURED`; mock video mode remains available independently.
+
 ## Frontend setup
 
 ```sh
@@ -83,7 +97,7 @@ project content is sent to a backend while mock mode is active. Export produces 
 JSON mock production package rather than a media file.
 
 `frontend/config.js` contains public runtime configuration. The checked-in Phase
-5 development configuration enables API mode through Storyboard. Keep the
+6 development configuration enables all six API boundaries. Keep the
 backend running and use this shape:
 
 ```js
@@ -94,17 +108,18 @@ window.CREATORPILOT_CONFIG = Object.freeze({
     script: "api",
     review: "api",
     storyboard: "api",
-    video: "mock",
+    video: "api",
   },
   apiBaseUrl: "http://127.0.0.1:8787",
   renderPollIntervalMs: 1500,
+  renderPollLimit: 240,
 });
 ```
 
 The legacy `useMockServices: true|false` switch remains supported. Per-service
 configuration takes precedence. No backend secret belongs in this public object.
-Set transcript, analysis, script, review, and storyboard back to `"mock"` for the
-deterministic, backend-free workflow.
+Set any service, including video, back to `"mock"` for the deterministic,
+backend-free workflow.
 
 Test transcript extraction directly:
 
@@ -196,6 +211,10 @@ LIVE_SCRIPT_TOPIC='A new and unrelated topic' \
 npm run test:live-storyboard
 ```
 
+To continue the paid live chain through a configured render provider, add the
+render variables and run `npm run test:live-render`. It reports `SKIP` unless
+all transcript, LLM, topic, and render variables are explicitly present.
+
 Retryable mock failures can be inspected with one of these query parameters:
 
 - `?fail=extractTranscript`
@@ -221,7 +240,7 @@ cd backend && npm test && npm audit
 DevTools connection and checks responsiveness, accessibility names, focus, and
 console errors.
 
-For a credential-free browser check of the Phase 5 HTTP boundary, start the
+For a credential-free browser check of the Phase 6 HTTP boundary, start the
 static server and Chrome DevTools as above, then run the injected fake-provider
 backend and browser test in separate terminals:
 
@@ -235,6 +254,7 @@ CREATORPILOT_EXPECT_API_ANALYSIS=1 \
 CREATORPILOT_EXPECT_API_SCRIPT=1 \
 CREATORPILOT_EXPECT_API_REVIEW=1 \
 CREATORPILOT_EXPECT_API_STORYBOARD=1 \
+CREATORPILOT_EXPECT_API_VIDEO=1 \
 CREATORPILOT_TEST_YOUTUBE_URL='https://www.youtube.com/watch?v=jNQXAC9IVRw' \
 python3 frontend/tests/browser-cdp.py
 ```

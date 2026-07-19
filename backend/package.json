@@ -7,13 +7,14 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "test": "node tests/run-tests.js && node tests/analysis-tests.js && node tests/scriptwriter-tests.js && node tests/originality-reviewer-tests.js && node tests/storyboard-tests.js",
+    "test": "node tests/run-tests.js && node tests/analysis-tests.js && node tests/scriptwriter-tests.js && node tests/originality-reviewer-tests.js && node tests/storyboard-tests.js && node tests/video-producer-tests.js",
     "test:live": "node tests/live-transcript.js",
     "test:provider": "node tests/provider-diagnostic.js",
     "test:live-analysis": "node tests/live-analysis.js",
     "test:live-scriptwriter": "node tests/live-scriptwriter.js",
     "test:live-reviewer": "node tests/live-reviewer.js",
     "test:live-storyboard": "node tests/live-storyboard.js",
+    "test:live-render": "node tests/live-render.js",
     "dev:browser-fixture": "node tests/browser-fixture-server.js"
   },
   "engines": {

@@ -8,8 +8,9 @@ window.CREATORPILOT_CONFIG = Object.freeze({
     script: "api",
     review: "api",
     storyboard: "api",
-    video: "mock",
+    video: "api",
   },
   apiBaseUrl: "http://127.0.0.1:8787",
   renderPollIntervalMs: 1500,
+  renderPollLimit: 240,
 });

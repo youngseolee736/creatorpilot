@@ -13,7 +13,9 @@ Authentication: undecided; credentials and provider keys must never be shipped i
 - Successful responses use `{ "requestId": "req_...", "data": ... }`.
 - Errors use the envelope below. `retryable` controls whether the existing Retry action should be offered.
 - `400`, `404`, and `422` are not retried automatically. One network failure, `429`, or `5xx` may be retried after user action. Rendering status polling is the only automatic retry loop.
-- Idempotency keys are recommended for generation and render POSTs. The frontend adapter does not yet send them; the backend engineer must choose the header name and retention window.
+- Generation and render POSTs are idempotent within the running backend. The
+  Video Producer derives a canonical request fingerprint and sends it to the
+  provider as `Idempotency-Key`; this in-process retention resets on restart.
 
 ```json
 {
@@ -387,7 +389,7 @@ REVIEW_NOT_FOUND`; `429 LLM_RATE_LIMITED`; `500 LLM_NOT_CONFIGURED` or
 
 Purpose: start an asynchronous video render from an approved script/storyboard. Responsible agent/tool: Video Producer Agent plus rendering provider. Consumed by: Production screen.
 
-Required: `projectId`, `approvedReviewId`, `storyboard`, `productionSettings`, `format`, `durationSeconds`. Optional: `callbackUrl` (server-to-server only). Loading UI: progress panel begins immediately. Retry: do not automatically repeat POST; reuse an idempotency key or query the returned `renderId`.
+Required: `projectId`, `approvedReviewId`, `storyboard`, `productionSettings`, `format`, `durationSeconds`. No optional fields are accepted in Phase 6. Loading UI: progress panel begins immediately. An identical retry reuses the in-process job and provider idempotency key.
 
 Request:
 
@@ -413,18 +415,24 @@ Success (`202`):
     "stage": "Preparing production",
     "progress": 2,
     "completed": false,
+    "source": "provider",
     "statusUrl": "/api/videos/render_01JZ8W/status"
   }
 }
 ```
 
-Errors: `400 INVALID_RENDER_INPUT`; `403 SCRIPT_NOT_APPROVED`; `404 PROJECT_OR_STORYBOARD_NOT_FOUND`; `409 RENDER_ALREADY_EXISTS`; `422 ASSET_OR_TIMELINE_INVALID`; `429 RENDER_CAPACITY_LIMITED`; `502 RENDER_PROVIDER_ERROR`.
+Errors: `400 INVALID_RENDER_INPUT`; `403 STORYBOARD_NOT_APPROVED`; `404
+REVIEW_NOT_FOUND`; `422 ASSET_OR_TIMELINE_INVALID`; `429
+RENDER_CAPACITY_LIMITED`; `500 RENDER_NOT_CONFIGURED`; `502
+RENDER_PROVIDER_ERROR` or `INVALID_RENDER_RESPONSE`; `504 RENDER_TIMEOUT`.
 
 ## `GET /api/videos/:renderId/status`
 
 Purpose: report render progress and final deliverables. Responsible tool: rendering provider adapter. Consumed by: Production progress and result screens.
 
-Required path field: `renderId`. Optional query field: `includeDiagnostics=false`. Loading: poll every 1.5 seconds in API mode while queued/running; stop on completed, failed, navigation away, or a practical timeout chosen by the backend team. Retry: exponential backoff after network/`429`/`5xx`; honor `Retry-After`.
+Required path field: `renderId`. Loading: poll every 1.5 seconds in API mode while
+queued/running and stop on completed, failed, or the configured frontend poll
+limit. Provider diagnostics are never returned.
 
 Request: `GET /api/videos/render_01JZ8W/status`
 
@@ -433,7 +441,7 @@ Success while running (`200`):
 ```json
 {
   "requestId": "req_status_01",
-  "data": { "renderId": "render_01JZ8W", "status": "running", "stage": "Creating captions", "progress": 66, "completed": false, "updatedAt": "2026-07-18T05:20:10Z" }
+  "data": { "renderId": "render_01JZ8W", "status": "running", "stage": "Creating captions", "progress": 66, "completed": false, "source": "provider", "updatedAt": "2026-07-18T05:20:10Z" }
 }
 ```
 
@@ -448,6 +456,7 @@ Success when complete (`200`):
     "stage": "Final video ready",
     "progress": 100,
     "completed": true,
+    "source": "provider",
     "format": "9:16",
     "duration": 60,
     "voice": "Min — Clear explainer",
@@ -460,7 +469,11 @@ Success when complete (`200`):
 }
 ```
 
-Errors: `404 RENDER_NOT_FOUND`; `410 RENDER_EXPIRED`; `429 STATUS_RATE_LIMITED`; `502 RENDER_PROVIDER_ERROR`. A terminal failure may also be returned as `200` with `data.status: "failed"` and a structured `data.error` so polling can stop deterministically.
+Errors: `404 RENDER_NOT_FOUND`; `429 RENDER_CAPACITY_LIMITED`; `500
+RENDER_NOT_CONFIGURED`; `502 RENDER_PROVIDER_ERROR` or
+`INVALID_RENDER_RESPONSE`; `504 RENDER_TIMEOUT`. A terminal provider failure is
+returned as `200` with `data.status: "failed"` and a safe structured error so
+polling stops deterministically.
 
 ## `POST /api/projects`
 

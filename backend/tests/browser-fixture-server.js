@@ -2,6 +2,7 @@ const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst")
 const { OriginalityReviewer } = require("../src/agents/originality-reviewer/originality-reviewer");
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
 const { StoryboardAgent } = require("../src/agents/storyboard/storyboard");
+const { VideoProducer } = require("../src/agents/video-producer/video-producer");
 const { createApp } = require("../src/app");
 
 const transcriptText = "The reference begins with a surprising question, introduces familiar context, compares several approaches, raises practical stakes, and resolves the opening idea near the ending. The presentation uses concise transitions and a final invitation for viewers to reflect on the topic.";
@@ -127,20 +128,52 @@ const storyboardProvider = {
     });
   },
 };
+const storyboardAgent = new StoryboardAgent({
+  provider: storyboardProvider,
+  reviewResolver: (reviewId) => reviewer.findReview(reviewId),
+});
+const renderPolls = new Map();
+const renderProvider = {
+  async startRender(productionPackage) {
+    const jobId = `fixture-render-${productionPackage.projectId}`;
+    renderPolls.set(jobId, 0);
+    return { jobId, status: "queued", stage: "Preparing production", progress: 2 };
+  },
+  async getStatus(jobId) {
+    const stages = [
+      { status: "running", stage: "Planning scenes", progress: 10 },
+      { status: "running", stage: "Finding B-roll", progress: 28 },
+      { status: "running", stage: "Generating narration", progress: 48 },
+      { status: "running", stage: "Creating captions", progress: 66 },
+      { status: "running", stage: "Combining scenes", progress: 84 },
+      { status: "running", stage: "Rendering final video", progress: 96 },
+    ];
+    const poll = renderPolls.get(jobId) || 0;
+    renderPolls.set(jobId, poll + 1);
+    return stages[poll] || {
+      status: "completed",
+      completedAt: "2026-07-19T02:00:00Z",
+      videoUrl: `https://media.example.test/${jobId}.mp4`,
+      productionPackageUrl: `https://media.example.test/${jobId}.json`,
+    };
+  },
+};
 
 const app = createApp({
   transcriptService,
   scriptAnalyst: new ScriptAnalyst({ provider }),
   scriptwriter: new Scriptwriter({ provider: scriptProvider }),
   originalityReviewer: reviewer,
-  storyboardAgent: new StoryboardAgent({
-    provider: storyboardProvider,
+  storyboardAgent,
+  videoProducer: new VideoProducer({
+    provider: renderProvider,
     reviewResolver: (reviewId) => reviewer.findReview(reviewId),
+    storyboardResolver: (reviewId, scenes) => storyboardAgent.findStoryboard(reviewId, scenes),
   }),
 });
 const port = Number(process.env.PORT || 8787);
 const server = app.listen(port, "127.0.0.1", () => {
-  console.log(`CreatorPilot Phase 5 browser fixture listening on http://127.0.0.1:${port}`);
+  console.log(`CreatorPilot Phase 6 browser fixture listening on http://127.0.0.1:${port}`);
 });
 
 function shutdown() {

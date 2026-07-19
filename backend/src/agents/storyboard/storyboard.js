@@ -24,6 +24,7 @@ class StoryboardAgent {
     });
     this.reviewResolver = options.reviewResolver || (() => null);
     this.completed = new Map();
+    this.storyboardsByReview = new Map();
     this.inFlight = new Map();
     this.maxCompleted = Number(options.maxCompleted) || 100;
   }
@@ -36,9 +37,25 @@ class StoryboardAgent {
     }
   }
 
-  remember(key, value) {
-    if (this.completed.size >= this.maxCompleted) this.completed.delete(this.completed.keys().next().value);
+  remember(key, value, script) {
+    if (this.completed.size >= this.maxCompleted) {
+      const oldestKey = this.completed.keys().next().value;
+      const oldest = this.completed.get(oldestKey);
+      this.completed.delete(oldestKey);
+      if (oldest?.reviewId) {
+        const records = this.storyboardsByReview.get(oldest.reviewId) || [];
+        this.storyboardsByReview.set(oldest.reviewId, records.filter((record) => record.storyboard.storyboardId !== oldest.storyboardId));
+      }
+    }
     this.completed.set(key, value);
+    const records = this.storyboardsByReview.get(value.reviewId) || [];
+    records.push({ storyboard: value, script });
+    this.storyboardsByReview.set(value.reviewId, records);
+  }
+
+  findStoryboard(reviewId, scenes) {
+    const records = this.storyboardsByReview.get(String(reviewId || "")) || [];
+    return records.find((record) => JSON.stringify(record.storyboard.scenes) === JSON.stringify(scenes)) || null;
   }
 
   async authorize(input) {
@@ -77,7 +94,7 @@ class StoryboardAgent {
     if (this.inFlight.has(fingerprint)) return this.inFlight.get(fingerprint);
     const operation = this.generateCandidate(input, scenePlan, fingerprint)
       .then((result) => {
-        this.remember(fingerprint, result);
+        this.remember(fingerprint, result, input.script);
         return result;
       })
       .finally(() => this.inFlight.delete(fingerprint));

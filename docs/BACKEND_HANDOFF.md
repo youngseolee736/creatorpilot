@@ -1,16 +1,15 @@
 # CreatorPilot Backend Handoff Map
 
-Status: Phase 5 transcript extraction, Script Analyst, Scriptwriter, Originality
-Reviewer, and Storyboard backend implemented; video production remains mocked.
+Status: Phase 6 transcript extraction, Script Analyst, Scriptwriter, Originality
+Reviewer, Storyboard, and Video Producer boundaries implemented.
 
 ## Runtime boundary
 
 - `frontend/config.js` is public runtime configuration and defaults to `useMockServices: true`.
 - `frontend/service-client.mjs` is the only service selector imported by `frontend/app.js`.
 - Mock mode delegates to `frontend/mock-services.mjs` unchanged.
-- Per-service mode can route transcript extraction, reference analysis, script
-  generation/revision, originality review, and storyboarding through the Express
-  API while video remains mocked.
+- Per-service mode can route every production stage through the Express API or
+  retain an individual deterministic mock fallback.
 - No API key, provider credential, or private configuration may be added to `config.js` or any browser bundle.
 - The browser's local storage key remains `creatorpilot:v1`; project cloud persistence is not yet wired into the store.
 
@@ -24,7 +23,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
 });
 ```
 
-Example public API-mode configuration (not enabled in this repository):
+Example public API-mode configuration (enabled in this repository):
 
 ```js
 window.CREATORPILOT_CONFIG = Object.freeze({
@@ -34,17 +33,19 @@ window.CREATORPILOT_CONFIG = Object.freeze({
     script: "api",
     review: "api",
     storyboard: "api",
-    video: "mock",
+    video: "api",
   },
   apiBaseUrl: "http://127.0.0.1:8787",
   renderPollIntervalMs: 1500,
+  renderPollLimit: 240,
 });
 ```
 
 The backend selects `LLM_PROVIDER=openai-compatible`. `LLM_API_BASE_URL`,
 `LLM_API_KEY`, and `LLM_MODEL` are required when a real analysis, Scriptwriter,
 Reviewer, or Storyboard endpoint is called. `LLM_TIMEOUT_MS` defaults to 30000.
-These variables are server-only.
+These variables are server-only. Video API mode additionally requires
+`RENDER_API_BASE_URL`, `RENDER_API_KEY`, and optionally `RENDER_TIMEOUT_MS`.
 
 ## Service summary
 
@@ -220,7 +221,9 @@ Review lookup and completed storyboard caching are not durable across restarts.
 
 ### `renderVideo(project, onProgress)`
 
-Current input fields read: `format`, `duration`, and `productionSettings`; it reports six progress callbacks before returning.
+Mock mode reads `format`, `duration`, and `productionSettings` and reports six
+progress callbacks. API mode submits the review ID, exact Storyboard, settings,
+format, and duration to the implemented Video Producer.
 
 Current progress callbacks:
 
@@ -251,7 +254,13 @@ Current final response:
 }
 ```
 
-API mode starts with POST and polls the returned `statusUrl`/`renderId`. It forwards each status to the existing progress UI and stops on `completed` or `failed`. The real final result adds signed `videoUrl` and `productionPackageUrl`; the current Export action still creates a local JSON package and must be changed only when real media export is approved. Render start and poll failures require separate recovery so an existing render is not duplicated.
+API mode starts with POST and polls the returned `renderId`. The backend resolves
+the passed review and exact stored Storyboard before submitting one idempotent
+provider job. The frontend forwards normalized statuses to the progress UI,
+stops on `completed` or `failed`, and displays signed `videoUrl` and
+`productionPackageUrl` links only for provider completion. Mock completion keeps
+the local JSON export. Registries and job idempotency are in process and reset on
+server restart.
 
 ## Project persistence handoff
 
