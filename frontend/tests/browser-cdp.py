@@ -15,11 +15,13 @@ from pathlib import Path
 expect_api_transcript = os.environ.get("CREATORPILOT_EXPECT_API_TRANSCRIPT") == "1"
 expect_api_analysis = os.environ.get("CREATORPILOT_EXPECT_API_ANALYSIS") == "1"
 expect_api_script = os.environ.get("CREATORPILOT_EXPECT_API_SCRIPT") == "1"
+expect_api_review = os.environ.get("CREATORPILOT_EXPECT_API_REVIEW") == "1"
 expect_transcript_error = os.environ.get("CREATORPILOT_EXPECT_TRANSCRIPT_ERROR") == "1"
 test_youtube_url = os.environ.get(
     "CREATORPILOT_TEST_YOUTUBE_URL",
     "https://youtube.com/watch?v=creatorpilot-demo",
 )
+api_base_url = os.environ.get("CREATORPILOT_API_BASE_URL", "http://127.0.0.1:8787")
 
 
 def target_socket_url():
@@ -121,12 +123,12 @@ browser.command("Runtime.enable")
 browser.command("Log.enable")
 browser.command("Page.enable")
 browser.command("Accessibility.enable")
-if expect_api_analysis or expect_api_script:
+if expect_api_analysis or expect_api_script or expect_api_review:
     browser.command("Page.addScriptToEvaluateOnNewDocument", {
         "source": "Object.defineProperty(window, 'CREATORPILOT_CONFIG', {"
         "configurable: false, get() { return Object.freeze({"
-        f"services: {{transcript:'api',analysis:'api',script:'{'api' if expect_api_script else 'mock'}',review:'mock',storyboard:'mock',video:'mock'}},"
-        "apiBaseUrl:'http://127.0.0.1:8787',renderPollIntervalMs:1500}); }, set() {} });"
+        f"services: {{transcript:'api',analysis:'api',script:'{'api' if expect_api_script else 'mock'}',review:'{'api' if expect_api_review else 'mock'}',storyboard:'mock',video:'mock'}},"
+        f"apiBaseUrl:{json.dumps(api_base_url)},renderPollIntervalMs:1500}}); }}, set() {{}} }});"
     })
 browser.command("Emulation.setDeviceMetricsOverride", {
     "width": 1280, "height": 900, "deviceScaleFactor": 1, "mobile": False,
@@ -226,7 +228,10 @@ if expect_api_analysis:
     check(evaluate("document.body.textContent.includes('88% confidence')"), "real analysis confidence renders")
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].analysis.analysisId.startsWith('analysis_')"), "real normalized analysis persists")
     check(not evaluate("document.body.textContent.includes('Return one JSON object only')"), "system prompt is not displayed")
-    connection_label = "Transcript + analyst + scriptwriter connected" if expect_api_script else "Transcript + analyst connected"
+    if expect_api_review:
+        connection_label = "Transcript + analyst + writer + reviewer connected"
+    else:
+        connection_label = "Transcript + analyst + scriptwriter connected" if expect_api_script else "Transcript + analyst connected"
     check(evaluate(f"document.body.textContent.includes({json.dumps(connection_label)})"), "hybrid service state is labeled accurately")
 
 click("[data-action='generate-script']")

@@ -333,6 +333,13 @@ Example input/output:
 
 Role: return a conservative originality estimate plus quality signals. It must always include pass/fail, originality estimate, potential phrase overlap, structure similarity, quality scores, revision instructions, and the non-legal disclaimer.
 
+Implementation note: the model returns only evidence, estimates, quality scores,
+and guidance. The backend derives `reviewId`, preserves the exact `scriptId`,
+calculates `overall`, canonicalizes structure risk, applies pass/fail thresholds,
+and supplies the fixed disclaimer. Phrase evidence must be a bounded exact excerpt
+from the submitted reference transcript and script; invented evidence receives
+one repair attempt and is never promoted to project state.
+
 Input schema:
 
 ```json

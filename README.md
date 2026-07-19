@@ -7,7 +7,8 @@ script editing, similarity review, storyboard generation, and video rendering.
 Phase 1 adds real YouTube transcript extraction. Phase 2 adds a configurable,
 LLM-powered Script Analyst that converts a transcript into validated abstract
 storytelling mechanics. Phase 3 adds real initial and revision Scriptwriter
-flows. Originality review, storyboarding, and video production remain mocked.
+flows. Phase 4 adds a real, conservative Originality Reviewer. Storyboarding and
+video production remain mocked.
 
 ## Requirements
 
@@ -52,8 +53,8 @@ Set `TRANSCRIPT_PROVIDER=hosted` to use `TRANSCRIPT_API_URL` directly, or set
 retryable local-provider failure. Keep fallback disabled unless the configured
 endpoint is trusted and its request and response contract has been verified.
 
-The Script Analyst and Scriptwriter default to an OpenAI-compatible Chat
-Completions provider. All values remain server-side:
+The Script Analyst, Scriptwriter, and Originality Reviewer default to an
+OpenAI-compatible Chat Completions provider. All values remain server-side:
 
 ```dotenv
 LLM_PROVIDER=openai-compatible
@@ -63,8 +64,8 @@ LLM_MODEL=replace-with-model-id
 LLM_TIMEOUT_MS=30000
 ```
 
-The backend and mock-only frontend work without these values. Calling either
-real LLM endpoint without complete configuration returns `LLM_NOT_CONFIGURED`.
+The backend and mock-only frontend work without these values. Calling any real
+LLM endpoint without complete configuration returns `LLM_NOT_CONFIGURED`.
 Never add an LLM key to `frontend/config.js`.
 
 ## Frontend setup
@@ -80,9 +81,9 @@ Project data is saved in versioned browser local storage. No URL, transcript, or
 project content is sent to a backend while mock mode is active. Export produces a
 JSON mock production package rather than a media file.
 
-`frontend/config.js` contains public runtime configuration and defaults every
-service to mock mode. For the Phase 3 mixed workflow, keep the backend running
-and use this configuration:
+`frontend/config.js` contains public runtime configuration. The checked-in Phase
+4 development configuration enables API mode through the Reviewer. Keep the
+backend running and use this shape:
 
 ```js
 window.CREATORPILOT_CONFIG = Object.freeze({
@@ -90,7 +91,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
     transcript: "api",
     analysis: "api",
     script: "api",
-    review: "mock",
+    review: "api",
     storyboard: "mock",
     video: "mock",
   },
@@ -101,8 +102,8 @@ window.CREATORPILOT_CONFIG = Object.freeze({
 
 The legacy `useMockServices: true|false` switch remains supported. Per-service
 configuration takes precedence. No backend secret belongs in this public object.
-Set both `transcript` and `analysis` back to `"mock"` for the deterministic,
-backend-free workflow.
+Set transcript, analysis, script, and review back to `"mock"` for the
+deterministic, backend-free workflow.
 
 Test transcript extraction directly:
 
@@ -127,6 +128,12 @@ The Scriptwriter endpoint accepts the topic, language, duration, audience, and
 normalized abstract analysis. It intentionally rejects a raw transcript. Script
 IDs, section IDs, version lineage, ranges, and speaking-time estimates are
 controlled by the backend rather than accepted from the model.
+
+The Reviewer endpoint accepts the exact normalized reference transcript,
+abstract analysis, and current script because phrase comparison requires both
+texts. The backend controls review identity, overall score, risk bands, pass/fail
+thresholds, and the non-legal disclaimer. Model-proposed phrase evidence is
+accepted only when it is a bounded exact excerpt from the submitted texts.
 
 Run one optional live transcript-plus-LLM check only when valid server-side LLM
 credentials are present:
@@ -157,6 +164,19 @@ LIVE_SCRIPT_TOPIC='A new and unrelated topic' \
 npm run test:live-scriptwriter
 ```
 
+To extend that paid live check through the Originality Reviewer, use the same
+variables with:
+
+```sh
+cd backend
+LLM_API_BASE_URL='https://provider.example/v1' \
+LLM_API_KEY='server-side-key' \
+LLM_MODEL='model-id' \
+LIVE_YOUTUBE_URL='https://www.youtube.com/watch?v=PUBLIC_VIDEO_ID' \
+LIVE_SCRIPT_TOPIC='A new and unrelated topic' \
+npm run test:live-reviewer
+```
+
 Retryable mock failures can be inspected with one of these query parameters:
 
 - `?fail=extractTranscript`
@@ -182,7 +202,7 @@ cd backend && npm test && npm audit
 DevTools connection and checks responsiveness, accessibility names, focus, and
 console errors.
 
-For a credential-free browser check of the Phase 3 HTTP boundary, start the
+For a credential-free browser check of the Phase 4 HTTP boundary, start the
 static server and Chrome DevTools as above, then run the injected fake-provider
 backend and browser test in separate terminals:
 
@@ -194,11 +214,12 @@ cd backend && npm run dev:browser-fixture
 CREATORPILOT_EXPECT_API_TRANSCRIPT=1 \
 CREATORPILOT_EXPECT_API_ANALYSIS=1 \
 CREATORPILOT_EXPECT_API_SCRIPT=1 \
+CREATORPILOT_EXPECT_API_REVIEW=1 \
 CREATORPILOT_TEST_YOUTUBE_URL='https://www.youtube.com/watch?v=jNQXAC9IVRw' \
 python3 frontend/tests/browser-cdp.py
 ```
 
-The fixture is test-only. Production analysis always uses the configured LLM
+The fixture is test-only. Production LLM agents always use the configured
 provider.
 
 ## Transcript provider limitations
@@ -226,7 +247,7 @@ The backend does not store transcripts in Phase 1, does not log transcript bodie
 rejects malformed provider output, and maps provider timeouts, rate limits, and
 unavailable captions to structured user-safe errors.
 
-## Script Analyst and Scriptwriter privacy and limitations
+## LLM agent privacy and limitations
 
 When analysis API mode is enabled, the full transcript and timing segments are
 sent from the CreatorPilot backend to the configured LLM provider. CreatorPilot
@@ -240,8 +261,10 @@ makes one structured repair attempt for malformed JSON. These controls reduce
 risk but do not make model analysis deterministic or guarantee originality.
 The Scriptwriter receives the new-topic brief and abstract analysis but never the
 raw reference transcript. Revision requests additionally send the current draft
-and explicit instructions to the configured provider. The backend validates the
-section plan and duration, but it has no research or fact-checking service and
-cannot guarantee factual accuracy or originality. The real Originality Reviewer
-has not yet been implemented. Its future similarity checks will be product
-estimates, not copyright clearance or legal advice.
+and explicit instructions to the configured provider. The Reviewer receives the
+reference transcript and exact draft because it must compare them. It validates
+bounded phrase evidence and supplies a server-controlled verdict and disclaimer.
+The backend has no research, fact-checking, or external plagiarism database and
+cannot guarantee factual accuracy, legal clearance, or exhaustive originality.
+Reviewer results are editorial estimates, not copyright determinations or legal
+advice.

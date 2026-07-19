@@ -20,6 +20,7 @@ import {
 } from "../mock-services.mjs";
 import { createServices, getServiceConfig } from "../service-client.mjs";
 import { errorNotice } from "../components.mjs";
+import { renderReview } from "../pages/review.mjs";
 
 globalThis.location = { search: "?fast=1" };
 
@@ -263,6 +264,69 @@ test("Scriptwriter revision sends version lineage, instructions, and stable-ID p
   assert.equal(call.body.preserveSectionIds, true);
   assert.equal(Object.prototype.hasOwnProperty.call(call.body, "transcript"), false);
   assert.equal(revised.version, 2);
+});
+
+test("Phase 4 mixed mode sends the exact reference and script to the Reviewer", async () => {
+  let call;
+  const services = createServices(
+    {
+      services: { transcript: "mock", analysis: "mock", script: "mock", review: "api", storyboard: "mock", video: "mock" },
+      apiBaseUrl: "http://127.0.0.1:8787",
+    },
+    async (url, options) => {
+      call = { url, body: JSON.parse(options.body) };
+      return { ok: true, json: async () => ({ data: {
+        reviewId: "review_api",
+        scriptId: "script_api",
+        status: "passed",
+        overall: 91,
+        originalityEstimate: 92,
+        structureSimilarity: { score: 32, risk: "low", note: "Abstract mechanics only." },
+        scores: { hook: 90, structure: 87, clarity: 94, duration: 96 },
+        summary: "Distinct wording and subject expression.",
+        overlaps: [],
+        instructions: ["Verify factual claims."],
+        disclaimer: "This similarity review is an originality estimate, not a copyright or legal determination.",
+      } }) };
+    },
+  );
+  const project = createProject({ id: "project-phase-4", topic: "A new topic", language: "English" });
+  project.transcript = { transcriptId: "transcript_api", text: "The exact reference wording used for comparison." };
+  project.analysis = await analyzeReference(project);
+  project.generatedScript = {
+    scriptId: "script_api",
+    title: "A new script",
+    version: 1,
+    estimatedSeconds: 59,
+    sections: [{ id: "hook", label: "Hook", range: "0–60s", text: "The exact generated narration." }],
+  };
+  const review = await services.reviewOriginality(project);
+  assert.equal(call.url, "http://127.0.0.1:8787/api/scripts/review");
+  assert.equal(call.body.referenceTranscript.text, project.transcript.text);
+  assert.equal(call.body.referenceAnalysis.analysisId, project.analysis.analysisId);
+  assert.equal(call.body.script.scriptId, project.generatedScript.scriptId);
+  assert.equal(call.body.script.sections[0].text, "The exact generated narration.");
+  assert.equal(review.reviewId, "review_api");
+});
+
+test("the review screen distinguishes medium and high overlap risks", () => {
+  const project = createProject();
+  project.originalityReview = {
+    status: "failed",
+    overall: 70,
+    scores: { hook: 80, structure: 70, clarity: 90, duration: 95 },
+    summary: "Revision is required.",
+    overlaps: [
+      { reference: "Reference one", generated: "Draft one", risk: "Medium", note: "Review this cadence." },
+      { reference: "Reference two", generated: "Draft two", risk: "High", note: "Rewrite this phrase." },
+    ],
+    instructions: ["Rewrite the flagged phrase."],
+    disclaimer: "This similarity review is an originality estimate, not a copyright or legal determination.",
+  };
+  const html = renderReview(project);
+  assert.match(html, /class="risk-medium"/);
+  assert.match(html, /class="risk-high"/);
+  assert.doesNotMatch(html, /class="risk-low">Medium/);
 });
 
 test("analysis errors distinguish permanent configuration failures from retryable failures", () => {

@@ -6,6 +6,9 @@ function studioConnectionLabel() {
   const apiServices = Object.entries(services).filter(([, mode]) => mode === "api").map(([name]) => name);
   if (!apiServices.length) return { mode: "Mock studio", detail: "No AI backend connected" };
   if (services.transcript === "api" && services.analysis === "api") {
+    if (services.script === "api" && services.review === "api") {
+      return { mode: "Hybrid studio", detail: "Transcript + analyst + writer + reviewer connected" };
+    }
     if (services.script === "api") {
       return { mode: "Hybrid studio", detail: "Transcript + analyst + scriptwriter connected" };
     }
@@ -26,6 +29,7 @@ export function icon(name, size = 18) {
     retry: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
     download: '<path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14"/>',
     external: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v7H4V6h7"/>',
+    trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14H5V6"/><path d="M10 11v6M14 11v6"/>',
   };
   return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.file}</svg>`;
 }
@@ -71,7 +75,7 @@ export function appShell({ content, route, project = null }) {
         <div class="topbar-meta"><span class="availability-dot"></span>Studio online</div>
       </header>
       <div class="app-body${inWorkspace ? " has-workspace" : ""}">
-        ${inWorkspace ? `<aside class="workspace-rail"><a class="back-link" href="${routeFor("dashboard")}">← All projects</a><div class="rail-project"><span>Current production</span><strong>${escapeHtml(project.title)}</strong>${statusBadge(project.status)}</div>${pipeline(project)}</aside>` : ""}
+        ${inWorkspace ? `<aside class="workspace-rail"><a class="back-link" href="${routeFor("dashboard")}">← All projects</a><div class="rail-project"><span>Current production</span><strong>${escapeHtml(project.title)}</strong>${statusBadge(project.status)}</div>${pipeline(project)}<button class="rail-delete" type="button" data-action="delete-project">${icon("trash", 14)}Delete project</button></aside>` : ""}
         <main id="page-content" class="page-content" tabindex="-1">${content}</main>
       </div>
     </div>
@@ -105,6 +109,9 @@ export function errorNotice(error, retryAction, agentLabel = "Script Analyst") {
     required: "The model omitted one or more required analysis fields.",
     required_string: "A required analysis field was empty or invalid.",
     invalid_array: "A required analysis list or section list was incomplete.",
+    must_be_exact_source_excerpt: "The Reviewer proposed evidence that was not an exact excerpt from the submitted text.",
+    out_of_range: "The model returned a score outside the accepted range.",
+    invalid_enum: "The model returned an unsupported review risk level.",
   };
   const message = error.code === "INVALID_LLM_RESPONSE" && validationHints[validationReason]
     ? `${error.message || error} ${validationHints[validationReason]}`

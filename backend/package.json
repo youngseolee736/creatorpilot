@@ -7,11 +7,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "test": "node tests/run-tests.js && node tests/analysis-tests.js && node tests/scriptwriter-tests.js",
+    "test": "node tests/run-tests.js && node tests/analysis-tests.js && node tests/scriptwriter-tests.js && node tests/originality-reviewer-tests.js",
     "test:live": "node tests/live-transcript.js",
     "test:provider": "node tests/provider-diagnostic.js",
     "test:live-analysis": "node tests/live-analysis.js",
     "test:live-scriptwriter": "node tests/live-scriptwriter.js",
+    "test:live-reviewer": "node tests/live-reviewer.js",
     "dev:browser-fixture": "node tests/browser-fixture-server.js"
   },
   "engines": {

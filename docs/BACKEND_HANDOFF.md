@@ -1,16 +1,16 @@
 # CreatorPilot Backend Handoff Map
 
-Status: Phase 3 transcript extraction, Script Analyst, and Scriptwriter backend
-implemented; Originality Reviewer and later workflow services remain mocked.
+Status: Phase 4 transcript extraction, Script Analyst, Scriptwriter, and
+Originality Reviewer backend implemented; later workflow services remain mocked.
 
 ## Runtime boundary
 
 - `frontend/config.js` is public runtime configuration and defaults to `useMockServices: true`.
 - `frontend/service-client.mjs` is the only service selector imported by `frontend/app.js`.
 - Mock mode delegates to `frontend/mock-services.mjs` unchanged.
-- Per-service mode can route transcript extraction, reference analysis, and
-  script generation/revision through the Express API while review, storyboard,
-  and video remain mocked.
+- Per-service mode can route transcript extraction, reference analysis, script
+  generation/revision, and originality review through the Express API while
+  storyboard and video remain mocked.
 - No API key, provider credential, or private configuration may be added to `config.js` or any browser bundle.
 - The browser's local storage key remains `creatorpilot:v1`; project cloud persistence is not yet wired into the store.
 
@@ -32,7 +32,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
     transcript: "api",
     analysis: "api",
     script: "api",
-    review: "mock",
+    review: "api",
     storyboard: "mock",
     video: "mock",
   },
@@ -42,9 +42,9 @@ window.CREATORPILOT_CONFIG = Object.freeze({
 ```
 
 The backend selects `LLM_PROVIDER=openai-compatible`. `LLM_API_BASE_URL`,
-`LLM_API_KEY`, and `LLM_MODEL` are required when a real analysis or Scriptwriter
-endpoint is called. `LLM_TIMEOUT_MS` defaults to 30000. These variables are
-server-only.
+`LLM_API_KEY`, and `LLM_MODEL` are required when a real analysis, Scriptwriter,
+or Reviewer endpoint is called. `LLM_TIMEOUT_MS` defaults to 30000. These
+variables are server-only.
 
 ## Service summary
 
@@ -176,7 +176,14 @@ Current response:
 }
 ```
 
-The real response must also include `reviewId`, `scriptId`, `originalityEstimate`, and `structureSimilarity`. `status` is `passed` or `failed`; the UI only exposes production approval when passed. Failure to run the reviewer is an agent error, never a review failure and never a pass. Cache only an exact script/reference hash.
+The implemented response also includes `reviewId`, `scriptId`,
+`originalityEstimate`, and `structureSimilarity`. The backend validates every
+phrase against the submitted texts, derives the weighted overall score and
+structure-risk band, and applies the configured thresholds. `status` is `passed`
+or `failed`; the UI only exposes production approval when passed. Failure to run
+the reviewer is an agent error, never a review failure and never a pass.
+Identical completed requests are cached in memory by their normalized exact
+input; durable persistence remains future work.
 
 ### `generateStoryboard(project)`
 

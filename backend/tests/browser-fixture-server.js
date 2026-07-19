@@ -1,4 +1,5 @@
 const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst");
+const { OriginalityReviewer } = require("../src/agents/originality-reviewer/originality-reviewer");
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
 const { createApp } = require("../src/app");
 
@@ -75,13 +76,41 @@ const scriptProvider = {
   },
 };
 
+const reviewerProvider = {
+  async complete() {
+    return JSON.stringify({
+      originalityEstimate: 92,
+      structureSimilarity: {
+        score: 32,
+        note: "The draft shares only an abstract escalation-and-resolution arc with the reference.",
+      },
+      scores: { hook: 90, structure: 87, clarity: 94, duration: 96 },
+      summary: "The draft keeps the reference's pacing mechanics while using distinct language and subject-specific expression.",
+      overlaps: [{
+        reference: "raises practical stakes",
+        generated: "making future crises harder to contain",
+        risk: "Low",
+        note: "Both escalate consequences, but the wording, topic, and narrative placement are distinct.",
+      }, {
+        reference: "resolves the opening idea near the ending",
+        generated: "The map looks narrow, but the consequences are global",
+        risk: "Low",
+        note: "Both resolve the opening near the close, while the language and conclusion remain topic-specific.",
+      }],
+      instructions: ["Keep all supporting claims tied to reliable sources before production."],
+    });
+  },
+};
+
 const app = createApp({
   transcriptService,
   scriptAnalyst: new ScriptAnalyst({ provider }),
   scriptwriter: new Scriptwriter({ provider: scriptProvider }),
+  originalityReviewer: new OriginalityReviewer({ provider: reviewerProvider }),
 });
-const server = app.listen(8787, "127.0.0.1", () => {
-  console.log("CreatorPilot Phase 3 browser fixture listening on http://127.0.0.1:8787");
+const port = Number(process.env.PORT || 8787);
+const server = app.listen(port, "127.0.0.1", () => {
+  console.log(`CreatorPilot Phase 4 browser fixture listening on http://127.0.0.1:${port}`);
 });
 
 function shutdown() {

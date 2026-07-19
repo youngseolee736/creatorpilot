@@ -206,6 +206,13 @@ LLM_NOT_CONFIGURED` or `SCRIPT_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or
 
 Purpose: estimate originality and production quality; it is not copyright clearance. Responsible agent: Originality Reviewer Agent. Consumed by: Originality Review screen.
 
+Implemented in Phase 4. The model provides evidence and score inputs only. The
+backend controls review and script identity, the weighted overall score,
+structure-risk bands, pass/fail thresholds, and the fixed non-legal disclaimer.
+Every reported phrase must be a short exact excerpt found in the submitted
+reference transcript or script. Identical requests are coalesced and successful
+results are cached for the running process.
+
 Required: `projectId`, `referenceAnalysis`, `referenceTranscript`, `script`. Optional: `thresholds`. Loading UI: “Comparing language and story structure.” Retry: user-triggered for transient failures; the same script version should return the same stored review when possible.
 
 Request:
@@ -254,7 +261,9 @@ Success (`200`):
 }
 ```
 
-Errors: `400 INVALID_REVIEW_INPUT`; `404 SCRIPT_OR_REFERENCE_NOT_FOUND`; `409 REVIEW_IN_PROGRESS`; `422 SCRIPT_EMPTY`; `429 MODEL_RATE_LIMITED`; `502 REVIEW_PROVIDER_ERROR`; `504 REVIEW_TIMEOUT`.
+Errors: `400 INVALID_REVIEW_INPUT`; `429 LLM_RATE_LIMITED`; `500
+LLM_NOT_CONFIGURED` or `REVIEW_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or
+`INVALID_LLM_RESPONSE`; `504 LLM_TIMEOUT`.
 
 ## `POST /api/scripts/revise`
 

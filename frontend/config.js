@@ -6,7 +6,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
     transcript: "api",
     analysis: "api",
     script: "api",
-    review: "mock",
+    review: "api",
     storyboard: "mock",
     video: "mock",
   },
