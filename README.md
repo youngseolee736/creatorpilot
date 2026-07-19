@@ -66,11 +66,33 @@ LLM_MODEL=replace-with-model-id
 LLM_TIMEOUT_MS=30000
 ```
 
+Each LLM Agent can override any shared value independently. Blank or omitted
+Agent values fall back field-by-field to `LLM_*`, so a deployment can change
+only a model or provide a completely separate endpoint and key:
+
+```dotenv
+ANALYST_LLM_MODEL=fast-analysis-model
+
+SCRIPTWRITER_LLM_API_BASE_URL=https://writer-provider.example/v1
+SCRIPTWRITER_LLM_API_KEY=writer-server-side-key
+SCRIPTWRITER_LLM_MODEL=strong-writing-model
+
+REVIEWER_LLM_MODEL=conservative-review-model
+STORYBOARD_LLM_MODEL=visual-planning-model
+```
+
+The supported prefixes are `ANALYST_`, `SCRIPTWRITER_`, `REVIEWER_`, and
+`STORYBOARD_`; each accepts `LLM_PROVIDER`, `LLM_API_BASE_URL`, `LLM_API_KEY`,
+`LLM_MODEL`, and `LLM_TIMEOUT_MS`. Current LLM adapters must expose the
+OpenAI-compatible Chat Completions contract. Native Gemini or Anthropic
+contracts require an additional provider adapter.
+
 The backend and mock-only frontend work without these values. Calling any real
 LLM endpoint without complete configuration returns `LLM_NOT_CONFIGURED`.
 Never add an LLM key to `frontend/config.js`.
 
-The Video Producer uses a generic server-side HTTP provider contract. The base
+The Video Producer never inherits any `LLM_*` or Agent-specific value. It uses a
+separate generic server-side HTTP provider contract. The base
 URL must expose `POST /renders` and `GET /renders/:providerJobId`. HTTPS is
 required outside localhost, and credentials never enter the browser bundle:
 

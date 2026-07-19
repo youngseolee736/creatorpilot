@@ -44,8 +44,11 @@ window.CREATORPILOT_CONFIG = Object.freeze({
 The backend selects `LLM_PROVIDER=openai-compatible`. `LLM_API_BASE_URL`,
 `LLM_API_KEY`, and `LLM_MODEL` are required when a real analysis, Scriptwriter,
 Reviewer, or Storyboard endpoint is called. `LLM_TIMEOUT_MS` defaults to 30000.
-These variables are server-only. Video API mode additionally requires
-`RENDER_API_BASE_URL`, `RENDER_API_KEY`, and optionally `RENDER_TIMEOUT_MS`.
+Each Agent first reads its `ANALYST_LLM_*`, `SCRIPTWRITER_LLM_*`,
+`REVIEWER_LLM_*`, or `STORYBOARD_LLM_*` override and falls back field-by-field
+to the shared `LLM_*` values. These variables are server-only. Video API mode is
+deliberately isolated from all LLM settings and requires `RENDER_API_BASE_URL`,
+`RENDER_API_KEY`, and optionally `RENDER_TIMEOUT_MS`.
 
 ## Service summary
 

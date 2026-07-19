@@ -13,6 +13,7 @@ class OriginalityReviewer {
   constructor(options = {}) {
     this.provider = options.provider || createLLMProvider({
       ...(options.llmOptions || {}),
+      envPrefix: "REVIEWER",
       agentLabel: "Originality Reviewer",
       unsupportedErrorCode: "REVIEW_INTERNAL_ERROR",
     });

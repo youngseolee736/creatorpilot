@@ -5,13 +5,15 @@ const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
 const { StoryboardAgent } = require("../src/agents/storyboard/storyboard");
 const { VideoProducer } = require("../src/agents/video-producer/video-producer");
 const { TranscriptService } = require("../src/services/transcript-service");
+const { hasLLMConfiguration } = require("../src/services/llm");
 const { extractYouTubeVideo } = require("../src/utils/youtube-url");
 
-const requiredVariables = [
-  "LLM_API_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "LIVE_SCRIPT_TOPIC",
-  "RENDER_API_BASE_URL", "RENDER_API_KEY",
-];
-const missingVariables = requiredVariables.filter((name) => !String(process.env[name] || "").trim());
+const missingVariables = ["ANALYST", "SCRIPTWRITER", "REVIEWER", "STORYBOARD"]
+  .filter((scope) => !hasLLMConfiguration(scope))
+  .map((scope) => `${scope}_LLM_* (or shared LLM_*)`);
+for (const name of ["LIVE_SCRIPT_TOPIC", "RENDER_API_BASE_URL", "RENDER_API_KEY"]) {
+  if (!String(process.env[name] || "").trim()) missingVariables.push(name);
+}
 if (missingVariables.length) {
   console.log(`SKIP: Live render test requires ${missingVariables.join(", ")}.`);
   process.exit(0);

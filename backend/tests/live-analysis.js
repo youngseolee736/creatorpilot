@@ -1,10 +1,10 @@
 const assert = require("assert");
 const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst");
 const { TranscriptService } = require("../src/services/transcript-service");
+const { hasLLMConfiguration } = require("../src/services/llm");
 const { extractYouTubeVideo } = require("../src/utils/youtube-url");
 
-const requiredVariables = ["LLM_API_BASE_URL", "LLM_API_KEY", "LLM_MODEL"];
-const missingVariables = requiredVariables.filter((name) => !String(process.env[name] || "").trim());
+const missingVariables = hasLLMConfiguration("ANALYST") ? [] : ["ANALYST_LLM_* (or shared LLM_*)"];
 
 if (missingVariables.length) {
   console.log(`SKIP: Live Script Analyst test requires ${missingVariables.join(", ")}.`);

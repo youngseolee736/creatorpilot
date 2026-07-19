@@ -24,7 +24,8 @@ whether revision is required, and what action advances the production.
 - Professional creator dashboard and project empty state.
 - Backend-mediated public YouTube transcript extraction with mock fallback.
 - Configurable real Script Analyst, Scriptwriter, Originality Reviewer, and
-  Storyboard services with per-service mock fallback.
+  Storyboard services with independent server-side provider configuration and
+  per-service mock fallback.
 - One complete, navigable mock production workflow.
 - Editable generated script and persistent browser-local project state.
 - Originality estimate with careful non-legal language.

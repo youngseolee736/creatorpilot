@@ -13,6 +13,7 @@ class ScriptAnalyst {
   constructor(options = {}) {
     this.provider = options.provider || createLLMProvider({
       ...(options.llmOptions || {}),
+      envPrefix: "ANALYST",
       agentLabel: "Script Analyst",
       unsupportedErrorCode: "ANALYSIS_INTERNAL_ERROR",
     });

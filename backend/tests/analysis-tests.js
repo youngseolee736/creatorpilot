@@ -1,12 +1,15 @@
 const assert = require("assert");
 const http = require("http");
 const AbortController = require("abort-controller");
+const { OriginalityReviewer } = require("../src/agents/originality-reviewer/originality-reviewer");
 const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst");
+const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
+const { StoryboardAgent } = require("../src/agents/storyboard/storyboard");
 const { containsLongExcerpt } = require("../src/agents/script-analyst/normalize-analysis");
 const { MAX_TRANSCRIPT_CHARACTERS } = require("../src/agents/script-analyst/script-analyst-schema");
 const { createApp } = require("../src/app");
 const { OpenAICompatibleProvider } = require("../src/services/llm/openai-compatible-provider");
-const { createLLMProvider } = require("../src/services/llm");
+const { createLLMProvider, resolveLLMConfig } = require("../src/services/llm");
 
 const tests = [];
 function test(name, callback) { tests.push({ name, callback }); }
@@ -290,6 +293,40 @@ test("returns a clear error when provider configuration is missing", async () =>
   assert.equal(result.status, 500);
   assert.equal(result.body.error.code, "LLM_NOT_CONFIGURED");
   assert.equal(result.body.error.retryable, false);
+});
+
+test("Agent LLM settings override individual shared values and retain fallback", () => {
+  const environment = {
+    LLM_PROVIDER: "openai-compatible",
+    LLM_API_BASE_URL: "https://shared.example/v1",
+    LLM_API_KEY: "shared-key",
+    LLM_MODEL: "shared-model",
+    LLM_TIMEOUT_MS: "31000",
+    ANALYST_LLM_API_BASE_URL: "https://analyst.example/v1",
+    ANALYST_LLM_MODEL: "analyst-model",
+    ANALYST_LLM_TIMEOUT_MS: "12000",
+  };
+  assert.deepEqual(resolveLLMConfig("ANALYST", environment), {
+    providerName: "openai-compatible",
+    apiBaseUrl: "https://analyst.example/v1",
+    apiKey: "shared-key",
+    model: "analyst-model",
+    timeoutMs: 12000,
+  });
+  assert.equal(resolveLLMConfig("SCRIPTWRITER", environment).model, "shared-model");
+});
+
+test("each LLM Agent selects its own scoped provider configuration", () => {
+  const environment = {
+    LLM_API_BASE_URL: "https://shared.example/v1", LLM_API_KEY: "shared-key", LLM_MODEL: "shared-model",
+    ANALYST_LLM_MODEL: "analyst-model", SCRIPTWRITER_LLM_MODEL: "writer-model",
+    REVIEWER_LLM_MODEL: "reviewer-model", STORYBOARD_LLM_MODEL: "storyboard-model",
+  };
+  const llmOptions = { environment };
+  assert.equal(new ScriptAnalyst({ llmOptions }).provider.model, "analyst-model");
+  assert.equal(new Scriptwriter({ llmOptions }).provider.model, "writer-model");
+  assert.equal(new OriginalityReviewer({ llmOptions }).provider.model, "reviewer-model");
+  assert.equal(new StoryboardAgent({ llmOptions }).provider.model, "storyboard-model");
 });
 
 test("maps an unknown provider error", async () => {

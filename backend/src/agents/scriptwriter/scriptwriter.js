@@ -18,6 +18,7 @@ class Scriptwriter {
   constructor(options = {}) {
     this.provider = options.provider || createLLMProvider({
       ...(options.llmOptions || {}),
+      envPrefix: "SCRIPTWRITER",
       agentLabel: "Scriptwriter",
       unsupportedErrorCode: "SCRIPT_INTERNAL_ERROR",
     });

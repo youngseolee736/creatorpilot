@@ -3,10 +3,13 @@ const { OriginalityReviewer } = require("../src/agents/originality-reviewer/orig
 const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst");
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
 const { TranscriptService } = require("../src/services/transcript-service");
+const { hasLLMConfiguration } = require("../src/services/llm");
 const { extractYouTubeVideo } = require("../src/utils/youtube-url");
 
-const requiredVariables = ["LLM_API_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "LIVE_SCRIPT_TOPIC"];
-const missingVariables = requiredVariables.filter((name) => !String(process.env[name] || "").trim());
+const missingVariables = ["ANALYST", "SCRIPTWRITER", "REVIEWER"]
+  .filter((scope) => !hasLLMConfiguration(scope))
+  .map((scope) => `${scope}_LLM_* (or shared LLM_*)`);
+if (!String(process.env.LIVE_SCRIPT_TOPIC || "").trim()) missingVariables.push("LIVE_SCRIPT_TOPIC");
 
 if (missingVariables.length) {
   console.log(`SKIP: Live Reviewer test requires ${missingVariables.join(", ")}.`);

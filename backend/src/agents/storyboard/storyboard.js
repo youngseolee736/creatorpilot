@@ -19,6 +19,7 @@ class StoryboardAgent {
   constructor(options = {}) {
     this.provider = options.provider || createLLMProvider({
       ...(options.llmOptions || {}),
+      envPrefix: "STORYBOARD",
       agentLabel: "Storyboard Agent",
       unsupportedErrorCode: "STORYBOARD_INTERNAL_ERROR",
     });
