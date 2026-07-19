@@ -4,8 +4,8 @@
 
 CreatorPilot turns a reference YouTube video and a new topic into an original
 60-second vertical-video production plan. It visualizes the work of a Script
-Analyst, Scriptwriter, Originality Reviewer, and Video Producer without presenting
-those agents as a chatbot.
+Analyst, Scriptwriter, Originality Reviewer, Storyboard Agent, and Video Producer
+without presenting those agents as a chatbot.
 
 ## Primary journey
 
@@ -22,12 +22,12 @@ whether revision is required, and what action advances the production.
 
 - Professional creator dashboard and project empty state.
 - Backend-mediated public YouTube transcript extraction with mock fallback.
-- Configurable real Script Analyst, Scriptwriter, and Originality Reviewer
-  services with per-service mock fallback.
+- Configurable real Script Analyst, Scriptwriter, Originality Reviewer, and
+  Storyboard services with per-service mock fallback.
 - One complete, navigable mock production workflow.
 - Editable generated script and persistent browser-local project state.
 - Originality estimate with careful non-legal language.
-- Seven-to-ten-scene storyboard and mock rendering lifecycle.
+- Server-validated seven-to-ten-scene storyboard and mock rendering lifecycle.
 - Responsive, accessible HTML, CSS, and native JavaScript modules.
 - Async service interfaces ready to replace with future backend adapters.
 
@@ -44,8 +44,8 @@ whether revision is required, and what action advances the production.
   uses Express as its isolated integration layer.
 - Hash routes provide refresh-safe navigation on the existing static server.
 - Project data is stored in versioned local storage for the prototype.
-- Transcript extraction, analysis, script generation/revision, and originality
-  review can use the Express API; later services remain asynchronous mocks with
-  retryable errors.
+- Transcript extraction, analysis, script generation/revision, originality
+  review, and storyboarding can use the Express API; rendering remains an
+  asynchronous mock with retryable errors.
 - UI meaning never relies on color alone; focus, keyboard flow, and status text are
   required.

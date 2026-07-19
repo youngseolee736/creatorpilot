@@ -328,7 +328,13 @@ LLM_PROVIDER_ERROR` or `INVALID_LLM_RESPONSE`; `504 LLM_TIMEOUT`.
 
 Purpose: turn an approved script into timed scenes and production metadata. Responsible agent: Storyboard Agent. Consumed by: Storyboard/Production screen.
 
-Required: `projectId`, `approvedReviewId`, `script`, `format`. Optional: `sceneCount`, `visualConstraints`. The backend must reject scripts whose linked review did not pass. Loading UI: “Planning scenes and visual evidence.” Retry: user-triggered for transient failures.
+Implemented in Phase 5. Required: `projectId`, `approvedReviewId`, `script`,
+`format`, and `targetDurationSeconds`. Optional: `sceneCount` and
+`visualConstraints`. The backend resolves the review from its running Reviewer
+registry and rejects missing, failed, or script-mismatched reviews before any
+model call. It preserves exact narration and controls IDs and the gap-free target
+timeline. Loading UI: “Planning scenes and visual evidence.” Retry:
+user-triggered for transient failures.
 
 Request:
 
@@ -344,6 +350,7 @@ Request:
     "sections": [{ "id": "hook", "label": "Hook", "range": "0–5s", "text": "The most important line on a map may be the one ships cannot cross." }]
   },
   "format": "9:16",
+  "targetDurationSeconds": 60,
   "sceneCount": 8,
   "visualConstraints": ["No graphic violence", "Use licensed or generated assets only"]
 }
@@ -371,7 +378,10 @@ Success (`201`):
 }
 ```
 
-Errors: `400 INVALID_STORYBOARD_INPUT`; `403 SCRIPT_NOT_APPROVED`; `404 PROJECT_SCRIPT_OR_REVIEW_NOT_FOUND`; `409 STORYBOARD_IN_PROGRESS`; `422 DURATION_MISMATCH`; `429 MODEL_RATE_LIMITED`; `502 STORYBOARD_PROVIDER_ERROR`; `504 STORYBOARD_TIMEOUT`.
+Errors: `400 INVALID_STORYBOARD_INPUT`; `403 SCRIPT_NOT_APPROVED`; `404
+REVIEW_NOT_FOUND`; `429 LLM_RATE_LIMITED`; `500 LLM_NOT_CONFIGURED` or
+`STORYBOARD_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or
+`INVALID_LLM_RESPONSE`; `504 LLM_TIMEOUT`.
 
 ## `POST /api/videos/render`
 

@@ -22,13 +22,16 @@ function finalResult(project) {
 }
 
 export function renderProduction(project) {
-  if (project.error) return `${pageHeading("Video Producer Agent", "Production paused.", "The approved script and storyboard remain saved.")}${errorNotice(project.error, project.storyboard.length ? "retry-render" : "retry-storyboard")}`;
-  if (!project.storyboard.length) return `${pageHeading("Video Producer Agent", "Turning narration into scenes.", "The producer is planning visual evidence, captions, transitions, and pacing.")}${loadingPanel("Video Producer Agent", "Generating an eight-scene storyboard…")}`;
+  if (project.error) {
+    const agent = project.storyboard.length ? "Video Producer" : "Storyboard Agent";
+    return `${pageHeading(agent, "Production paused.", "The approved script and storyboard remain saved.")}${errorNotice(project.error, project.storyboard.length ? "retry-render" : "retry-storyboard", agent)}`;
+  }
+  if (!project.storyboard.length) return `${pageHeading("Storyboard Agent", "Turning narration into scenes.", "The agent is planning visual evidence, captions, transitions, and pacing.")}${loadingPanel("Storyboard Agent", "Generating an eight-scene storyboard…")}`;
   if (project.render?.completed) return finalResult(project);
   if (project.status === "video_rendering") return renderProgress(project);
   const settings = project.productionSettings;
   const selected = (value, current) => value === current ? " selected" : "";
-  return `${pageHeading("Video Producer Agent · Storyboard ready", "A visual plan for every second.", "Review the scene sequence and production settings before starting the mock render.", `<button class="button button-primary" type="button" data-action="render-video">Render vertical video ${icon("play")}</button>`)}
+  return `${pageHeading("Storyboard Agent · Plan ready", "A visual plan for every second.", "Review the scene sequence and production settings before starting the mock render.", `<button class="button button-primary" type="button" data-action="render-video">Render vertical video ${icon("play")}</button>`)}
     <section class="production-settings"><div><span>Voice</span><select aria-label="Voice selection" data-project-setting="voice"><option${selected("Sora — Warm documentary", settings.voice)}>Sora — Warm documentary</option><option${selected("Min — Clear explainer", settings.voice)}>Min — Clear explainer</option><option${selected("Alex — Direct news", settings.voice)}>Alex — Direct news</option></select></div><div><span>Caption style</span><select aria-label="Caption style" data-project-setting="captions"><option${selected("Editorial high contrast", settings.captions)}>Editorial high contrast</option><option${selected("Minimal lower third", settings.captions)}>Minimal lower third</option><option${selected("Centered bold", settings.captions)}>Centered bold</option></select></div><div><span>Background music</span><label class="switch"><input type="checkbox" ${settings.music ? "checked " : ""}data-project-setting="music"/><span></span><b>${settings.music ? "Enabled" : "Off"}</b></label></div><div><span>Output</span><strong>${escapeHtml(project.format)} · ${project.duration}s</strong></div></section>
     <section class="storyboard-section"><div class="section-bar"><div><p class="eyebrow">Production board</p><h2>${project.storyboard.length} generated scenes</h2></div><span>Total ${formatTime(project.duration)}</span></div><div class="storyboard-list">${project.storyboard.map(sceneCard).join("")}</div></section>
     <div class="sticky-action"><span><strong>Storyboard ready for production</strong><small>No stock footage or audio will be fetched in this frontend demonstration.</small></span><button class="button button-primary" type="button" data-action="render-video">Render vertical video ${icon("play")}</button></div>`;

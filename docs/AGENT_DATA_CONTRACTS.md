@@ -436,6 +436,13 @@ Example output:
 
 Role: convert only a reviewed script into a timed production plan. It may propose search terms, but it does not license or fetch media.
 
+Implementation note: the backend resolves `approvedReviewId` from the running
+Reviewer registry before invoking the model. It deterministically divides the
+exact script narration into immutable scene slots and derives storyboard/scene
+IDs, order, timing, and duration. The model returns only a matching slot plus
+caption, visual direction, search query, and transition. Unknown model timing,
+identity, or narration fields are ignored.
+
 Input schema:
 
 ```json
@@ -443,14 +450,10 @@ Input schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["projectId", "approvedReview", "script", "format", "targetDurationSeconds"],
+  "required": ["projectId", "approvedReviewId", "script", "format", "targetDurationSeconds"],
   "properties": {
     "projectId": { "type": "string" },
-    "approvedReview": {
-      "type": "object",
-      "required": ["reviewId", "scriptId", "status"],
-      "properties": { "reviewId": { "type": "string" }, "scriptId": { "type": "string" }, "status": { "const": "passed" } }
-    },
+    "approvedReviewId": { "type": "string" },
     "script": { "type": "object", "required": ["scriptId", "sections"] },
     "format": { "enum": ["9:16", "1:1", "16:9"] },
     "targetDurationSeconds": { "type": "integer", "minimum": 15, "maximum": 180 },
@@ -467,10 +470,12 @@ Output schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["storyboardId", "scriptId", "totalDuration", "scenes"],
+  "required": ["storyboardId", "scriptId", "reviewId", "format", "totalDuration", "scenes"],
   "properties": {
     "storyboardId": { "type": "string" },
     "scriptId": { "type": "string" },
+    "reviewId": { "type": "string" },
+    "format": { "enum": ["9:16", "1:1", "16:9"] },
     "totalDuration": { "type": "number", "minimum": 1 },
     "scenes": {
       "type": "array",

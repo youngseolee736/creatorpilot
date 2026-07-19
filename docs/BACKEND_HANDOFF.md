@@ -1,7 +1,7 @@
 # CreatorPilot Backend Handoff Map
 
-Status: Phase 4 transcript extraction, Script Analyst, Scriptwriter, and
-Originality Reviewer backend implemented; later workflow services remain mocked.
+Status: Phase 5 transcript extraction, Script Analyst, Scriptwriter, Originality
+Reviewer, and Storyboard backend implemented; video production remains mocked.
 
 ## Runtime boundary
 
@@ -9,8 +9,8 @@ Originality Reviewer backend implemented; later workflow services remain mocked.
 - `frontend/service-client.mjs` is the only service selector imported by `frontend/app.js`.
 - Mock mode delegates to `frontend/mock-services.mjs` unchanged.
 - Per-service mode can route transcript extraction, reference analysis, script
-  generation/revision, and originality review through the Express API while
-  storyboard and video remain mocked.
+  generation/revision, originality review, and storyboarding through the Express
+  API while video remains mocked.
 - No API key, provider credential, or private configuration may be added to `config.js` or any browser bundle.
 - The browser's local storage key remains `creatorpilot:v1`; project cloud persistence is not yet wired into the store.
 
@@ -33,7 +33,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
     analysis: "api",
     script: "api",
     review: "api",
-    storyboard: "mock",
+    storyboard: "api",
     video: "mock",
   },
   apiBaseUrl: "http://127.0.0.1:8787",
@@ -43,8 +43,8 @@ window.CREATORPILOT_CONFIG = Object.freeze({
 
 The backend selects `LLM_PROVIDER=openai-compatible`. `LLM_API_BASE_URL`,
 `LLM_API_KEY`, and `LLM_MODEL` are required when a real analysis, Scriptwriter,
-or Reviewer endpoint is called. `LLM_TIMEOUT_MS` defaults to 30000. These
-variables are server-only.
+Reviewer, or Storyboard endpoint is called. `LLM_TIMEOUT_MS` defaults to 30000.
+These variables are server-only.
 
 ## Service summary
 
@@ -187,7 +187,9 @@ input; durable persistence remains future work.
 
 ### `generateStoryboard(project)`
 
-Current input fields read: topic and generated script sections. API mode sends `approvedReviewId`, script, and format.
+Mock mode reads the topic and generated script sections. API mode sends the
+approved review ID, exact script, format, target duration, requested scene count,
+and visual constraints.
 
 Current response (eight items; one shown):
 
@@ -208,7 +210,13 @@ Current response (eight items; one shown):
 ]
 ```
 
-The production screen consumes all fields and expects a non-empty array. The backend must verify that `approvedReviewId` belongs to the exact script version. Do not imply that `searchQuery` results are licensed. A regenerated/edited script invalidates the storyboard.
+The production screen consumes all fields and expects a non-empty array. The
+implemented backend resolves `approvedReviewId` from the in-process Reviewer
+registry, requires a passed review for the exact script, preserves every script
+word in order, and derives a gap-free timeline ending at the target duration.
+The model cannot control narration, IDs, or timing. Search queries remain
+unlicensed proposals. A regenerated or edited script invalidates the storyboard.
+Review lookup and completed storyboard caching are not durable across restarts.
 
 ### `renderVideo(project, onProgress)`
 

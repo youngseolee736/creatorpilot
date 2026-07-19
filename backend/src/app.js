@@ -3,10 +3,12 @@ const { createCorsMiddleware } = require("./middleware/cors");
 const { errorHandler, notFoundHandler } = require("./middleware/error-handler");
 const { createAnalysisRouter } = require("./routes/analysis");
 const { createScriptsRouter } = require("./routes/scripts");
+const { createStoryboardRouter } = require("./routes/storyboards");
 const { createTranscriptRouter } = require("./routes/transcripts");
 const { ScriptAnalyst } = require("./agents/script-analyst/script-analyst");
 const { OriginalityReviewer } = require("./agents/originality-reviewer/originality-reviewer");
 const { Scriptwriter } = require("./agents/scriptwriter/scriptwriter");
+const { StoryboardAgent } = require("./agents/storyboard/storyboard");
 const { TranscriptService } = require("./services/transcript-service");
 const { createRequestId } = require("./utils/request-id");
 
@@ -16,6 +18,9 @@ function createApp(options = {}) {
   const scriptAnalyst = options.scriptAnalyst || new ScriptAnalyst();
   const scriptwriter = options.scriptwriter || new Scriptwriter();
   const originalityReviewer = options.originalityReviewer || new OriginalityReviewer();
+  const storyboardAgent = options.storyboardAgent || new StoryboardAgent({
+    reviewResolver: (reviewId) => originalityReviewer.findReview?.(reviewId) || null,
+  });
 
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -32,6 +37,7 @@ function createApp(options = {}) {
   app.use("/api/transcripts", createTranscriptRouter(transcriptService));
   app.use("/api/analysis", createAnalysisRouter(scriptAnalyst));
   app.use("/api/scripts", createScriptsRouter(scriptwriter, originalityReviewer));
+  app.use("/api/storyboards", createStoryboardRouter(storyboardAgent));
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;

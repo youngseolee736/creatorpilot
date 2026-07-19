@@ -6,6 +6,9 @@ function studioConnectionLabel() {
   const apiServices = Object.entries(services).filter(([, mode]) => mode === "api").map(([name]) => name);
   if (!apiServices.length) return { mode: "Mock studio", detail: "No AI backend connected" };
   if (services.transcript === "api" && services.analysis === "api") {
+    if (services.script === "api" && services.review === "api" && services.storyboard === "api") {
+      return { mode: "Hybrid studio", detail: "5 production services connected" };
+    }
     if (services.script === "api" && services.review === "api") {
       return { mode: "Hybrid studio", detail: "Transcript + analyst + writer + reviewer connected" };
     }
@@ -96,6 +99,8 @@ export function errorNotice(error, retryAction, agentLabel = "Script Analyst") {
     TRANSCRIPT_TOO_LARGE: "This transcript is too large to analyze.",
     TRANSCRIPT_NOT_ANALYZABLE: "This transcript cannot be analyzed reliably.",
     LLM_PROVIDER_ERROR: `The ${agentLabel} provider is unavailable.`,
+    REVIEW_NOT_FOUND: "The approved review is no longer available on this server.",
+    SCRIPT_NOT_APPROVED: "This script does not have a matching passed review.",
   };
   const title = titles[error.code] || "The agent stopped before completing this stage.";
   const validationReason = error.details?.[0]?.reason;

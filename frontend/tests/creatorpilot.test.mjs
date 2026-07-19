@@ -21,6 +21,7 @@ import {
 import { createServices, getServiceConfig } from "../service-client.mjs";
 import { errorNotice } from "../components.mjs";
 import { renderReview } from "../pages/review.mjs";
+import { renderProduction } from "../pages/production.mjs";
 
 globalThis.location = { search: "?fast=1" };
 
@@ -327,6 +328,61 @@ test("the review screen distinguishes medium and high overlap risks", () => {
   assert.match(html, /class="risk-medium"/);
   assert.match(html, /class="risk-high"/);
   assert.doesNotMatch(html, /class="risk-low">Medium/);
+});
+
+test("Phase 5 mixed mode sends approval, duration, and constraints to Storyboard", async () => {
+  let call;
+  const services = createServices(
+    {
+      services: { transcript: "mock", analysis: "mock", script: "mock", review: "mock", storyboard: "api", video: "mock" },
+      apiBaseUrl: "http://127.0.0.1:8787",
+    },
+    async (url, options) => {
+      call = { url, body: JSON.parse(options.body) };
+      return { ok: true, json: async () => ({ data: [{
+        id: "scene-1",
+        number: 1,
+        start: 0,
+        end: 60,
+        duration: 60,
+        narration: "Exact narration.",
+        caption: "Exact evidence",
+        visual: "A restrained vertical composition.",
+        searchQuery: "licensed evidence vertical",
+        transition: "Fade up",
+      }] }) };
+    },
+  );
+  const project = createProject({ id: "project-phase-5", duration: 60, format: "9:16" });
+  project.generatedScript = {
+    scriptId: "script-approved",
+    title: "Approved script",
+    version: 2,
+    estimatedSeconds: 59,
+    sections: [{ id: "hook", label: "Hook", range: "0–60s", text: "Exact narration." }],
+  };
+  project.originalityReview = { reviewId: "review-approved", scriptId: "script-approved", status: "passed" };
+  const scenes = await services.generateStoryboard(project);
+  assert.equal(call.url, "http://127.0.0.1:8787/api/storyboards/generate");
+  assert.equal(call.body.approvedReviewId, "review-approved");
+  assert.equal(call.body.script.scriptId, "script-approved");
+  assert.equal(call.body.targetDurationSeconds, 60);
+  assert.equal(call.body.sceneCount, 8);
+  assert.match(call.body.visualConstraints[0], /licensed/);
+  assert.equal(scenes[0].id, "scene-1");
+});
+
+test("the production board identifies the Storyboard Agent before rendering", () => {
+  const project = createProject();
+  project.originalityReview = { status: "passed" };
+  const loading = renderProduction(project);
+  assert.match(loading, /Storyboard Agent/);
+  project.storyboard = [{
+    id: "scene-1", number: 1, start: 0, end: 60, duration: 60,
+    narration: "Narration", caption: "Caption", visual: "Visual", searchQuery: "Query", transition: "Fade up",
+  }];
+  const ready = renderProduction(project);
+  assert.match(ready, /Storyboard Agent · Plan ready/);
 });
 
 test("analysis errors distinguish permanent configuration failures from retryable failures", () => {

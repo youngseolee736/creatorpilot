@@ -1,6 +1,7 @@
 const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst");
 const { OriginalityReviewer } = require("../src/agents/originality-reviewer/originality-reviewer");
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
+const { StoryboardAgent } = require("../src/agents/storyboard/storyboard");
 const { createApp } = require("../src/app");
 
 const transcriptText = "The reference begins with a surprising question, introduces familiar context, compares several approaches, raises practical stakes, and resolves the opening idea near the ending. The presentation uses concise transitions and a final invitation for viewers to reflect on the topic.";
@@ -102,15 +103,44 @@ const reviewerProvider = {
   },
 };
 
+const reviewer = new OriginalityReviewer({ provider: reviewerProvider });
+const storyboardProvider = {
+  async complete(messages) {
+    const payload = JSON.parse(messages[1].content.slice(messages[1].content.indexOf("{")));
+    return JSON.stringify({
+      scenes: payload.scenePlan.map((scene, index) => ({
+        slot: scene.slot,
+        caption: [
+          "A narrow route, global stakes",
+          "Networks beyond one island",
+          "Promises shape decisions",
+          "Uncertainty crosses borders",
+          "Supply chains carry the shock",
+          "Coordination creates resilience",
+          "Peace needs clear choices",
+          "The consequences are global",
+        ][index],
+        visual: `Vertical documentary composition ${index + 1} using maps, infrastructure, and restrained motion graphics tied to the narration.`,
+        searchQuery: `licensed geopolitical infrastructure vertical scene ${index + 1}`,
+        transition: index === 0 ? "Fade up" : index === payload.scenePlan.length - 1 ? "Fade out" : "Straight cut",
+      })),
+    });
+  },
+};
+
 const app = createApp({
   transcriptService,
   scriptAnalyst: new ScriptAnalyst({ provider }),
   scriptwriter: new Scriptwriter({ provider: scriptProvider }),
-  originalityReviewer: new OriginalityReviewer({ provider: reviewerProvider }),
+  originalityReviewer: reviewer,
+  storyboardAgent: new StoryboardAgent({
+    provider: storyboardProvider,
+    reviewResolver: (reviewId) => reviewer.findReview(reviewId),
+  }),
 });
 const port = Number(process.env.PORT || 8787);
 const server = app.listen(port, "127.0.0.1", () => {
-  console.log(`CreatorPilot Phase 4 browser fixture listening on http://127.0.0.1:${port}`);
+  console.log(`CreatorPilot Phase 5 browser fixture listening on http://127.0.0.1:${port}`);
 });
 
 function shutdown() {

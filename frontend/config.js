@@ -7,7 +7,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
     analysis: "api",
     script: "api",
     review: "api",
-    storyboard: "mock",
+    storyboard: "api",
     video: "mock",
   },
   apiBaseUrl: "http://127.0.0.1:8787",

@@ -16,6 +16,7 @@ expect_api_transcript = os.environ.get("CREATORPILOT_EXPECT_API_TRANSCRIPT") == 
 expect_api_analysis = os.environ.get("CREATORPILOT_EXPECT_API_ANALYSIS") == "1"
 expect_api_script = os.environ.get("CREATORPILOT_EXPECT_API_SCRIPT") == "1"
 expect_api_review = os.environ.get("CREATORPILOT_EXPECT_API_REVIEW") == "1"
+expect_api_storyboard = os.environ.get("CREATORPILOT_EXPECT_API_STORYBOARD") == "1"
 expect_transcript_error = os.environ.get("CREATORPILOT_EXPECT_TRANSCRIPT_ERROR") == "1"
 test_youtube_url = os.environ.get(
     "CREATORPILOT_TEST_YOUTUBE_URL",
@@ -123,11 +124,11 @@ browser.command("Runtime.enable")
 browser.command("Log.enable")
 browser.command("Page.enable")
 browser.command("Accessibility.enable")
-if expect_api_analysis or expect_api_script or expect_api_review:
+if expect_api_analysis or expect_api_script or expect_api_review or expect_api_storyboard:
     browser.command("Page.addScriptToEvaluateOnNewDocument", {
         "source": "Object.defineProperty(window, 'CREATORPILOT_CONFIG', {"
         "configurable: false, get() { return Object.freeze({"
-        f"services: {{transcript:'api',analysis:'api',script:'{'api' if expect_api_script else 'mock'}',review:'{'api' if expect_api_review else 'mock'}',storyboard:'mock',video:'mock'}},"
+        f"services: {{transcript:'api',analysis:'api',script:'{'api' if expect_api_script else 'mock'}',review:'{'api' if expect_api_review else 'mock'}',storyboard:'{'api' if expect_api_storyboard else 'mock'}',video:'mock'}},"
         f"apiBaseUrl:{json.dumps(api_base_url)},renderPollIntervalMs:1500}}); }}, set() {{}} }});"
     })
 browser.command("Emulation.setDeviceMetricsOverride", {
@@ -228,7 +229,9 @@ if expect_api_analysis:
     check(evaluate("document.body.textContent.includes('88% confidence')"), "real analysis confidence renders")
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].analysis.analysisId.startsWith('analysis_')"), "real normalized analysis persists")
     check(not evaluate("document.body.textContent.includes('Return one JSON object only')"), "system prompt is not displayed")
-    if expect_api_review:
+    if expect_api_storyboard:
+        connection_label = "5 production services connected"
+    elif expect_api_review:
         connection_label = "Transcript + analyst + writer + reviewer connected"
     else:
         connection_label = "Transcript + analyst + scriptwriter connected" if expect_api_script else "Transcript + analyst connected"
@@ -267,6 +270,9 @@ check(evaluate("document.querySelector('#app').textContent.includes('CreatorPilo
 
 click("[data-action='approve-production']")
 wait_for("document.querySelectorAll('.scene-row').length === 8", "storyboard generates eight scenes")
+if expect_api_storyboard:
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].storyboard[0].searchQuery.includes('licensed geopolitical')"), "real Storyboard metadata persists")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].storyboard.at(-1).end === 60"), "real Storyboard timeline reaches the target duration")
 capture("storyboard-1280")
 check(evaluate("document.body.textContent.includes('Search query')"), "storyboard includes production metadata")
 set_value("[data-project-setting='voice']", "Min — Clear explainer")

@@ -17,6 +17,7 @@ class OriginalityReviewer {
       unsupportedErrorCode: "REVIEW_INTERNAL_ERROR",
     });
     this.completed = new Map();
+    this.reviewsById = new Map();
     this.inFlight = new Map();
     this.maxCompleted = Number(options.maxCompleted) || 100;
   }
@@ -30,8 +31,18 @@ class OriginalityReviewer {
   }
 
   remember(key, value) {
-    if (this.completed.size >= this.maxCompleted) this.completed.delete(this.completed.keys().next().value);
+    if (this.completed.size >= this.maxCompleted) {
+      const oldestKey = this.completed.keys().next().value;
+      const oldestReview = this.completed.get(oldestKey);
+      this.completed.delete(oldestKey);
+      if (oldestReview?.reviewId) this.reviewsById.delete(oldestReview.reviewId);
+    }
     this.completed.set(key, value);
+    this.reviewsById.set(value.reviewId, value);
+  }
+
+  findReview(reviewId) {
+    return this.reviewsById.get(String(reviewId || "")) || null;
   }
 
   async generateCandidate(input, fingerprint) {

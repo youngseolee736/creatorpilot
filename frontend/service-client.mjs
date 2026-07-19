@@ -121,6 +121,9 @@ function makeApiServices(config, fetchImpl) {
         approvedReviewId: project.originalityReview?.reviewId,
         script: scriptPayload(project),
         format: project.format,
+        targetDurationSeconds: project.duration,
+        sceneCount: 8,
+        visualConstraints: ["Use licensed, original, or generated assets only."],
       });
     },
     async renderVideo(project, onProgress = () => {}) {

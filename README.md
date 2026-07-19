@@ -7,8 +7,8 @@ script editing, similarity review, storyboard generation, and video rendering.
 Phase 1 adds real YouTube transcript extraction. Phase 2 adds a configurable,
 LLM-powered Script Analyst that converts a transcript into validated abstract
 storytelling mechanics. Phase 3 adds real initial and revision Scriptwriter
-flows. Phase 4 adds a real, conservative Originality Reviewer. Storyboarding and
-video production remain mocked.
+flows. Phase 4 adds a real, conservative Originality Reviewer. Phase 5 adds a
+server-authorized Storyboard Agent. Video production remains mocked.
 
 ## Requirements
 
@@ -53,8 +53,9 @@ Set `TRANSCRIPT_PROVIDER=hosted` to use `TRANSCRIPT_API_URL` directly, or set
 retryable local-provider failure. Keep fallback disabled unless the configured
 endpoint is trusted and its request and response contract has been verified.
 
-The Script Analyst, Scriptwriter, and Originality Reviewer default to an
-OpenAI-compatible Chat Completions provider. All values remain server-side:
+The Script Analyst, Scriptwriter, Originality Reviewer, and Storyboard Agent
+default to an OpenAI-compatible Chat Completions provider. All values remain
+server-side:
 
 ```dotenv
 LLM_PROVIDER=openai-compatible
@@ -82,7 +83,7 @@ project content is sent to a backend while mock mode is active. Export produces 
 JSON mock production package rather than a media file.
 
 `frontend/config.js` contains public runtime configuration. The checked-in Phase
-4 development configuration enables API mode through the Reviewer. Keep the
+5 development configuration enables API mode through Storyboard. Keep the
 backend running and use this shape:
 
 ```js
@@ -92,7 +93,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
     analysis: "api",
     script: "api",
     review: "api",
-    storyboard: "mock",
+    storyboard: "api",
     video: "mock",
   },
   apiBaseUrl: "http://127.0.0.1:8787",
@@ -102,7 +103,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
 
 The legacy `useMockServices: true|false` switch remains supported. Per-service
 configuration takes precedence. No backend secret belongs in this public object.
-Set transcript, analysis, script, and review back to `"mock"` for the
+Set transcript, analysis, script, review, and storyboard back to `"mock"` for the
 deterministic, backend-free workflow.
 
 Test transcript extraction directly:
@@ -134,6 +135,12 @@ abstract analysis, and current script because phrase comparison requires both
 texts. The backend controls review identity, overall score, risk bands, pass/fail
 thresholds, and the non-legal disclaimer. Model-proposed phrase evidence is
 accepted only when it is a bounded exact excerpt from the submitted texts.
+
+The Storyboard endpoint accepts only the ID of a passed review that remains in
+the running backend's Reviewer registry. The backend verifies that review against
+the exact script, divides the unchanged narration into scene slots, and controls
+scene IDs and timing. The model proposes captions, visual direction, search
+queries, and transitions; it does not fetch or license assets.
 
 Run one optional live transcript-plus-LLM check only when valid server-side LLM
 credentials are present:
@@ -177,6 +184,18 @@ LIVE_SCRIPT_TOPIC='A new and unrelated topic' \
 npm run test:live-reviewer
 ```
 
+To continue the paid live chain through Storyboard when the live review passes:
+
+```sh
+cd backend
+LLM_API_BASE_URL='https://provider.example/v1' \
+LLM_API_KEY='server-side-key' \
+LLM_MODEL='model-id' \
+LIVE_YOUTUBE_URL='https://www.youtube.com/watch?v=PUBLIC_VIDEO_ID' \
+LIVE_SCRIPT_TOPIC='A new and unrelated topic' \
+npm run test:live-storyboard
+```
+
 Retryable mock failures can be inspected with one of these query parameters:
 
 - `?fail=extractTranscript`
@@ -202,7 +221,7 @@ cd backend && npm test && npm audit
 DevTools connection and checks responsiveness, accessibility names, focus, and
 console errors.
 
-For a credential-free browser check of the Phase 4 HTTP boundary, start the
+For a credential-free browser check of the Phase 5 HTTP boundary, start the
 static server and Chrome DevTools as above, then run the injected fake-provider
 backend and browser test in separate terminals:
 
@@ -215,6 +234,7 @@ CREATORPILOT_EXPECT_API_TRANSCRIPT=1 \
 CREATORPILOT_EXPECT_API_ANALYSIS=1 \
 CREATORPILOT_EXPECT_API_SCRIPT=1 \
 CREATORPILOT_EXPECT_API_REVIEW=1 \
+CREATORPILOT_EXPECT_API_STORYBOARD=1 \
 CREATORPILOT_TEST_YOUTUBE_URL='https://www.youtube.com/watch?v=jNQXAC9IVRw' \
 python3 frontend/tests/browser-cdp.py
 ```
@@ -267,4 +287,6 @@ bounded phrase evidence and supplies a server-controlled verdict and disclaimer.
 The backend has no research, fact-checking, or external plagiarism database and
 cannot guarantee factual accuracy, legal clearance, or exhaustive originality.
 Reviewer results are editorial estimates, not copyright determinations or legal
-advice.
+advice. The Storyboard Agent receives the exact script narration and proposes
+visual metadata only. Search queries do not establish asset availability,
+accuracy, suitability, or licensing.
