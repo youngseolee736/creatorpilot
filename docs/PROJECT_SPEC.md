@@ -22,6 +22,8 @@ whether revision is required, and what action advances the production.
 
 - Professional creator dashboard and project empty state.
 - Backend-mediated public YouTube transcript extraction with mock fallback.
+- Configurable real Script Analyst and Scriptwriter services with per-service
+  mock fallback.
 - One complete, navigable mock production workflow.
 - Editable generated script and persistent browser-local project state.
 - Originality estimate with careful non-legal language.
@@ -31,8 +33,8 @@ whether revision is required, and what action advances the production.
 
 ## Out of scope
 
-- Real AI analysis/generation, stock-footage search, narration, rendering, export,
-  authentication, payments, and cloud persistence.
+- Real originality review, research/fact retrieval, stock-footage search,
+  narration, rendering, export, authentication, payments, and cloud persistence.
 - Copyright clearance or legal guarantees.
 - Copying wording, branding, graphics, or full layouts from reference products.
 
@@ -42,7 +44,7 @@ whether revision is required, and what action advances the production.
   uses Express as its isolated integration layer.
 - Hash routes provide refresh-safe navigation on the existing static server.
 - Project data is stored in versioned local storage for the prototype.
-- Transcript extraction can use the Phase 1 Express API; later services remain
-  asynchronous mocks with retryable error states.
+- Transcript extraction, analysis, and script generation/revision can use the
+  Express API; later services remain asynchronous mocks with retryable errors.
 - UI meaning never relies on color alone; focus, keyboard flow, and status text are
   required.

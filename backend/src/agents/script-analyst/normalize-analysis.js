@@ -107,14 +107,11 @@ function normalizeAnalysis(raw, input) {
   if (!Array.isArray(raw.structure) || raw.structure.length < 2 || raw.structure.length > 24) {
     throw invalid("structure", "invalid_array");
   }
-  let previousEnd = -1;
-  normalized.structure = raw.structure.map((section, index) => {
+  const structureDrafts = raw.structure.map((section, index) => {
     if (!section || typeof section !== "object" || Array.isArray(section)) throw invalid(`structure.${index}`, "invalid_object");
     const start = finiteNumber(section.start, `structure.${index}.start`, { min: 0, max: 7200 });
     const end = finiteNumber(section.end, `structure.${index}.end`, { min: 0, max: 7200 });
     if (end <= start) throw invalid(`structure.${index}.end`, "must_follow_start");
-    if (start < previousEnd) throw invalid(`structure.${index}.start`, "overlaps_previous_section");
-    previousEnd = end;
     return {
       label: stringField(section.label, `structure.${index}.label`, 80),
       start,
@@ -122,14 +119,18 @@ function normalizeAnalysis(raw, input) {
       note: stringField(section.note, `structure.${index}.note`, 300),
     };
   });
-
-  const lastEnd = normalized.structure[normalized.structure.length - 1].end;
-  const durationTolerance = Math.max(5, normalized.estimatedOriginalDuration * 0.25);
-  if (lastEnd > normalized.estimatedOriginalDuration + durationTolerance
-    || Math.abs(lastEnd - normalized.estimatedOriginalDuration) > durationTolerance) {
-    throw invalid("structure", "duration_inconsistent");
-  }
-  if (normalized.hookDuration > normalized.structure[0].end + 2) throw invalid("hookDuration", "timeline_inconsistent");
+  const weights = structureDrafts.map((section) => section.end - section.start);
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  let timelineEnd = 0;
+  normalized.structure = structureDrafts.map((section, index) => {
+    const start = timelineEnd;
+    timelineEnd = index === structureDrafts.length - 1
+      ? normalized.estimatedOriginalDuration
+      : Math.round((timelineEnd + (normalized.estimatedOriginalDuration * weights[index]) / totalWeight) * 1000) / 1000;
+    if (timelineEnd <= start) throw invalid(`structure.${index}`, "duration_too_small");
+    return { label: section.label, start, end: timelineEnd, note: section.note };
+  });
+  normalized.hookDuration = Math.min(normalized.hookDuration, normalized.structure[0].end);
 
   if (containsLongExcerpt(normalized, input.transcript.text)) {
     throw invalid("safety", "long_source_excerpt");

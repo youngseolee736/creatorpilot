@@ -18,7 +18,7 @@ export function renderAnalysis(project) {
           <div><span>Tone</span><strong>${escapeHtml(analysis.tone)}</strong></div>
           <div><span>Pacing</span><strong>${escapeHtml(analysis.pacing)}</strong></div>
         </div>
-        <section class="timeline-section"><div class="section-bar"><div><p class="eyebrow">60-second anatomy</p><h2>Story structure</h2></div><span>${formatTime(analysis.estimatedOriginalDuration)}</span></div>
+        <section class="timeline-section"><div class="section-bar"><div><p class="eyebrow">Reference anatomy</p><h2>Story structure</h2></div><span>${formatTime(analysis.estimatedOriginalDuration)}</span></div>
           <ol class="structure-timeline">${analysis.structure.map((segment, index) => `<li style="--segment:${segment.end - segment.start}"><div class="segment-time"><span>${segment.start}s</span><i></i><span>${segment.end}s</span></div><div><small>0${index + 1}</small><strong>${escapeHtml(segment.label)}</strong><p>${escapeHtml(segment.note)}</p></div></li>`).join("")}</ol>
         </section>
       </section>

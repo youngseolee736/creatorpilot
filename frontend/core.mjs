@@ -52,6 +52,7 @@ export function createProject(input = {}) {
     transcript: input.transcript || null,
     analysis: input.analysis || null,
     generatedScript: input.generatedScript || null,
+    pendingRevisionInstructions: input.pendingRevisionInstructions || null,
     originalityReview: input.originalityReview || null,
     storyboard: input.storyboard || [],
     render: input.render || null,

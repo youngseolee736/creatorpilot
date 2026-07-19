@@ -1,15 +1,16 @@
 # CreatorPilot Backend Handoff Map
 
-Status: Phase 2 transcript extraction and Script Analyst backend implemented;
-Scriptwriter and later workflow services remain mocked.
+Status: Phase 3 transcript extraction, Script Analyst, and Scriptwriter backend
+implemented; Originality Reviewer and later workflow services remain mocked.
 
 ## Runtime boundary
 
 - `frontend/config.js` is public runtime configuration and defaults to `useMockServices: true`.
 - `frontend/service-client.mjs` is the only service selector imported by `frontend/app.js`.
 - Mock mode delegates to `frontend/mock-services.mjs` unchanged.
-- Per-service mode can route transcript extraction and reference analysis through
-  the Express API while script, review, storyboard, and video remain mocked.
+- Per-service mode can route transcript extraction, reference analysis, and
+  script generation/revision through the Express API while review, storyboard,
+  and video remain mocked.
 - No API key, provider credential, or private configuration may be added to `config.js` or any browser bundle.
 - The browser's local storage key remains `creatorpilot:v1`; project cloud persistence is not yet wired into the store.
 
@@ -30,7 +31,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
   services: {
     transcript: "api",
     analysis: "api",
-    script: "mock",
+    script: "api",
     review: "mock",
     storyboard: "mock",
     video: "mock",
@@ -41,8 +42,9 @@ window.CREATORPILOT_CONFIG = Object.freeze({
 ```
 
 The backend selects `LLM_PROVIDER=openai-compatible`. `LLM_API_BASE_URL`,
-`LLM_API_KEY`, and `LLM_MODEL` are required only when the real analysis endpoint
-is called. `LLM_TIMEOUT_MS` defaults to 30000. These variables are server-only.
+`LLM_API_KEY`, and `LLM_MODEL` are required when a real analysis or Scriptwriter
+endpoint is called. `LLM_TIMEOUT_MS` defaults to 30000. These variables are
+server-only.
 
 ## Service summary
 
@@ -124,7 +126,9 @@ transcript/model-contract version.
 
 ### `generateScript(project)`
 
-Current input fields read: `topic`, previous `generatedScript.version`. API mode additionally sends language, duration, audience, reference analysis, and revision instructions.
+Mock mode reads the topic and current version. API mode sends language, duration,
+audience, and allowlisted abstract reference analysis. Initial generation sends
+an empty instruction list. It never sends `project.transcript`.
 
 Current response:
 
@@ -145,7 +149,11 @@ Current response:
 }
 ```
 
-The editor requires stable section IDs, editable text, labels/ranges, title, version, and duration estimate. Add `scriptId` server-side. User edits invalidate `project.originalityReview`. A retry must not silently produce multiple versions; the backend needs idempotency/version rules.
+The implemented backend adds `scriptId`, derives section IDs/ranges and duration,
+and makes one repair attempt for invalid JSON or length. Identical requests are
+coalesced/cached within the running process, so retries do not silently create a
+new version. This cache is not durable across restarts. User edits invalidate
+`project.originalityReview`.
 
 ### `reviewOriginality(project)`
 
@@ -244,7 +252,12 @@ A project-list endpoint is still required before the dashboard can become fully 
 
 ## Revision handoff
 
-The current “Send back to Scriptwriter” action returns the user to the editor and clears the existing review. It does not call a mock AI revision function. `service-client.mjs` nevertheless exposes `reviseScript(project, revisionInstructions)` for the contracted `POST /api/scripts/revise` endpoint. Before wiring a UI action, product/backend must decide whether revision instructions are entered by the user, copied from the review, or both.
+“Send back to Scriptwriter” preserves reviewer instructions locally before
+clearing the stale review. “Write new version” saves current editor changes and
+calls `reviseScript(project, revisionInstructions)`. Reviewer instructions are
+used when available; otherwise the UI sends a neutral request for distinct
+wording while preserving the brief and section functions. Successful revisions
+increment the version, link `supersedesScriptId`, and preserve section IDs.
 
 ## Error and loading behavior already available
 

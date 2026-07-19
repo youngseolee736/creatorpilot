@@ -70,6 +70,7 @@ export async function generateScript(project) {
   await wait(560);
   maybeFail("generateScript");
   return {
+    scriptId: `script_mock_${project.id}_${(project.generatedScript?.version || 0) + 1}`,
     title: project.topic,
     version: (project.generatedScript?.version || 0) + 1,
     estimatedSeconds: 59,
@@ -82,6 +83,22 @@ export async function generateScript(project) {
       { id: "conclusion", label: "Conclusion", range: "51–57s", text: "Walking away might look simpler today, but it would make every future crisis harder." },
       { id: "cta", label: "CTA", range: "57–60s", text: "Follow for one-minute explanations of the forces shaping tomorrow." },
     ],
+  };
+}
+
+export async function reviseScript(project, revisionInstructions = []) {
+  const currentScript = project.generatedScript;
+  const revised = await generateScript(project);
+  return {
+    ...revised,
+    supersedesScriptId: currentScript?.scriptId,
+    sections: revised.sections.map((section, index) => ({
+      ...section,
+      id: currentScript?.sections?.[index]?.id || section.id,
+      text: revisionInstructions.length && index === revised.sections.length - 2
+        ? `${section.text} This version also incorporates the requested editorial direction.`
+        : section.text,
+    })),
   };
 }
 

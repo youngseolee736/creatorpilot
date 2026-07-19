@@ -26,6 +26,7 @@ export function getServiceConfig(runtimeConfig = globalThis.CREATORPILOT_CONFIG)
 
 function scriptPayload(project) {
   return {
+    scriptId: project.generatedScript?.scriptId,
     title: project.generatedScript?.title || project.title,
     version: project.generatedScript?.version || 1,
     estimatedSeconds: project.generatedScript?.estimatedSeconds || project.duration,
@@ -90,7 +91,7 @@ function makeApiServices(config, fetchImpl) {
         targetDurationSeconds: project.duration,
         audience: project.analysis?.targetAudience || "General YouTube audience",
         referenceAnalysis: project.analysis,
-        revisionInstructions: project.originalityReview?.instructions || [],
+        revisionInstructions: [],
       });
     },
     reviewOriginality(project) {
@@ -111,6 +112,7 @@ function makeApiServices(config, fetchImpl) {
         referenceAnalysis: project.analysis,
         currentScript: scriptPayload(project),
         revisionInstructions,
+        preserveSectionIds: true,
       });
     },
     generateStoryboard(project) {
@@ -159,7 +161,7 @@ export function createServices(runtimeConfig, fetchImpl = globalThis.fetch?.bind
     extractTranscript: select("transcript", mockServices.extractTranscript, apiServices?.extractTranscript),
     analyzeReference: select("analysis", mockServices.analyzeReference, apiServices?.analyzeReference),
     generateScript: select("script", mockServices.generateScript, apiServices?.generateScript),
-    reviseScript: select("script", (project) => mockServices.generateScript(project), apiServices?.reviseScript),
+    reviseScript: select("script", mockServices.reviseScript, apiServices?.reviseScript),
     reviewOriginality: select("review", mockServices.reviewOriginality, apiServices?.reviewOriginality),
     generateStoryboard: select("storyboard", mockServices.generateStoryboard, apiServices?.generateStoryboard),
     renderVideo: select("video", mockServices.renderVideo, apiServices?.renderVideo),

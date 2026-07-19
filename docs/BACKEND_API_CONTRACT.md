@@ -146,6 +146,13 @@ TRANSCRIPT_NOT_ANALYZABLE`; `429 LLM_RATE_LIMITED`; `500 LLM_NOT_CONFIGURED` or
 
 Purpose: create a new, topic-specific script using only abstract reference mechanics. Responsible agent: Scriptwriter Agent. Consumed by: Script Editor screen.
 
+Implemented in Phase 3. The endpoint rejects raw transcript fields and allowlists
+the abstract analysis before building the prompt. The model supplies only title
+and narration text; the backend controls IDs, versions, ranges, and speaking-time
+estimates. Identical in-flight requests are coalesced and successful identical
+requests reuse the same result within the running process. Persistence across a
+server restart is not yet available.
+
 Required: `projectId`, `topic`, `targetLanguage`, `targetDurationSeconds`, `audience`, `referenceAnalysis`. Optional: `revisionInstructions` (empty for first draft). Loading UI: “Drafting original narration.” Retry: user-triggered; an idempotent retry must not create duplicate versions.
 
 Request:
@@ -163,7 +170,11 @@ Request:
     "tone": "Urgent, informed, optimistic",
     "pacing": "Fast opening, measured evidence, decisive close",
     "retentionTechniques": ["Expectation reversal", "Open-loop question"],
-    "structure": [{ "label": "Hook", "start": 0, "end": 5, "note": "Contradicts the expected solution" }]
+    "doNotCopy": ["Reference examples", "Distinctive sentence sequences"],
+    "structure": [
+      { "label": "Hook", "start": 0, "end": 5, "note": "Contradicts the expected solution" },
+      { "label": "Development", "start": 5, "end": 60, "note": "Develops and resolves the new topic" }
+    ]
   },
   "revisionInstructions": []
 }
@@ -187,7 +198,9 @@ Success (`201`):
 }
 ```
 
-Errors: `400 INVALID_SCRIPT_BRIEF`; `404 PROJECT_OR_ANALYSIS_NOT_FOUND`; `409 SCRIPT_GENERATION_IN_PROGRESS`; `422 UNSUPPORTED_LANGUAGE_OR_DURATION`; `429 MODEL_RATE_LIMITED`; `502 MODEL_PROVIDER_ERROR`; `504 SCRIPT_TIMEOUT`.
+Errors: `400 INVALID_SCRIPT_BRIEF`; `429 LLM_RATE_LIMITED`; `500
+LLM_NOT_CONFIGURED` or `SCRIPT_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or
+`INVALID_LLM_RESPONSE`; `504 LLM_TIMEOUT`.
 
 ## `POST /api/scripts/review`
 
@@ -245,7 +258,7 @@ Errors: `400 INVALID_REVIEW_INPUT`; `404 SCRIPT_OR_REFERENCE_NOT_FOUND`; `409 RE
 
 ## `POST /api/scripts/revise`
 
-Purpose: produce a new script version from explicit review/user instructions. Responsible agent: Scriptwriter Agent. Consumed by: Script Editor after “Send back to Scriptwriter”; current mock UI supports manual editing and will adopt this call when AI-assisted revision is enabled.
+Purpose: produce a new script version from explicit review/user instructions. Responsible agent: Scriptwriter Agent. Consumed by: Script Editor after “Send back to Scriptwriter” or “Write new version.” The Phase 3 UI preserves the current draft, calls this endpoint, and stores version lineage locally.
 
 Required: `projectId`, topic/language/duration/audience, `referenceAnalysis`, `currentScript`, and at least one `revisionInstructions` item. Optional: `preserveSectionIds`. Loading UI: “Writing a new version.” Retry: user-triggered and idempotent for the same script version/instructions.
 
@@ -258,7 +271,18 @@ Request:
   "targetLanguage": "English",
   "targetDurationSeconds": 60,
   "audience": "Curious general audience interested in geopolitics",
-  "referenceAnalysis": { "analysisId": "an_01JZ8R", "hookType": "Counter-intuitive claim" },
+  "referenceAnalysis": {
+    "analysisId": "an_01JZ8R",
+    "hookType": "Counter-intuitive claim",
+    "tone": "Urgent, informed",
+    "pacing": "Fast opening, decisive close",
+    "retentionTechniques": ["Expectation reversal"],
+    "doNotCopy": ["Reference examples", "Distinctive sentence sequences"],
+    "structure": [
+      { "label": "Hook", "start": 0, "end": 5, "note": "Create curiosity" },
+      { "label": "Development", "start": 5, "end": 60, "note": "Develop and resolve the new topic" }
+    ]
+  },
   "currentScript": {
     "scriptId": "sc_01JZ8S",
     "version": 1,
@@ -287,7 +311,9 @@ Success (`201`):
 }
 ```
 
-Errors: `400 REVISION_INSTRUCTIONS_REQUIRED`; `404 SCRIPT_OR_ANALYSIS_NOT_FOUND`; `409 STALE_SCRIPT_VERSION`; `422 REVISION_NOT_POSSIBLE`; `429 MODEL_RATE_LIMITED`; `502 MODEL_PROVIDER_ERROR`; `504 REVISION_TIMEOUT`.
+Errors: `400 REVISION_INSTRUCTIONS_REQUIRED` or `INVALID_SCRIPT_BRIEF`; `429
+LLM_RATE_LIMITED`; `500 LLM_NOT_CONFIGURED` or `SCRIPT_INTERNAL_ERROR`; `502
+LLM_PROVIDER_ERROR` or `INVALID_LLM_RESPONSE`; `504 LLM_TIMEOUT`.
 
 ## `POST /api/storyboards/generate`
 

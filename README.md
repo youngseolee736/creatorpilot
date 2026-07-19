@@ -6,8 +6,8 @@ script editing, similarity review, storyboard generation, and video rendering.
 
 Phase 1 adds real YouTube transcript extraction. Phase 2 adds a configurable,
 LLM-powered Script Analyst that converts a transcript into validated abstract
-storytelling mechanics. Scriptwriting, originality review, storyboarding, and
-video production remain mocked.
+storytelling mechanics. Phase 3 adds real initial and revision Scriptwriter
+flows. Originality review, storyboarding, and video production remain mocked.
 
 ## Requirements
 
@@ -52,8 +52,8 @@ Set `TRANSCRIPT_PROVIDER=hosted` to use `TRANSCRIPT_API_URL` directly, or set
 retryable local-provider failure. Keep fallback disabled unless the configured
 endpoint is trusted and its request and response contract has been verified.
 
-The Script Analyst defaults to an OpenAI-compatible Chat Completions provider.
-All values remain server-side:
+The Script Analyst and Scriptwriter default to an OpenAI-compatible Chat
+Completions provider. All values remain server-side:
 
 ```dotenv
 LLM_PROVIDER=openai-compatible
@@ -63,8 +63,8 @@ LLM_MODEL=replace-with-model-id
 LLM_TIMEOUT_MS=30000
 ```
 
-The backend and mock-only frontend work without these values. Calling the real
-analysis endpoint without complete configuration returns `LLM_NOT_CONFIGURED`.
+The backend and mock-only frontend work without these values. Calling either
+real LLM endpoint without complete configuration returns `LLM_NOT_CONFIGURED`.
 Never add an LLM key to `frontend/config.js`.
 
 ## Frontend setup
@@ -81,7 +81,7 @@ project content is sent to a backend while mock mode is active. Export produces 
 JSON mock production package rather than a media file.
 
 `frontend/config.js` contains public runtime configuration and defaults every
-service to mock mode. For the Phase 2 mixed workflow, keep the backend running
+service to mock mode. For the Phase 3 mixed workflow, keep the backend running
 and use this configuration:
 
 ```js
@@ -89,7 +89,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
   services: {
     transcript: "api",
     analysis: "api",
-    script: "mock",
+    script: "api",
     review: "mock",
     storyboard: "mock",
     video: "mock",
@@ -123,6 +123,11 @@ The analysis endpoint follows the request schema in
 `docs/BACKEND_API_CONTRACT.md`: `projectId`, the normalized `transcript`,
 `targetDurationSeconds`, and optional `analysisLanguage`.
 
+The Scriptwriter endpoint accepts the topic, language, duration, audience, and
+normalized abstract analysis. It intentionally rejects a raw transcript. Script
+IDs, section IDs, version lineage, ranges, and speaking-time estimates are
+controlled by the backend rather than accepted from the model.
+
 Run one optional live transcript-plus-LLM check only when valid server-side LLM
 credentials are present:
 
@@ -137,6 +142,20 @@ npm run test:live-analysis
 
 Without those LLM variables, the command reports `SKIP` and makes no paid API
 request.
+
+To perform the full live transcript, analysis, and first-draft check, explicitly
+provide a new topic. This can make more than one paid LLM request because invalid
+JSON or script length receives one repair attempt:
+
+```sh
+cd backend
+LLM_API_BASE_URL='https://provider.example/v1' \
+LLM_API_KEY='server-side-key' \
+LLM_MODEL='model-id' \
+LIVE_YOUTUBE_URL='https://www.youtube.com/watch?v=PUBLIC_VIDEO_ID' \
+LIVE_SCRIPT_TOPIC='A new and unrelated topic' \
+npm run test:live-scriptwriter
+```
 
 Retryable mock failures can be inspected with one of these query parameters:
 
@@ -163,7 +182,7 @@ cd backend && npm test && npm audit
 DevTools connection and checks responsiveness, accessibility names, focus, and
 console errors.
 
-For a credential-free browser check of the Phase 2 HTTP boundary, start the
+For a credential-free browser check of the Phase 3 HTTP boundary, start the
 static server and Chrome DevTools as above, then run the injected fake-provider
 backend and browser test in separate terminals:
 
@@ -174,6 +193,7 @@ cd backend && npm run dev:browser-fixture
 ```sh
 CREATORPILOT_EXPECT_API_TRANSCRIPT=1 \
 CREATORPILOT_EXPECT_API_ANALYSIS=1 \
+CREATORPILOT_EXPECT_API_SCRIPT=1 \
 CREATORPILOT_TEST_YOUTUBE_URL='https://www.youtube.com/watch?v=jNQXAC9IVRw' \
 python3 frontend/tests/browser-cdp.py
 ```
@@ -206,7 +226,7 @@ The backend does not store transcripts in Phase 1, does not log transcript bodie
 rejects malformed provider output, and maps provider timeouts, rate limits, and
 unavailable captions to structured user-safe errors.
 
-## Script Analyst privacy and limitations
+## Script Analyst and Scriptwriter privacy and limitations
 
 When analysis API mode is enabled, the full transcript and timing segments are
 sent from the CreatorPilot backend to the configured LLM provider. CreatorPilot
@@ -218,6 +238,10 @@ The Script Analyst treats transcript text as untrusted content, requests JSON
 only, validates and normalizes the result, rejects long source excerpts, and
 makes one structured repair attempt for malformed JSON. These controls reduce
 risk but do not make model analysis deterministic or guarantee originality.
-Later Scriptwriter output remains mocked, and the real Originality Reviewer has
-not yet been implemented. Its future similarity checks will be product estimates,
-not copyright clearance or legal advice.
+The Scriptwriter receives the new-topic brief and abstract analysis but never the
+raw reference transcript. Revision requests additionally send the current draft
+and explicit instructions to the configured provider. The backend validates the
+section plan and duration, but it has no research or fact-checking service and
+cannot guarantee factual accuracy or originality. The real Originality Reviewer
+has not yet been implemented. Its future similarity checks will be product
+estimates, not copyright clearance or legal advice.

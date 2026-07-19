@@ -1,11 +1,11 @@
 // Public runtime configuration only. Never place API keys or secrets in this file.
 // Deployment environments may replace this object without rebuilding the frontend.
 window.CREATORPILOT_CONFIG = Object.freeze({
-  useMockServices: true,
+  useMockServices: false,
   services: {
-    transcript: "mock",
-    analysis: "mock",
-    script: "mock",
+    transcript: "api",
+    analysis: "api",
+    script: "api",
     review: "mock",
     storyboard: "mock",
     video: "mock",

@@ -198,13 +198,91 @@ test("Phase 2 mixed mode uses API transcript and analysis while later agents sta
   assert.equal(project.generatedScript.version, 1);
 });
 
+test("Phase 3 mixed mode sends abstract analysis to the Scriptwriter without a transcript", async () => {
+  const calls = [];
+  const services = createServices(
+    {
+      services: { transcript: "mock", analysis: "mock", script: "api", review: "mock", storyboard: "mock", video: "mock" },
+      apiBaseUrl: "http://127.0.0.1:8787",
+    },
+    async (url, options) => {
+      const body = JSON.parse(options.body);
+      calls.push({ url, body });
+      return { ok: true, json: async () => ({ data: {
+        scriptId: "script_api_v1",
+        title: "An API-generated script",
+        version: 1,
+        estimatedSeconds: 58,
+        sections: [{ id: "hook", label: "Hook", range: "0–60s", text: "A complete original narration." }],
+      } }) };
+    },
+  );
+  const project = createProject({ id: "project-phase-3", topic: "A new topic", language: "English" });
+  project.transcript = { transcriptId: "tr_private", text: "Raw reference wording must not be sent." };
+  project.analysis = await analyzeReference(project);
+  project.generatedScript = await services.generateScript(project);
+  assert.equal(calls[0].url, "http://127.0.0.1:8787/api/scripts/generate");
+  assert.equal(Object.prototype.hasOwnProperty.call(calls[0].body, "transcript"), false);
+  assert.equal(calls[0].body.referenceAnalysis.analysisId, project.analysis.analysisId);
+  assert.deepEqual(calls[0].body.revisionInstructions, []);
+  assert.equal(project.generatedScript.scriptId, "script_api_v1");
+});
+
+test("Scriptwriter revision sends version lineage, instructions, and stable-ID preference", async () => {
+  let call;
+  const services = createServices(
+    {
+      services: { transcript: "mock", analysis: "mock", script: "api", review: "mock", storyboard: "mock", video: "mock" },
+      apiBaseUrl: "http://127.0.0.1:8787",
+    },
+    async (url, options) => {
+      call = { url, body: JSON.parse(options.body) };
+      return { ok: true, json: async () => ({ data: {
+        scriptId: "script_api_v2",
+        supersedesScriptId: "script_api_v1",
+        title: "Revised script",
+        version: 2,
+        estimatedSeconds: 59,
+        sections: [{ id: "hook", label: "Hook", range: "0–60s", text: "A revised original narration." }],
+      } }) };
+    },
+  );
+  const project = createProject({ id: "project-revision", topic: "A new topic", language: "English" });
+  project.analysis = await analyzeReference(project);
+  project.generatedScript = {
+    scriptId: "script_api_v1",
+    title: "First script",
+    version: 1,
+    estimatedSeconds: 58,
+    sections: [{ id: "hook", label: "Hook", range: "0–60s", text: "The first narration." }],
+  };
+  const revised = await services.reviseScript(project, ["Use a more concrete conclusion."]);
+  assert.equal(call.url, "http://127.0.0.1:8787/api/scripts/revise");
+  assert.equal(call.body.currentScript.scriptId, "script_api_v1");
+  assert.deepEqual(call.body.revisionInstructions, ["Use a more concrete conclusion."]);
+  assert.equal(call.body.preserveSectionIds, true);
+  assert.equal(Object.prototype.hasOwnProperty.call(call.body, "transcript"), false);
+  assert.equal(revised.version, 2);
+});
+
 test("analysis errors distinguish permanent configuration failures from retryable failures", () => {
   const permanent = errorNotice({ code: "LLM_NOT_CONFIGURED", message: "Configure the provider.", retryable: false }, "retry-analysis");
   assert.match(permanent, /not configured/);
   assert.doesNotMatch(permanent, />Retry</);
   const retryable = errorNotice({ code: "LLM_TIMEOUT", message: "Timed out.", retryable: true }, "retry-analysis");
-  assert.match(retryable, /analysis took too long/);
+  assert.match(retryable, /Script Analyst took too long/);
   assert.match(retryable, />Retry</);
+});
+
+test("analysis contract errors explain safe validation categories", () => {
+  const notice = errorNotice({
+    code: "INVALID_LLM_RESPONSE",
+    message: "The response did not match the contract.",
+    retryable: true,
+    details: [{ field: "structure", reason: "duration_inconsistent" }],
+  }, "retry-analysis");
+  assert.match(notice, /section timeline did not match the reference duration/);
+  assert.doesNotMatch(notice, /transcript text|API key/i);
 });
 
 let failures = 0;

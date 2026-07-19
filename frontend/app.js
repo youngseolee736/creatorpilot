@@ -14,6 +14,7 @@ import {
   generateStoryboard,
   renderVideo,
   reviewOriginality,
+  reviseScript,
 } from "./service-client.mjs";
 import { appShell } from "./components.mjs";
 import { renderDashboard } from "./pages/dashboard.mjs";
@@ -137,6 +138,35 @@ async function ensureScript(project, { force = false } = {}) {
       current = store.updateProject(project.id, {
         generatedScript,
         originalityReview: null,
+        status: "script_generated",
+        pipeline: updatePipeline(current, "writer", "completed", `Draft ${generatedScript.version} ready for editing`),
+      });
+      render({ preserveFocus: true });
+    } catch (error) {
+      failProject(current, "writer", error);
+    }
+  });
+}
+
+async function ensureScriptRevision(project, revisionInstructions) {
+  await runTask(`script:${project.id}`, async () => {
+    let current = store.getProject(project.id);
+    if (!current.generatedScript) return ensureScript(current);
+    const instructions = revisionInstructions?.length
+      ? revisionInstructions
+      : ["Create a fresh version with distinct wording while preserving the brief and section functions."];
+    try {
+      current = store.updateProject(project.id, {
+        error: null,
+        pendingRevisionInstructions: instructions,
+        pipeline: updatePipeline(current, "writer", "in_progress", "Writing a new version"),
+      });
+      render({ preserveFocus: true });
+      const generatedScript = await reviseScript(current, instructions);
+      current = store.updateProject(project.id, {
+        generatedScript,
+        originalityReview: null,
+        pendingRevisionInstructions: null,
         status: "script_generated",
         pipeline: updatePipeline(current, "writer", "completed", `Draft ${generatedScript.version} ready for editing`),
       });
@@ -305,10 +335,11 @@ app.addEventListener("click", async (event) => {
   if (!project && !["clear-projects"].includes(action)) return;
   if (action === "generate-script") navigate(routeFor("script", project.id));
   if (action === "regenerate-script") {
-    saveScriptForm(project);
-    store.updateProject(project.id, { generatedScript: null, originalityReview: null });
-    render({ preserveFocus: true });
-    ensureScript(store.getProject(project.id), { force: true });
+    const saved = saveScriptForm(project);
+    const instructions = saved.pendingRevisionInstructions
+      || saved.originalityReview?.instructions
+      || ["Create a fresh version with distinct wording while preserving the brief and section functions."];
+    ensureScriptRevision(saved, instructions);
   }
   if (action === "save-script") {
     saveScriptForm(project);
@@ -318,6 +349,7 @@ app.addEventListener("click", async (event) => {
   if (action === "send-back-script") {
     store.updateProject(project.id, {
       status: "revision_required",
+      pendingRevisionInstructions: project.originalityReview?.instructions || [],
       originalityReview: null,
       pipeline: updatePipeline(project, "reviewer", "revision_required", "Returned with revision guidance"),
     });
@@ -350,7 +382,12 @@ app.addEventListener("click", async (event) => {
   if (action === "retry-script") {
     store.updateProject(project.id, { error: null });
     render({ preserveFocus: true });
-    ensureScript(store.getProject(project.id));
+    const current = store.getProject(project.id);
+    if (current.generatedScript && current.pendingRevisionInstructions?.length) {
+      ensureScriptRevision(current, current.pendingRevisionInstructions);
+    } else {
+      ensureScript(current);
+    }
   }
   if (action === "retry-review") {
     store.updateProject(project.id, { error: null });

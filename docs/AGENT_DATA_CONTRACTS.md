@@ -231,6 +231,12 @@ Example output:
 
 Role: write an original script for the user's topic. The required input explicitly includes topic, target language, duration, audience, reference analysis, and revision instructions. The agent must not receive the raw reference transcript.
 
+Implementation note: the model returns only `title` and ordered section
+`slot`/`label`/`text` values. The backend derives the public `scriptId`, version
+lineage, stable section IDs, ranges, and speaking-time estimate. It rejects raw
+transcript fields, allowlists abstract analysis fields, and makes at most one
+repair attempt for malformed or incorrectly sized model output.
+
 Input schema:
 
 ```json

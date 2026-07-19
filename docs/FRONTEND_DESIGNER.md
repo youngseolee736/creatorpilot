@@ -55,11 +55,26 @@ unless the user explicitly requests the full process.
 
 For each reference:
 
-1. Document the product, page or feature, URL, and review date.
-2. Explain why the reference was selected.
-3. Identify the specific pattern being adapted.
-4. Explain how the pattern will be changed for CreatorPilot.
-5. Identify elements that must not be copied.
+1. Document the product, page or feature, and URL. Each reference carries its
+   own review date — the day it was actually opened and inspected, not the day
+   the document was drafted.
+2. Record at least one concrete element observed during that review: a specific
+   layout behavior, component, copy pattern, or flow seen on the live page. If
+   the reference could not be opened or verified, say so plainly and do not
+   describe it from memory or assumption.
+3. Explain why the reference was selected.
+4. Identify the specific pattern being adapted.
+5. Explain how the pattern will be changed for CreatorPilot.
+6. Identify elements that must not be copied.
+
+When practical, store a dated screenshot or short observation note under
+`docs/references/` so later work can audit what was actually seen. Remove or
+archive reference material that no longer describes the current product.
+
+References go stale as products redesign. Before reusing a reference whose
+review date is more than six months old, or whose referenced product has
+visibly changed, open it again and refresh the recorded review date and
+observations.
 
 Use **adapted**, not **copied**, when describing design influence. Never copy
 logos, text, proprietary graphics, or an entire layout. References are evidence
@@ -95,8 +110,11 @@ Before implementing a major frontend task:
 6. Compare the actual result against the desired result and references.
 7. Revise weak areas before reporting completion.
 
-Store the plan under `docs/plans/active/`. When the work and completion report
-are finished, move it to `docs/plans/completed/`.
+Store the plan under `docs/plans/active/`. The task is not complete until the
+plan reflects the work as actually delivered — final validation counts, the
+self-review log, and the changed-file list — and the plan has moved to
+`docs/plans/completed/`. Do not report completion while the plan still sits in
+`active/` or still describes an earlier state of the work.
 
 ## Implementation workflow
 
@@ -106,7 +124,10 @@ are finished, move it to `docs/plans/completed/`.
 4. Create a reverse implementation plan for major work.
 5. Build the smallest coherent user journey before adding secondary decoration.
 6. Implement responsive behavior and all relevant interface states.
-7. Run the repository's relevant formatting, lint, test, and build checks.
+7. Run the automated checks that actually exist in the repository (for example
+   the node tests and the browser workflow fixture). If a class of check has no
+   tooling — formatting, linting, or automated contrast measurement — say so in
+   the completion report instead of claiming it was performed.
 8. Inspect the application in a browser at the required viewport sizes.
 9. Complete a self-review, fix weaknesses, and repeat relevant validation.
 10. Report the result and any validation that could not be performed.
@@ -121,6 +142,9 @@ references, and the following questions:
 - Are creator inputs, agent outputs, mock data, and uncertainty distinct?
 - Does the interface feel focused, credible, and specific to creator production?
 - Is any visual treatment decorative, repetitive, or unsupported by a user need?
+- Do final screenshots remain clearly distinct from every documented reference —
+  no shared branding, layout, or distinctive element that reads as copied rather
+  than adapted?
 - Do loading, empty, success, validation-error, and API-error states work?
 - Does the layout remain intentional at desktop, tablet, and mobile sizes?
 - Can the core flow be completed with a keyboard and understood without relying
@@ -136,7 +160,8 @@ first working result as the final result.
 
 A major frontend task is complete only when it includes:
 
-- 3–5 documented references;
+- 3–5 documented references, each with its own review date and at least one
+  observed element, re-verified before reuse when stale;
 - a written desired outcome;
 - a reverse implementation plan;
 - responsive implementation;
@@ -147,9 +172,14 @@ A major frontend task is complete only when it includes:
 - mobile review at approximately 390px viewport width;
 - browser console review;
 - keyboard completion of the core flow, visible focus, semantic controls,
-  accessible names or labels, non-color-only meaning, and basic text contrast;
+  accessible names or labels, non-color-only meaning, and text contrast checked
+  with the best available method (tooling when present, otherwise an explicit
+  manual judgment recorded as a limitation);
+- a reference distance check comparing final screenshots with every documented
+  reference;
 - at least one explicit self-review pass;
-- revision of weaknesses found during self-review; and
+- revision of weaknesses found during self-review;
+- the plan updated to its final state and moved to `docs/plans/completed/`; and
 - accurate reporting of files changed and testing performed.
 
 If a required validation is unavailable, state that clearly. Do not claim full
@@ -183,12 +213,19 @@ Do not expose or modify authentication secrets, API keys, or deployment settings
 without explicit approval. Raise backend or data concerns as documented findings
 rather than expanding the frontend task without authorization.
 
+Other people or agents may be working in this repository at the same time. Keep
+changes scoped to the files the current task requires. Do not revert, reformat,
+rename, or tidy files outside the task scope — including uncommitted work you
+did not author — and do not move or delete plans, references, or evidence that
+belong to another in-flight task.
+
 ## Required completion report
 
 Every major frontend completion report must include:
 
 1. **Outcome:** what was delivered and which user problem it addresses.
-2. **Design evidence:** references used and the patterns adapted.
+2. **Design evidence:** references used, their review dates, what was actually
+   observed, and the patterns adapted.
 3. **Files changed:** an accurate list grouped by purpose.
 4. **Validation:** commands run, browser sizes inspected, console results,
    accessibility checks, and their outcomes.

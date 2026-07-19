@@ -12,6 +12,7 @@ class OpenAICompatibleProvider extends LLMProvider {
     this.timeoutMs = Number(options.timeoutMs ?? process.env.LLM_TIMEOUT_MS ?? 30000);
     this.fetchImpl = options.fetchImpl || fetch;
     this.AbortControllerImpl = options.AbortControllerImpl || AbortController;
+    this.agentLabel = options.agentLabel || "AI agent";
   }
 
   endpoint() {
@@ -22,13 +23,13 @@ class OpenAICompatibleProvider extends LLMProvider {
 
   validateConfiguration() {
     if (!this.apiBaseUrl || !this.apiKey || !this.model || !Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0) {
-      throw llmConfigurationError();
+      throw llmConfigurationError(this.agentLabel);
     }
     try {
       const url = new URL(this.endpoint());
       if (url.protocol !== "https:" && url.hostname !== "127.0.0.1" && url.hostname !== "localhost") throw new Error("unsafe protocol");
     } catch {
-      throw llmConfigurationError();
+      throw llmConfigurationError(this.agentLabel);
     }
   }
 
@@ -76,9 +77,9 @@ class OpenAICompatibleProvider extends LLMProvider {
       if (controller.signal.aborted) {
         const timeoutError = new Error("LLM request aborted after timeout");
         timeoutError.name = "AbortError";
-        throw mapLLMError(timeoutError);
+        throw mapLLMError(timeoutError, this.agentLabel);
       }
-      throw mapLLMError(error);
+      throw mapLLMError(error, this.agentLabel);
     } finally {
       clearTimeout(timeout);
     }

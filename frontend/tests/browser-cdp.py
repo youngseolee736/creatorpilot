@@ -14,6 +14,7 @@ from pathlib import Path
 
 expect_api_transcript = os.environ.get("CREATORPILOT_EXPECT_API_TRANSCRIPT") == "1"
 expect_api_analysis = os.environ.get("CREATORPILOT_EXPECT_API_ANALYSIS") == "1"
+expect_api_script = os.environ.get("CREATORPILOT_EXPECT_API_SCRIPT") == "1"
 expect_transcript_error = os.environ.get("CREATORPILOT_EXPECT_TRANSCRIPT_ERROR") == "1"
 test_youtube_url = os.environ.get(
     "CREATORPILOT_TEST_YOUTUBE_URL",
@@ -120,11 +121,11 @@ browser.command("Runtime.enable")
 browser.command("Log.enable")
 browser.command("Page.enable")
 browser.command("Accessibility.enable")
-if expect_api_analysis:
+if expect_api_analysis or expect_api_script:
     browser.command("Page.addScriptToEvaluateOnNewDocument", {
         "source": "Object.defineProperty(window, 'CREATORPILOT_CONFIG', {"
         "configurable: false, get() { return Object.freeze({"
-        "services: {transcript:'api',analysis:'api',script:'mock',review:'mock',storyboard:'mock',video:'mock'},"
+        f"services: {{transcript:'api',analysis:'api',script:'{'api' if expect_api_script else 'mock'}',review:'mock',storyboard:'mock',video:'mock'}},"
         "apiBaseUrl:'http://127.0.0.1:8787',renderPollIntervalMs:1500}); }, set() {} });"
     })
 browser.command("Emulation.setDeviceMetricsOverride", {
@@ -217,16 +218,25 @@ if expect_transcript_error:
 wait_for("document.querySelectorAll('.structure-timeline li').length === 6", "reference analysis completes")
 capture("analysis-1280")
 check(evaluate("document.querySelectorAll('.pipeline-completed').length >= 2"), "transcript and analyst pipeline stages complete")
+check(evaluate("(() => { const main = document.querySelector('.analysis-main').getBoundingClientRect(); const aside = document.querySelector('.analysis-aside').getBoundingClientRect(); return main.right <= aside.left + 1; })()"), "analysis columns do not overlap")
+check(evaluate("[...document.querySelectorAll('.analysis-overview > div, .analysis-aside > section')].every((element) => element.scrollWidth <= element.clientWidth + 1)"), "long analysis text stays inside its container")
 expected_transcript_label = "extracted transcript" if expect_api_transcript else "mock transcript"
 check(evaluate(f"document.querySelector('.transcript-disclosure').textContent.includes({json.dumps(expected_transcript_label)})"), "transcript preview is available")
 if expect_api_analysis:
     check(evaluate("document.body.textContent.includes('88% confidence')"), "real analysis confidence renders")
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].analysis.analysisId.startsWith('analysis_')"), "real normalized analysis persists")
     check(not evaluate("document.body.textContent.includes('Return one JSON object only')"), "system prompt is not displayed")
-    check(evaluate("document.body.textContent.includes('Transcript + analyst connected')"), "hybrid service state is labeled accurately")
+    connection_label = "Transcript + analyst + scriptwriter connected" if expect_api_script else "Transcript + analyst connected"
+    check(evaluate(f"document.body.textContent.includes({json.dumps(connection_label)})"), "hybrid service state is labeled accurately")
 
 click("[data-action='generate-script']")
-wait_for("document.querySelectorAll('[data-script-section]').length === 7", "original script generates")
+expected_script_sections = 6 if expect_api_script else 7
+wait_for(f"document.querySelectorAll('[data-script-section]').length === {expected_script_sections}", "original script generates")
+if expect_api_script:
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].generatedScript.scriptId.startsWith('script_')"), "real Scriptwriter draft persists")
+    click("[data-action='regenerate-script']")
+    wait_for("document.querySelector('.editor-toolbar').textContent.includes('Draft 2')", "Scriptwriter revision creates version two")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].generatedScript.supersedesScriptId.startsWith('script_')"), "revision lineage persists")
 capture("script-1280")
 set_value("#section-hook", "A single shipping lane can change the balance of an entire region.")
 click("#script-form button[type='submit']")
@@ -239,7 +249,7 @@ check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].
 
 click("[data-action='send-back-script']")
 wait_for("Boolean(document.querySelector('#script-form'))", "review can return to the Scriptwriter")
-set_value("#section-conclusion", "The easier choice today can create the more dangerous crisis tomorrow.")
+set_value(".script-section:nth-last-child(2) textarea", "The easier choice today can create the more dangerous crisis tomorrow.")
 click("#script-form button[type='submit']")
 wait_for("document.querySelectorAll('.score-ring').length === 4", "revised script receives a fresh review")
 

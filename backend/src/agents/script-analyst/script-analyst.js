@@ -11,7 +11,11 @@ const { validateAnalysisRequest } = require("./script-analyst-schema");
 
 class ScriptAnalyst {
   constructor(options = {}) {
-    this.provider = options.provider || createLLMProvider(options.llmOptions);
+    this.provider = options.provider || createLLMProvider({
+      ...(options.llmOptions || {}),
+      agentLabel: "Script Analyst",
+      unsupportedErrorCode: "ANALYSIS_INTERNAL_ERROR",
+    });
   }
 
   async providerComplete(messages) {
@@ -29,17 +33,16 @@ class ScriptAnalyst {
       { role: "user", content: buildAnalysisUserPrompt(input) },
     ]);
 
-    let parsed;
     try {
-      parsed = parseAnalysisJSON(raw);
-    } catch {
+      return normalizeAnalysis(parseAnalysisJSON(raw), input);
+    } catch (error) {
+      if (error?.code !== "INVALID_LLM_RESPONSE") throw error;
       const repaired = await this.providerComplete([
         { role: "system", content: JSON_REPAIR_SYSTEM_PROMPT },
-        { role: "user", content: buildRepairUserPrompt(raw) },
+        { role: "user", content: buildRepairUserPrompt(raw, error, input) },
       ]);
-      parsed = parseAnalysisJSON(repaired);
+      return normalizeAnalysis(parseAnalysisJSON(repaired), input);
     }
-    return normalizeAnalysis(parsed, input);
   }
 }
 

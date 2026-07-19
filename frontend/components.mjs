@@ -6,6 +6,9 @@ function studioConnectionLabel() {
   const apiServices = Object.entries(services).filter(([, mode]) => mode === "api").map(([name]) => name);
   if (!apiServices.length) return { mode: "Mock studio", detail: "No AI backend connected" };
   if (services.transcript === "api" && services.analysis === "api") {
+    if (services.script === "api") {
+      return { mode: "Hybrid studio", detail: "Transcript + analyst + scriptwriter connected" };
+    }
     return { mode: "Hybrid studio", detail: "Transcript + analyst connected" };
   }
   return { mode: "Hybrid studio", detail: `${apiServices.length} API service${apiServices.length === 1 ? "" : "s"} connected` };
@@ -79,22 +82,37 @@ export function pageHeading(eyebrow, title, description, action = "") {
   return `<header class="page-heading"><div><p class="eyebrow">${escapeHtml(eyebrow)}</p><h1>${escapeHtml(title)}</h1>${description ? `<p>${escapeHtml(description)}</p>` : ""}</div>${action}</header>`;
 }
 
-export function errorNotice(error, retryAction) {
+export function errorNotice(error, retryAction, agentLabel = "Script Analyst") {
   if (!error) return "";
   const titles = {
-    LLM_NOT_CONFIGURED: "The Script Analyst is not configured.",
-    LLM_TIMEOUT: "The analysis took too long.",
-    LLM_RATE_LIMITED: "The Script Analyst is temporarily busy.",
+    LLM_NOT_CONFIGURED: `The ${agentLabel} is not configured.`,
+    LLM_TIMEOUT: `The ${agentLabel} took too long.`,
+    LLM_RATE_LIMITED: `The ${agentLabel} is temporarily busy.`,
     INVALID_LLM_RESPONSE: "The model response could not be validated.",
     TRANSCRIPT_TOO_LARGE: "This transcript is too large to analyze.",
     TRANSCRIPT_NOT_ANALYZABLE: "This transcript cannot be analyzed reliably.",
-    LLM_PROVIDER_ERROR: "The Script Analyst provider is unavailable.",
+    LLM_PROVIDER_ERROR: `The ${agentLabel} provider is unavailable.`,
   };
   const title = titles[error.code] || "The agent stopped before completing this stage.";
+  const validationReason = error.details?.[0]?.reason;
+  const validationHints = {
+    duration_inconsistent: "The model's section timeline did not match the reference duration.",
+    timeline_inconsistent: "The model returned inconsistent section or hook timing.",
+    overlaps_previous_section: "The model returned overlapping analysis sections.",
+    contained_by_previous_section: "The model returned a section entirely inside the previous section.",
+    long_source_excerpt: "The response included more source wording than the safety contract allows.",
+    malformed_json: "The model did not return a complete JSON analysis object.",
+    required: "The model omitted one or more required analysis fields.",
+    required_string: "A required analysis field was empty or invalid.",
+    invalid_array: "A required analysis list or section list was incomplete.",
+  };
+  const message = error.code === "INVALID_LLM_RESPONSE" && validationHints[validationReason]
+    ? `${error.message || error} ${validationHints[validationReason]}`
+    : error.message || error;
   const action = error.retryable === false
     ? "<small>Update the configuration or reference before trying again.</small>"
     : `<button class="button button-secondary button-small" type="button" data-action="${escapeHtml(retryAction)}">${icon("retry")}Retry</button>`;
-  return `<div class="notice notice-error" role="alert" tabindex="-1" id="service-error"><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(error.message || error)}</p></div>${action}</div>`;
+  return `<div class="notice notice-error" role="alert" tabindex="-1" id="service-error"><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(message)}</p></div>${action}</div>`;
 }
 
 export function loadingPanel(agent, message) {

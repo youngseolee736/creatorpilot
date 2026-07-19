@@ -19,7 +19,7 @@ class FakeProvider {
 
   async complete(messages) {
     this.calls.push(messages);
-    const output = this.outputs.shift();
+    const output = this.outputs.length > 1 ? this.outputs.shift() : this.outputs[0];
     if (output instanceof Error) throw output;
     return output;
   }
@@ -173,7 +173,19 @@ test("rejects missing required analysis fields", async () => {
   delete output.contentPromise;
   const { analyst, provider } = analystWith(JSON.stringify(output));
   await assert.rejects(analyst.analyze(validRequest()), (error) => error.code === "INVALID_LLM_RESPONSE");
-  assert.equal(provider.calls.length, 1);
+  assert.equal(provider.calls.length, 2);
+});
+
+test("repairs a contract-valid JSON object that fails semantic validation", async () => {
+  const invalidOutput = validAnalysis();
+  delete invalidOutput.contentPromise;
+  const { analyst, provider } = analystWith([JSON.stringify(invalidOutput), JSON.stringify(validAnalysis())]);
+  const result = await analyst.analyze(validRequest());
+  assert.equal(result.contentPromise, validAnalysis().contentPromise);
+  assert.equal(provider.calls.length, 2);
+  assert.match(provider.calls[1][0].content, /complete required object/);
+  assert.match(provider.calls[1][1].content, /\"reason\":\"required\"/);
+  assert.match(provider.calls[1][1].content, /originalAnalysisInput/);
 });
 
 test("rejects section end before section start", async () => {
@@ -183,11 +195,35 @@ test("rejects section end before section start", async () => {
   await assert.rejects(analyst.analyze(validRequest()), (error) => error.code === "INVALID_LLM_RESPONSE");
 });
 
-test("rejects overlapping sections", async () => {
+test("normalizes an overlapping boundary when section ends remain chronological", async () => {
   const output = validAnalysis();
   output.structure[1] = { ...output.structure[1], start: 3 };
-  const { analyst } = analystWith(JSON.stringify(output));
-  await assert.rejects(analyst.analyze(validRequest()), (error) => error.details?.[0]?.reason === "overlaps_previous_section");
+  const { analyst, provider } = analystWith(JSON.stringify(output));
+  const result = await analyst.analyze(validRequest());
+  assert.equal(result.structure[1].start, result.structure[0].end);
+  assert.equal(provider.calls.length, 1);
+});
+
+test("normalizes a section reported inside the previous section by relative duration", async () => {
+  const output = validAnalysis();
+  output.structure[1] = { ...output.structure[1], start: 2, end: 3 };
+  const { analyst, provider } = analystWith(JSON.stringify(output));
+  const result = await analyst.analyze(validRequest());
+  assert.equal(result.structure[1].start, result.structure[0].end);
+  assert.equal(result.structure[result.structure.length - 1].end, 60);
+  assert.equal(provider.calls.length, 1);
+});
+
+test("rescales model timing to the authoritative transcript duration", async () => {
+  const request = validRequest({ transcript: { estimatedDuration: 300 } });
+  const { analyst } = analystWith(JSON.stringify(validAnalysis()));
+  const result = await analyst.analyze(request);
+  assert.equal(result.estimatedOriginalDuration, 300);
+  assert.equal(result.structure[0].start, 0);
+  assert.equal(result.structure[result.structure.length - 1].end, 300);
+  for (let index = 1; index < result.structure.length; index += 1) {
+    assert.equal(result.structure[index].start, result.structure[index - 1].end);
+  }
 });
 
 test("rejects a negative duration", async () => {

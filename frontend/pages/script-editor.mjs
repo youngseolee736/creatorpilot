@@ -2,13 +2,13 @@ import { escapeHtml, wordCount } from "../core.mjs";
 import { errorNotice, icon, loadingPanel, pageHeading } from "../components.mjs";
 
 export function renderScriptEditor(project) {
-  if (project.error) return `${pageHeading("Scriptwriter Agent", "Script generation paused.", "Retry without losing the completed reference analysis.")}${errorNotice(project.error, "retry-script")}`;
+  if (project.error) return `${pageHeading("Scriptwriter Agent", "Script generation paused.", "Retry without losing the completed reference analysis or current draft.")}${errorNotice(project.error, "retry-script", "Scriptwriter")}`;
   if (!project.generatedScript) {
     return `${pageHeading("Scriptwriter Agent", "Writing for the new topic.", "The reference structure guides pacing, while every sentence is written for this project.")}${loadingPanel("Scriptwriter Agent", "Drafting an original 60-second narration…")}`;
   }
   const script = project.generatedScript;
   const count = wordCount(script);
-  return `${pageHeading("Scriptwriter Agent · Draft ready", "Shape the narration before review.", "Edit any section directly. Saved changes remain attached to this project.", `<button class="button button-secondary" type="button" data-action="regenerate-script">${icon("retry")}Regenerate</button>`)}
+  return `${pageHeading("Scriptwriter Agent · Draft ready", "Shape the narration before review.", "Edit any section directly. Saved changes remain attached to this project.", `<button class="button button-secondary" type="button" data-action="regenerate-script">${icon("retry")}New version</button>`)}
     <form id="script-form" class="editor-layout">
       <section class="script-workspace">
         <div class="editor-toolbar"><div><span>Draft ${script.version}</span><span>Auto-saved locally</span></div><div><span><strong id="word-count">${count}</strong> words</span><span><strong>${script.estimatedSeconds}</strong> sec</span></div></div>
