@@ -7,7 +7,16 @@ const SUPPORTED_HOSTS = new Set([
   "www.youtu.be",
 ]);
 
+const CHANNEL_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "music.youtube.com",
+]);
+
 const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{6,15}$/;
+const HANDLE_PATTERN = /^[A-Za-z0-9._-]{3,30}$/;
+const CHANNEL_ID_PATTERN = /^UC[A-Za-z0-9_-]{22}$/;
 
 function extractYouTubeVideo(value) {
   if (typeof value !== "string" || !value.trim()) return null;

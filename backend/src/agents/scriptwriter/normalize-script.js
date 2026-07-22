@@ -79,7 +79,7 @@ function createSectionPlan(input) {
       label: section.label,
       weight: parseRangeDuration(section.range),
     }))
-    : input.referenceAnalysis.structure.map((section, index) => ({
+    : input.referenceBlueprint.structure.map((section, index) => ({
       id: slug(section.label, `section-${index + 1}`),
       label: section.label,
       weight: section.end - section.start,

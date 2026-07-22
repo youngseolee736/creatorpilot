@@ -10,6 +10,8 @@ storytelling mechanics. Phase 3 adds real initial and revision Scriptwriter
 flows. Phase 4 adds a real, conservative Originality Reviewer. Phase 5 adds a
 server-authorized Storyboard Agent. Phase 6 adds a server-verified Video
 Producer boundary for an adapter-compatible asynchronous render provider.
+Phase 7 inserts a source-grounded Research Agent and tailored creative brief
+between reference analysis and scriptwriting.
 
 ## Requirements
 
@@ -81,7 +83,20 @@ REVIEWER_LLM_MODEL=conservative-review-model
 STORYBOARD_LLM_MODEL=visual-planning-model
 ```
 
-The supported prefixes are `ANALYST_`, `SCRIPTWRITER_`, `REVIEWER_`, and
+The Research Agent uses the OpenAI Responses API `web_search` tool rather than
+the Chat Completions adapter. It may reuse the shared OpenAI base URL, key, and
+model, or use its own server-side overrides. Web research defaults to a 120
+second timeout when no scoped timeout is supplied:
+
+```dotenv
+RESEARCH_LLM_PROVIDER=openai-web-search
+RESEARCH_LLM_API_BASE_URL=https://api.openai.com/v1
+RESEARCH_LLM_API_KEY=research-server-side-key
+RESEARCH_LLM_MODEL=web-search-capable-model
+RESEARCH_LLM_TIMEOUT_MS=120000
+```
+
+The supported prefixes are `ANALYST_`, `RESEARCH_`, `SCRIPTWRITER_`, `REVIEWER_`, and
 `STORYBOARD_`; each accepts `LLM_PROVIDER`, `LLM_API_BASE_URL`, `LLM_API_KEY`,
 `LLM_MODEL`, and `LLM_TIMEOUT_MS`. Current LLM adapters must expose the
 OpenAI-compatible Chat Completions contract. Native Gemini or Anthropic
@@ -145,7 +160,7 @@ project content is sent to a backend while mock mode is active. Export produces 
 JSON mock production package rather than a media file.
 
 `frontend/config.js` contains public runtime configuration. The checked-in Phase
-6 development configuration enables all six API boundaries. Keep the
+7 development configuration enables all seven API boundaries. Keep the
 backend running and use this shape:
 
 ```js
@@ -153,6 +168,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
   services: {
     transcript: "api",
     analysis: "api",
+    research: "api",
     script: "api",
     review: "api",
     storyboard: "api",
@@ -188,8 +204,11 @@ The analysis endpoint follows the request schema in
 `docs/BACKEND_API_CONTRACT.md`: `projectId`, the normalized `transcript`,
 `targetDurationSeconds`, and optional `analysisLanguage`.
 
-The Scriptwriter endpoint accepts the topic, language, duration, audience, and
-normalized abstract analysis. It intentionally rejects a raw transcript. Script
+The Research endpoint accepts the user's tailored creative brief and a compact
+reference blueprint, then returns a Fact Pack whose claim URLs are checked
+against sources returned by the web-search provider. The Scriptwriter endpoint
+accepts that same brief, blueprint, and Fact Pack. Both intentionally reject a
+raw transcript. Script
 IDs, section IDs, version lineage, ranges, and speaking-time estimates are
 controlled by the backend rather than accepted from the model.
 
@@ -347,13 +366,14 @@ The Script Analyst treats transcript text as untrusted content, requests JSON
 only, validates and normalizes the result, rejects long source excerpts, and
 makes one structured repair attempt for malformed JSON. These controls reduce
 risk but do not make model analysis deterministic or guarantee originality.
-The Scriptwriter receives the new-topic brief and abstract analysis but never the
-raw reference transcript. Revision requests additionally send the current draft
+The Scriptwriter receives the tailored brief, compact blueprint, and approved
+Fact Pack but never the raw reference transcript. Revision requests additionally send the current draft
 and explicit instructions to the configured provider. The Reviewer receives the
 reference transcript and exact draft because it must compare them. It validates
 bounded phrase evidence and supplies a server-controlled verdict and disclaimer.
-The backend has no research, fact-checking, or external plagiarism database and
-cannot guarantee factual accuracy, legal clearance, or exhaustive originality.
+The Research Agent searches the public web and exposes provider-returned sources,
+but neither citations nor model output guarantee factual accuracy. The backend
+has no external plagiarism database and cannot guarantee legal clearance or exhaustive originality.
 Reviewer results are editorial estimates, not copyright determinations or legal
 advice. The Storyboard Agent receives the exact script narration and proposes
 visual metadata only. Search queries do not establish asset availability,

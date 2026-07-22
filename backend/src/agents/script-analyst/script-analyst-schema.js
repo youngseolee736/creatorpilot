@@ -72,7 +72,7 @@ function validateAnalysisRequest(input) {
   return {
     projectId,
     targetDurationSeconds,
-    analysisLanguage: analysisLanguage || transcript.language || "English",
+    analysisLanguage: "English",
     transcript: {
       transcriptId,
       language: transcript.language || null,

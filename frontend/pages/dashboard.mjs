@@ -9,14 +9,17 @@ function destination(project) {
 }
 
 function projectRow(project) {
-  return `<a class="project-row" href="${destination(project)}">
-    <span class="project-thumbnail" aria-hidden="true"><span>${escapeHtml(project.format)}</span><i></i></span>
-    <span class="project-identity"><strong>${escapeHtml(project.title)}</strong><small>${escapeHtml(project.referenceTitle)}</small></span>
-    <span class="project-topic"><small>New topic</small>${escapeHtml(project.topic)}</span>
-    <span class="project-stage">${statusBadge(project.status)}</span>
-    <span class="project-date"><small>Last edited</small>${formatDate(project.updatedAt)}</span>
-    <span class="project-open">${icon("arrow", 18)}</span>
-  </a>`;
+  return `<div class="project-item" role="listitem">
+    <a class="project-row" href="${destination(project)}">
+      <span class="project-thumbnail" aria-hidden="true"><span>${escapeHtml(project.format)}</span><i></i></span>
+      <span class="project-identity"><strong>${escapeHtml(project.title)}</strong><small>${escapeHtml(project.referenceTitle)}</small></span>
+      <span class="project-topic"><small>New topic</small>${escapeHtml(project.topic)}</span>
+      <span class="project-stage">${statusBadge(project.status)}</span>
+      <span class="project-date"><small>Last edited</small>${formatDate(project.updatedAt)}</span>
+      <span class="project-open">${icon("arrow", 18)}</span>
+    </a>
+    <button class="project-delete" type="button" data-action="delete-project" data-project-id="${escapeHtml(project.id)}" aria-label="Delete ${escapeHtml(project.title)}">${icon("trash", 16)}</button>
+  </div>`;
 }
 
 export function renderDashboard(state) {

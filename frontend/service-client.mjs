@@ -7,7 +7,7 @@ const DEFAULT_CONFIG = Object.freeze({
   renderPollLimit: 240,
 });
 
-const SERVICE_KEYS = ["transcript", "analysis", "script", "review", "storyboard", "video"];
+const SERVICE_KEYS = ["transcript", "analysis", "research", "script", "review", "storyboard", "video"];
 
 export function getServiceConfig(runtimeConfig = globalThis.CREATORPILOT_CONFIG) {
   const config = { ...DEFAULT_CONFIG, ...(runtimeConfig || {}) };
@@ -82,17 +82,24 @@ function makeApiServices(config, fetchImpl) {
         projectId: project.id,
         transcript: project.transcript,
         targetDurationSeconds: project.duration,
-        analysisLanguage: project.language,
+        analysisLanguage: "English",
+      });
+    },
+    researchTopic(project) {
+      return post("/api/research/topic", {
+        projectId: project.id,
+        creativeBrief: project.creativeBrief,
+        referenceBlueprint: project.referenceBlueprint,
       });
     },
     generateScript(project) {
       return post("/api/scripts/generate", {
         projectId: project.id,
-        topic: project.topic,
+        creativeBrief: project.creativeBrief,
+        referenceBlueprint: project.referenceBlueprint,
+        factPack: project.research,
         targetLanguage: project.language,
         targetDurationSeconds: project.duration,
-        audience: project.analysis?.targetAudience || "General YouTube audience",
-        referenceAnalysis: project.analysis,
         revisionInstructions: [],
       });
     },
@@ -107,11 +114,11 @@ function makeApiServices(config, fetchImpl) {
     reviseScript(project, revisionInstructions) {
       return post("/api/scripts/revise", {
         projectId: project.id,
-        topic: project.topic,
+        creativeBrief: project.creativeBrief,
+        referenceBlueprint: project.referenceBlueprint,
+        factPack: project.research,
         targetLanguage: project.language,
         targetDurationSeconds: project.duration,
-        audience: project.analysis?.targetAudience || "General YouTube audience",
-        referenceAnalysis: project.analysis,
         currentScript: scriptPayload(project),
         revisionInstructions,
         preserveSectionIds: true,
@@ -175,6 +182,7 @@ export function createServices(runtimeConfig, fetchImpl = globalThis.fetch?.bind
   return {
     extractTranscript: select("transcript", mockServices.extractTranscript, apiServices?.extractTranscript),
     analyzeReference: select("analysis", mockServices.analyzeReference, apiServices?.analyzeReference),
+    researchTopic: select("research", mockServices.researchTopic, apiServices?.researchTopic),
     generateScript: select("script", mockServices.generateScript, apiServices?.generateScript),
     reviseScript: select("script", mockServices.reviseScript, apiServices?.reviseScript),
     reviewOriginality: select("review", mockServices.reviewOriginality, apiServices?.reviewOriginality),
@@ -188,6 +196,7 @@ const services = createServices(serviceConfig);
 
 export const extractTranscript = services.extractTranscript;
 export const analyzeReference = services.analyzeReference;
+export const researchTopic = services.researchTopic;
 export const generateScript = services.generateScript;
 export const reviewOriginality = services.reviewOriginality;
 export const reviseScript = services.reviseScript;

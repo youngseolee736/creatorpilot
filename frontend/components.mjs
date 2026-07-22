@@ -6,8 +6,8 @@ function studioConnectionLabel() {
   const apiServices = Object.entries(services).filter(([, mode]) => mode === "api").map(([name]) => name);
   if (!apiServices.length) return { mode: "Mock studio", detail: "No AI backend connected" };
   if (services.transcript === "api" && services.analysis === "api") {
-    if (services.script === "api" && services.review === "api" && services.storyboard === "api" && services.video === "api") {
-      return { mode: "Provider studio", detail: "All 6 production services connected" };
+    if (services.research === "api" && services.script === "api" && services.review === "api" && services.storyboard === "api" && services.video === "api") {
+      return { mode: "Provider studio", detail: "All 7 production services connected" };
     }
     if (services.script === "api" && services.review === "api" && services.storyboard === "api") {
       return { mode: "Hybrid studio", detail: "5 production services connected" };
@@ -32,6 +32,7 @@ export function icon(name, size = 18) {
     play: '<path d="m8 5 11 7-11 7Z"/>',
     file: '<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h6"/>',
     spark: '<path d="m12 2 1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7Z"/><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z"/>',
+    shield: '<path d="M12 3 5 6v5c0 4.6 2.9 8.3 7 10 4.1-1.7 7-5.4 7-10V6z"/><path d="m9 12 2 2 4-5"/>',
     retry: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
     download: '<path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14"/>',
     external: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v7H4V6h7"/>',
@@ -99,6 +100,8 @@ export function errorNotice(error, retryAction, agentLabel = "Script Analyst") {
     LLM_TIMEOUT: `The ${agentLabel} took too long.`,
     LLM_RATE_LIMITED: `The ${agentLabel} is temporarily busy.`,
     INVALID_LLM_RESPONSE: "The model response could not be validated.",
+    INVALID_RESEARCH_RESPONSE: "The Fact Pack could not be grounded in provider sources.",
+    INVALID_RESEARCH_BRIEF: "The tailored research brief is incomplete.",
     TRANSCRIPT_TOO_LARGE: "This transcript is too large to analyze.",
     TRANSCRIPT_NOT_ANALYZABLE: "This transcript cannot be analyzed reliably.",
     LLM_PROVIDER_ERROR: `The ${agentLabel} provider is unavailable.`,

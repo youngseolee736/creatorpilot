@@ -1,5 +1,6 @@
 const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst");
 const { OriginalityReviewer } = require("../src/agents/originality-reviewer/originality-reviewer");
+const { Researcher } = require("../src/agents/researcher/researcher");
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
 const { StoryboardAgent } = require("../src/agents/storyboard/storyboard");
 const { VideoProducer } = require("../src/agents/video-producer/video-producer");
@@ -26,6 +27,39 @@ const provider = {
       doNotCopy: ["Reference-specific examples", "Distinctive sentence sequences"],
       confidence: 0.88,
       estimatedOriginalDuration: 58,
+      hookMechanics: {
+        trigger: "It opens with a serious problem and hints that a bigger reveal is coming.",
+        curiosityGap: "The viewer does not yet know which event changes the meaning of the story.",
+        promisedPayoff: "Reveal the turning point and explain why it matters.",
+        deliveryPattern: "Show the problem, build evidence, reveal the turning point, then explain the consequences.",
+        evidenceStart: 0,
+        evidenceEnd: 4,
+        evidence: "The opening establishes urgency and signals an unexplained consequential development.",
+      },
+      narrativeStyle: {
+        primaryMode: "Problem and reveal",
+        narrativeEngine: "Each new event makes the problem more serious until one reveal changes how the viewer understands it.",
+        progression: ["Show the problem", "Add context", "Build evidence", "Reveal the bigger meaning", "End with uncertainty"],
+      },
+      informationFlow: {
+        pattern: "Problem → context → evidence → reveal → consequences",
+        explanation: "The video waits until the evidence is clear before explaining the bigger meaning.",
+        sequence: ["Show the problem", "Explain the situation", "Add evidence", "Reveal what changed", "Show why it matters"],
+      },
+      retentionMap: [
+        { type: "Unanswered question", start: 0, end: 4, purpose: "Make the viewer wait to learn which event changes the story.", evidence: "The opening promises a bigger development without explaining it." },
+        { type: "Growing consequences", start: 14, end: 41, purpose: "Make each new event feel more important than the last.", evidence: "The evidence grows before the larger meaning is revealed." },
+      ],
+      emotionalArc: [
+        { phase: "Urgency", start: 0, end: 14, purpose: "Make the viewer feel immediate relevance." },
+        { phase: "Concern", start: 14, end: 41, purpose: "Increase perceived consequences through accumulating evidence." },
+        { phase: "Uncertainty", start: 41, end: 58, purpose: "Close with unresolved scenarios that extend the stakes." },
+      ],
+      viewerExperience: {
+        entryState: "The viewer senses a serious development but lacks context.",
+        journey: "Urgency becomes informed concern as evidence accumulates and the implications widen.",
+        exitState: "The viewer leaves with a broader risk model and unresolved future scenarios.",
+      },
       structure: [
         { label: "Hook", start: 0, end: 4, note: "Create curiosity with an unresolved question." },
         { label: "Context", start: 4, end: 14, note: "Establish familiar context before analysis." },
@@ -68,13 +102,31 @@ const scriptProvider = {
   async complete(messages) {
     const payload = JSON.parse(messages[1].content.slice(messages[1].content.indexOf("{") ));
     return JSON.stringify({
-      title: payload.topic,
+      title: payload.creativeBrief.topic,
       sections: payload.sectionPlan.map((section, sectionIndex) => ({
         slot: section.slot,
         label: section.label,
         text: fixtureNarration[sectionIndex] || fixtureNarration[fixtureNarration.length - 1],
       })),
     });
+  },
+};
+
+const researchProvider = {
+  async research() {
+    return {
+      text: JSON.stringify({
+        summary: "A compact source-grounded brief for the selected angle and audience.",
+        facts: [1, 2, 3].map((number) => ({
+          claim: `Fixture claim ${number} grounded in a provider-returned source.`,
+          explanation: `Fixture explanation ${number} is suitable for the approved short-video angle.`,
+          confidence: number === 2 ? "medium" : "high",
+          sourceUrls: [`https://source${number}.example.test/report`],
+        })),
+        openQuestions: ["Recheck time-sensitive figures immediately before publication."],
+      }),
+      sources: [1, 2, 3].map((number) => ({ title: `Fixture source ${number}`, url: `https://source${number}.example.test/report` })),
+    };
   },
 };
 
@@ -162,6 +214,7 @@ const renderProvider = {
 const app = createApp({
   transcriptService,
   scriptAnalyst: new ScriptAnalyst({ provider }),
+  researcher: new Researcher({ provider: researchProvider }),
   scriptwriter: new Scriptwriter({ provider: scriptProvider }),
   originalityReviewer: reviewer,
   storyboardAgent,
@@ -173,7 +226,7 @@ const app = createApp({
 });
 const port = Number(process.env.PORT || 8787);
 const server = app.listen(port, "127.0.0.1", () => {
-  console.log(`CreatorPilot Phase 6 browser fixture listening on http://127.0.0.1:${port}`);
+  console.log(`CreatorPilot Phase 7 browser fixture listening on http://127.0.0.1:${port}`);
 });
 
 function shutdown() {

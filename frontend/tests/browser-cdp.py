@@ -18,10 +18,15 @@ expect_api_script = os.environ.get("CREATORPILOT_EXPECT_API_SCRIPT") == "1"
 expect_api_review = os.environ.get("CREATORPILOT_EXPECT_API_REVIEW") == "1"
 expect_api_storyboard = os.environ.get("CREATORPILOT_EXPECT_API_STORYBOARD") == "1"
 expect_api_video = os.environ.get("CREATORPILOT_EXPECT_API_VIDEO") == "1"
+research_expectation = os.environ.get("CREATORPILOT_EXPECT_API_RESEARCH")
+expect_api_research = research_expectation == "1" or (
+    research_expectation is None
+    and all((expect_api_transcript, expect_api_analysis, expect_api_script, expect_api_review, expect_api_storyboard, expect_api_video))
+)
 expect_transcript_error = os.environ.get("CREATORPILOT_EXPECT_TRANSCRIPT_ERROR") == "1"
 test_youtube_url = os.environ.get(
     "CREATORPILOT_TEST_YOUTUBE_URL",
-    "https://youtube.com/watch?v=creatorpilot-demo",
+    "https://youtube.com/watch?v=CPDemo12345",
 )
 api_base_url = os.environ.get("CREATORPILOT_API_BASE_URL", "http://127.0.0.1:8787")
 
@@ -125,11 +130,24 @@ browser.command("Runtime.enable")
 browser.command("Log.enable")
 browser.command("Page.enable")
 browser.command("Accessibility.enable")
-if expect_api_analysis or expect_api_script or expect_api_review or expect_api_storyboard or expect_api_video:
+api_expectations = {
+    "transcript": expect_api_transcript,
+    "analysis": expect_api_analysis,
+    "research": expect_api_research,
+    "script": expect_api_script,
+    "review": expect_api_review,
+    "storyboard": expect_api_storyboard,
+    "video": expect_api_video,
+}
+if any(api_expectations.values()):
+    service_modes = {
+        service: "api" if expected else "mock"
+        for service, expected in api_expectations.items()
+    }
     browser.command("Page.addScriptToEvaluateOnNewDocument", {
         "source": "Object.defineProperty(window, 'CREATORPILOT_CONFIG', {"
         "configurable: false, get() { return Object.freeze({"
-        f"services: {{transcript:'api',analysis:'api',script:'{'api' if expect_api_script else 'mock'}',review:'{'api' if expect_api_review else 'mock'}',storyboard:'{'api' if expect_api_storyboard else 'mock'}',video:'{'api' if expect_api_video else 'mock'}'}},"
+        f"services:{json.dumps(service_modes)},"
         f"apiBaseUrl:{json.dumps(api_base_url)},renderPollIntervalMs:{250 if expect_api_video else 1500},renderPollLimit:20}}); }}, set() {{}} }});"
     })
 browser.command("Emulation.setDeviceMetricsOverride", {
@@ -164,7 +182,15 @@ def wait_for(expression, label, timeout=4):
             print(f"PASS: {label}")
             return
         time.sleep(0.04)
-    raise AssertionError(f"Timed out: {label}")
+    diagnostics = evaluate(
+        "(() => {"
+        "const stored = JSON.parse(localStorage.getItem('creatorpilot:v1') || 'null');"
+        "return {hash: location.hash, text: document.body?.innerText?.slice(0, 800), "
+        "project: stored?.projects?.[0] ? {status: stored.projects[0].status, error: stored.projects[0].error, "
+        "pipeline: stored.projects[0].pipeline} : null};"
+        "})()"
+    )
+    raise AssertionError(f"Timed out: {label}; diagnostics={diagnostics}")
 
 
 def check(condition, label):
@@ -173,7 +199,10 @@ def check(condition, label):
     print(f"PASS: {label}")
 
 
-evidence = Path(__file__).resolve().parents[2] / "docs" / "plans" / "completed" / "creatorpilot-evidence"
+evidence = Path(os.environ.get(
+    "CREATORPILOT_EVIDENCE_DIR",
+    Path(__file__).resolve().parents[2] / "docs" / "plans" / "completed" / "creatorpilot-evidence",
+))
 evidence.mkdir(parents=True, exist_ok=True)
 
 
@@ -209,6 +238,11 @@ wait_for("Boolean(document.querySelector('#reference-form'))", "new project rout
 capture("new-project-1280")
 set_value("#reference-url", test_youtube_url)
 set_value("#project-topic", "Why the United States cannot abandon Taiwan")
+set_value("#project-angle", "Explain the economic and security consequences of withdrawal without partisan framing.")
+set_value("#target-audience", "Korean first-time voters interested in geopolitics")
+set_value("#viewer-goal", "Understand the issue well enough to explain it to someone else")
+set_value("#desired-takeaway", "Withdrawal would reshape supply chains, regional trust, and long-term security choices.")
+set_value("#tone", "Clear, informed, conversational")
 set_value("#language", "English")
 click("#reference-form button[type='submit']")
 
@@ -219,19 +253,35 @@ if expect_transcript_error:
     print("CreatorPilot transcript error browser check passed.")
     raise SystemExit(0)
 
-wait_for("document.querySelectorAll('.structure-timeline li').length === 6", "reference analysis completes")
+wait_for("document.querySelectorAll('.story-logic article').length === 5", "story logic analysis completes")
 capture("analysis-1280")
 check(evaluate("document.querySelectorAll('.pipeline-completed').length >= 2"), "transcript and analyst pipeline stages complete")
 check(evaluate("(() => { const main = document.querySelector('.analysis-main').getBoundingClientRect(); const aside = document.querySelector('.analysis-aside').getBoundingClientRect(); return main.right <= aside.left + 1; })()"), "analysis columns do not overlap")
 check(evaluate("[...document.querySelectorAll('.analysis-overview > div, .analysis-aside > section')].every((element) => element.scrollWidth <= element.clientWidth + 1)"), "long analysis text stays inside its container")
+check(evaluate("document.querySelectorAll('.story-blueprint li').length >= 2"), "reusable story blueprint renders")
+check(not evaluate("document.body.textContent.includes('Retention map')"), "technical retention timeline is not shown")
+evaluate("document.querySelector('.story-logic-section').scrollIntoView()")
+time.sleep(0.08)
+capture("analysis-dna-1280")
+for width, height, name in ((768, 1024, "tablet"), (390, 844, "mobile")):
+    browser.command("Emulation.setDeviceMetricsOverride", {
+        "width": width, "height": height, "deviceScaleFactor": 1, "mobile": width < 600,
+    })
+    time.sleep(0.08)
+    check(evaluate("document.documentElement.scrollWidth <= window.innerWidth"), f"{name} story analysis has no horizontal overflow")
+    capture(f"analysis-{name}-{width}")
+browser.command("Emulation.setDeviceMetricsOverride", {
+    "width": 1280, "height": 900, "deviceScaleFactor": 1, "mobile": False,
+})
+evaluate("window.scrollTo(0, 0)")
 expected_transcript_label = "extracted transcript" if expect_api_transcript else "mock transcript"
 check(evaluate(f"document.querySelector('.transcript-disclosure').textContent.includes({json.dumps(expected_transcript_label)})"), "transcript preview is available")
 if expect_api_analysis:
-    check(evaluate("document.body.textContent.includes('88% confidence')"), "real analysis confidence renders")
+    check(evaluate("document.body.textContent.includes('How this video tells its story')"), "real story analysis renders")
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].analysis.analysisId.startsWith('analysis_')"), "real normalized analysis persists")
     check(not evaluate("document.body.textContent.includes('Return one JSON object only')"), "system prompt is not displayed")
-    if expect_api_video:
-        connection_label = "All 6 production services connected"
+    if expect_api_research and expect_api_script and expect_api_review and expect_api_storyboard and expect_api_video:
+        connection_label = "All 7 production services connected"
     elif expect_api_storyboard:
         connection_label = "5 production services connected"
     elif expect_api_review:
@@ -240,9 +290,24 @@ if expect_api_analysis:
         connection_label = "Transcript + analyst + scriptwriter connected" if expect_api_script else "Transcript + analyst connected"
     check(evaluate(f"document.body.textContent.includes({json.dumps(connection_label)})"), "hybrid service state is labeled accurately")
 
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].transcript.transcriptId.length > 0"), "transcript extraction persists")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].creativeBrief.angle.includes('economic and security')"), "creative brief persists")
+
+click("[data-action='research-topic']")
+wait_for("document.querySelectorAll('.fact-card').length === 3", "Research Agent completes a three-claim Fact Pack")
+check(evaluate("location.hash.endsWith('/research')"), "workflow navigates to the Research page")
+check(evaluate("document.querySelectorAll('.fact-sources a').length === 3"), "Fact Pack keeps claim-level source links")
+check(evaluate("document.querySelectorAll('.source-list a').length === 3"), "Research page lists provider-verified sources")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].pipeline.researcher.status === 'completed'"), "research pipeline stage completes")
+if expect_api_research:
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].research.researchId.startsWith('research_')"), "API Research result persists")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].research.sources[0].domain.endsWith('example.test')"), "fixture Research sources persist")
+capture("research-1280")
+
 click("[data-action='generate-script']")
 expected_script_sections = 6 if expect_api_script else 7
 wait_for(f"document.querySelectorAll('[data-script-section]').length === {expected_script_sections}", "original script generates")
+check(evaluate("location.hash.endsWith('/script')"), "workflow navigates to Scriptwriter")
 if expect_api_script:
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].generatedScript.scriptId.startsWith('script_')"), "real Scriptwriter draft persists")
     click("[data-action='regenerate-script']")
@@ -253,6 +318,7 @@ set_value("#section-hook", "A single shipping lane can change the balance of an 
 click("#script-form button[type='submit']")
 
 wait_for("document.querySelectorAll('.score-ring').length === 4", "originality review completes")
+check(evaluate("location.hash.endsWith('/review')"), "workflow navigates to Originality Review")
 capture("review-1280")
 check(evaluate("document.querySelectorAll('.comparison-item').length === 2"), "phrase comparison evidence renders")
 check(evaluate("document.body.textContent.includes('not a copyright or legal determination')"), "review includes non-legal disclaimer")
@@ -273,6 +339,7 @@ check(evaluate("document.querySelector('#app').textContent.includes('CreatorPilo
 
 click("[data-action='approve-production']")
 wait_for("document.querySelectorAll('.scene-row').length === 8", "storyboard generates eight scenes")
+check(evaluate("location.hash.endsWith('/production')"), "workflow navigates to Storyboard and Video Producer")
 if expect_api_storyboard:
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].storyboard[0].searchQuery.includes('licensed geopolitical')"), "real Storyboard metadata persists")
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].storyboard.at(-1).end === 60"), "real Storyboard timeline reaches the target duration")
@@ -294,6 +361,9 @@ else:
 check(evaluate("document.querySelector('.delivery-panel').textContent.includes('Min — Clear explainer')"), "voice selection carries into the final package")
 check(evaluate("document.querySelector('.delivery-panel').textContent.includes('Off')"), "music setting carries into the final package")
 check(evaluate("document.querySelector('.pipeline-completed:last-child') !== null"), "producer pipeline stage completes")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].status === 'completed'"), "project reaches completed status")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].render.completed === true"), "final render state persists")
+check(evaluate("Object.values(JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].pipeline).every(step => step.status === 'completed')"), "every Phase 7 pipeline stage is complete")
 
 # Responsive and accessibility checks on the completed workflow.
 for width, height, name in ((1280, 900, "desktop"), (768, 1024, "tablet"), (390, 844, "mobile")):

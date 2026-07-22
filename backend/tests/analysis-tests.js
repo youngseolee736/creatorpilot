@@ -6,7 +6,7 @@ const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst")
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
 const { StoryboardAgent } = require("../src/agents/storyboard/storyboard");
 const { containsLongExcerpt } = require("../src/agents/script-analyst/normalize-analysis");
-const { MAX_TRANSCRIPT_CHARACTERS } = require("../src/agents/script-analyst/script-analyst-schema");
+const { MAX_TRANSCRIPT_CHARACTERS, validateAnalysisRequest } = require("../src/agents/script-analyst/script-analyst-schema");
 const { createApp } = require("../src/app");
 const { OpenAICompatibleProvider } = require("../src/services/llm/openai-compatible-provider");
 const { createLLMProvider, resolveLLMConfig } = require("../src/services/llm");
@@ -98,6 +98,39 @@ function validAnalysis(overrides = {}) {
     doNotCopy: ["Reference-specific examples", "Distinctive sentence sequences"],
     confidence: 0.88,
     estimatedOriginalDuration: 60,
+    hookMechanics: {
+      trigger: "A familiar assumption is turned into an unresolved question.",
+      curiosityGap: "The viewer understands the topic but not which approach will hold up.",
+      promisedPayoff: "A comparison that resolves the opening question.",
+      deliveryPattern: "State the tension quickly, delay the answer, and resolve it after escalation.",
+      evidenceStart: 0,
+      evidenceEnd: 4,
+      evidence: "The opening introduces a question before any explanatory context.",
+    },
+    narrativeStyle: {
+      primaryMode: "Question-led explainer",
+      narrativeEngine: "Each comparison raises the practical stakes until the opening question can be resolved.",
+      progression: ["Unresolved question", "Familiar context", "Escalating comparison", "Resolution"],
+    },
+    informationFlow: {
+      pattern: "Question → context → comparison → consequence → answer",
+      explanation: "The video earns its conclusion by moving from familiar framing to increasingly specific consequences.",
+      sequence: ["Question", "Context", "Options", "Practical stakes", "Answer"],
+    },
+    retentionMap: [
+      { type: "Open loop", start: 0, end: 4, purpose: "Create a question the conclusion must answer.", evidence: "The opening question is not resolved immediately." },
+      { type: "Escalation", start: 18, end: 45, purpose: "Increase consequence and specificity across the comparison.", evidence: "Each supporting point carries greater practical stakes." },
+    ],
+    emotionalArc: [
+      { phase: "Curiosity", start: 0, end: 18, purpose: "Move the viewer from recognition to an unresolved question." },
+      { phase: "Concern", start: 18, end: 45, purpose: "Make the comparison feel increasingly consequential." },
+      { phase: "Clarity", start: 45, end: 60, purpose: "Resolve the tension with an applicable conclusion." },
+    ],
+    viewerExperience: {
+      entryState: "The viewer recognizes a familiar topic but has not questioned the usual framing.",
+      journey: "Curiosity becomes concern as each option is compared against more concrete consequences.",
+      exitState: "The viewer leaves with a resolved mental model and a question to apply personally.",
+    },
     structure: [
       { label: "Hook", start: 0, end: 4, note: "Create curiosity with an unresolved question." },
       { label: "Context", start: 4, end: 18, note: "Establish familiar context before analysis." },
@@ -122,6 +155,10 @@ test("accepts a valid analysis request", async () => {
   const result = await endpointResult(validRequest(), JSON.stringify(validAnalysis()));
   assert.equal(result.status, 200);
   assert.equal(result.body.data.analysisId, "analysis_project-analysis-test");
+});
+
+test("normalizes every analysis output language to English", () => {
+  assert.equal(validateAnalysisRequest(validRequest({ analysisLanguage: "Korean" })).analysisLanguage, "English");
 });
 
 test("rejects a missing transcript", async () => {
@@ -150,7 +187,17 @@ test("returns a successful structured analysis", async () => {
   const result = await analyst.analyze(validRequest());
   assert.equal(result.hookType, "Provocative question");
   assert.equal(result.structure.length, 4);
+  assert.equal(result.narrativeStyle.primaryMode, "Question-led explainer");
+  assert.equal(result.retentionMap.length, 2);
+  assert.equal(Object.prototype.hasOwnProperty.call(result, "emotionalArc"), false);
   assert.deepEqual(result.safety, { longSourceExcerptsIncluded: false, maxQuotedWords: 0 });
+});
+
+test("rejects Narrative DNA timing outside the transcript duration", async () => {
+  const output = validAnalysis();
+  output.retentionMap[0] = { ...output.retentionMap[0], end: 61 };
+  const { analyst } = analystWith(JSON.stringify(output));
+  await assert.rejects(analyst.analyze(validRequest()), (error) => error.code === "INVALID_LLM_RESPONSE");
 });
 
 test("rejects malformed JSON after one repair attempt", async () => {
@@ -173,7 +220,7 @@ test("rejects an invalid response returned by the repair attempt", async () => {
 
 test("rejects missing required analysis fields", async () => {
   const output = validAnalysis();
-  delete output.contentPromise;
+  delete output.narrativeStyle;
   const { analyst, provider } = analystWith(JSON.stringify(output));
   await assert.rejects(analyst.analyze(validRequest()), (error) => error.code === "INVALID_LLM_RESPONSE");
   assert.equal(provider.calls.length, 2);
@@ -181,10 +228,10 @@ test("rejects missing required analysis fields", async () => {
 
 test("repairs a contract-valid JSON object that fails semantic validation", async () => {
   const invalidOutput = validAnalysis();
-  delete invalidOutput.contentPromise;
+  delete invalidOutput.narrativeStyle;
   const { analyst, provider } = analystWith([JSON.stringify(invalidOutput), JSON.stringify(validAnalysis())]);
   const result = await analyst.analyze(validRequest());
-  assert.equal(result.contentPromise, validAnalysis().contentPromise);
+  assert.equal(result.narrativeStyle.narrativeEngine, validAnalysis().narrativeStyle.narrativeEngine);
   assert.equal(provider.calls.length, 2);
   assert.match(provider.calls[1][0].content, /complete required object/);
   assert.match(provider.calls[1][1].content, /\"reason\":\"required\"/);
@@ -362,6 +409,8 @@ test("keeps prompt injection text inside the untrusted transcript boundary", asy
   const [systemMessage, userMessage] = provider.calls[0];
   assert.equal(systemMessage.role, "system");
   assert.match(systemMessage.content, /untrusted video content/);
+  assert.match(systemMessage.content, /written in English/);
+  assert.match(systemMessage.content, /at most 24 words/);
   assert.equal(userMessage.role, "user");
   assert.match(userMessage.content, /Ignore previous instructions/);
   assert.doesNotMatch(systemMessage.content, /reveal the system prompt/);

@@ -73,10 +73,16 @@ Errors: `400 INVALID_YOUTUBE_URL`; `404 VIDEO_NOT_FOUND` or `TRANSCRIPT_UNAVAILA
 
 ## `POST /api/analysis/reference`
 
-Purpose: derive abstract hook, pacing, retention, and structural patterns without reproducing long source excerpts. Responsible agent: Script Analyst Agent. Consumed by: Reference Analysis screen.
+Purpose: derive timestamp-grounded Narrative DNA—hook mechanics, narrative style,
+information flow, retention devices, intended emotional movement, viewer journey,
+and structural patterns—without reproducing source wording. Responsible agent:
+Script Analyst Agent. Consumed by: Reference Analysis screen and the compact
+reference blueprint passed to later agents.
 
 Required: `projectId`, `transcript`, `targetDurationSeconds`. Optional:
-`analysisLanguage`. `targetDurationSeconds` is an integer from 15 through 180.
+`analysisLanguage` is accepted for backward compatibility, but analysis prose is
+always normalized to English. The project's language controls the later script,
+not the analyst workspace. `targetDurationSeconds` is an integer from 15 through 180.
 Transcript text is limited to 100,000 characters in Phase 2. Loading UI: “Mapping
 hook, pacing, and structure.” Retry: user-triggered only for network, `429`,
 retryable provider errors, invalid model output, or timeouts; validation and
@@ -113,18 +119,17 @@ Success (`200`):
     "hookType": "Counter-intuitive claim",
     "hookDuration": 5,
     "hookPurpose": "Challenge the expected answer and create curiosity.",
-    "targetAudience": "Curious general audience interested in cities and technology",
     "tone": "Urgent, informed, optimistic",
-    "contentPromise": "Explain how an overlooked mechanism changes the familiar problem.",
     "pacing": "Fast opening, measured evidence, decisive close",
-    "retentionTechniques": ["Expectation reversal", "Concrete visual examples", "Open-loop question"],
-    "openLoops": ["Delay the full implication of the opening reframe until the conclusion."],
-    "transitions": ["Move from familiar assumption to mechanism, tension, and resolution."],
     "callToAction": "Invite the viewer to reconsider the obvious solution",
     "reusablePatterns": ["Open with an expectation reversal", "Escalate from one example to system-level stakes"],
     "doNotCopy": ["Reference-specific examples", "Distinctive analogies", "Original sentence sequences"],
     "confidence": 0.88,
     "estimatedOriginalDuration": 58,
+    "hookMechanics": { "trigger": "Expectation reversal", "curiosityGap": "The obvious answer is challenged before the alternative is explained.", "promisedPayoff": "Reveal the overlooked mechanism and its larger implication.", "deliveryPattern": "Challenge, delay, progressively reveal, then resolve.", "evidenceStart": 0, "evidenceEnd": 5, "evidence": "The opening rejects the expected solution before giving context." },
+    "narrativeStyle": { "primaryMode": "Reframe-driven explainer", "narrativeEngine": "A small mechanism expands into a larger possibility while constraints preserve uncertainty.", "progression": ["Expected answer", "Hidden alternative", "Mechanism", "Scale", "Tension", "Payoff"] },
+    "informationFlow": { "pattern": "Assumption → alternative → mechanism → scale → objections → implication", "explanation": "The broad stakes arrive only after the mechanism is understandable.", "sequence": ["Assumption", "Alternative", "Explanation", "Scale", "Constraints", "Implication"] },
+    "retentionMap": [{ "type": "Open loop", "start": 0, "end": 5, "purpose": "Create a question the ending must resolve.", "evidence": "The alternative is introduced without its full explanation." }],
     "structure": [
       { "label": "Hook", "start": 0, "end": 5, "note": "Contradicts the expected solution" },
       { "label": "Context", "start": 5, "end": 14, "note": "Introduces the hidden experiment" }
@@ -134,8 +139,12 @@ Success (`200`):
 }
 ```
 
-The response retains the Phase 1 frontend fields and adds the Phase 2 analytical
-detail. The backend generates `analysisId` and `safety`, removes unknown model
+The response focuses on plain-English story logic. Timing remains internal
+evidence for validation and is not presented as a user-facing timeline. The UI
+asks how the video opens, moves forward, reveals information, holds interest,
+and pays off. It never quotes the source or claims to observe visuals, editing,
+music, analytics, or private creator intent. The
+backend generates `analysisId` and `safety`, removes unknown model
 fields, validates section order and duration consistency, and never returns the
 raw provider response.
 
@@ -144,9 +153,66 @@ TRANSCRIPT_NOT_ANALYZABLE`; `429 LLM_RATE_LIMITED`; `500 LLM_NOT_CONFIGURED` or
 `ANALYSIS_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or `INVALID_LLM_RESPONSE`;
 `504 LLM_TIMEOUT`.
 
+## `POST /api/research/topic`
+
+Purpose: turn the user's tailored creative brief and compact reference blueprint
+into a source-grounded Fact Pack before writing. Responsible agent: Research
+Agent. Consumed by: Research review screen and Scriptwriter.
+
+Required: `projectId`, `creativeBrief`, and `referenceBlueprint`. Raw transcript
+fields are prohibited. The Research Agent uses the OpenAI Responses API
+`web_search` tool. Every fact must cite at least one HTTPS URL that also appears
+in the provider's returned citation/source metadata; unmatched URLs reject the
+entire result.
+
+Request:
+
+```json
+{
+  "projectId": "project_01JZ8P",
+  "creativeBrief": {
+    "topic": "Why the United States cannot abandon Taiwan",
+    "angle": "Explain economic and security consequences without partisan framing.",
+    "targetAudience": "Korean viewers interested in geopolitics",
+    "viewerGoal": "Understand the issue well enough to explain it",
+    "desiredTakeaway": "Withdrawal would reshape supply chains and regional trust",
+    "tone": "Clear, informed, conversational",
+    "language": "Korean",
+    "mustInclude": [],
+    "mustAvoid": ["Unverified casualty estimates"],
+    "callToAction": "Follow for more one-minute explainers"
+  },
+  "referenceBlueprint": {
+    "analysisId": "an_01JZ8R",
+    "hookType": "Counter-intuitive claim",
+    "hookPurpose": "Challenge the expected answer",
+    "tone": "Urgent, informed",
+    "pacing": "Fast opening, measured middle, concise close",
+    "ending": "Resolve the opening promise",
+    "retentionTechniques": ["Expectation reversal", "Open loop"],
+    "structure": [
+      { "label": "Hook", "start": 0, "end": 5, "purpose": "Create curiosity" },
+      { "label": "Context", "start": 5, "end": 15, "purpose": "Set up the issue" },
+      { "label": "Conclusion (Ending)", "start": 15, "end": 60, "purpose": "Resolve the promise" }
+    ]
+  }
+}
+```
+
+Success (`201`) includes `researchId`, `summary`, three through eight `facts`,
+normalized `sources`, optional `openQuestions`, `searchedAt`, and
+`safety.providerVerifiedSources=true`. A citation is evidence of provenance, not
+a factual guarantee.
+
+Errors: `400 INVALID_RESEARCH_BRIEF`; `429 LLM_RATE_LIMITED`; `500
+LLM_NOT_CONFIGURED` or `RESEARCH_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or
+`INVALID_RESEARCH_RESPONSE`; `504 LLM_TIMEOUT`.
+
 ## `POST /api/scripts/generate`
 
-Purpose: create a new, topic-specific script using only abstract reference mechanics. Responsible agent: Scriptwriter Agent. Consumed by: Script Editor screen.
+Purpose: create a new, topic-specific script from the user's tailored brief,
+compact reference mechanics, and approved Fact Pack. Responsible agent:
+Scriptwriter Agent. Consumed by: Script Editor screen.
 
 Implemented in Phase 3. The endpoint rejects raw transcript fields and allowlists
 the abstract analysis before building the prompt. The model supplies only title
@@ -155,29 +221,36 @@ estimates. Identical in-flight requests are coalesced and successful identical
 requests reuse the same result within the running process. Persistence across a
 server restart is not yet available.
 
-Required: `projectId`, `topic`, `targetLanguage`, `targetDurationSeconds`, `audience`, `referenceAnalysis`. Optional: `revisionInstructions` (empty for first draft). Loading UI: “Drafting original narration.” Retry: user-triggered; an idempotent retry must not create duplicate versions.
+Required: `projectId`, `creativeBrief`, `referenceBlueprint`, `factPack`,
+`targetLanguage`, and `targetDurationSeconds`. Optional:
+`revisionInstructions` (empty for first draft). The raw transcript and the old
+top-level `topic`, `audience`, and `referenceAnalysis` shape are rejected.
+Loading UI: “Drafting original narration.” Retry: user-triggered; an idempotent
+retry must not create duplicate versions.
 
 Request:
 
 ```json
 {
   "projectId": "project_01JZ8P",
-  "topic": "Why the United States cannot abandon Taiwan",
+  "creativeBrief": { "topic": "Why the United States cannot abandon Taiwan", "angle": "Explain system consequences", "targetAudience": "Korean viewers interested in geopolitics", "viewerGoal": "Understand why it matters", "desiredTakeaway": "Withdrawal has wider consequences", "tone": "Clear and informed", "language": "English", "mustInclude": [], "mustAvoid": [], "callToAction": "" },
   "targetLanguage": "English",
   "targetDurationSeconds": 60,
-  "audience": "Curious general audience interested in geopolitics",
-  "referenceAnalysis": {
+  "referenceBlueprint": {
     "analysisId": "an_01JZ8R",
     "hookType": "Counter-intuitive claim",
+    "hookPurpose": "Create curiosity",
     "tone": "Urgent, informed, optimistic",
     "pacing": "Fast opening, measured evidence, decisive close",
     "retentionTechniques": ["Expectation reversal", "Open-loop question"],
-    "doNotCopy": ["Reference examples", "Distinctive sentence sequences"],
+    "ending": "Resolve the opening promise",
     "structure": [
-      { "label": "Hook", "start": 0, "end": 5, "note": "Contradicts the expected solution" },
-      { "label": "Development", "start": 5, "end": 60, "note": "Develops and resolves the new topic" }
+      { "label": "Hook", "start": 0, "end": 5, "purpose": "Contradicts the expected solution" },
+      { "label": "Context", "start": 5, "end": 15, "purpose": "Introduces the issue" },
+      { "label": "Conclusion (Ending)", "start": 15, "end": 60, "purpose": "Develops and resolves the new topic" }
     ]
   },
+  "factPack": { "researchId": "research_01", "summary": "Grounded claims", "facts": [{ "factId": "fact_1", "claim": "A sourced claim", "explanation": "Why it matters", "confidence": "high", "sourceIds": ["source_1"], "usableInScript": true }, { "factId": "fact_2", "claim": "A second claim", "explanation": "Why it matters", "confidence": "medium", "sourceIds": ["source_1"], "usableInScript": true }, { "factId": "fact_3", "claim": "A third claim", "explanation": "Why it matters", "confidence": "high", "sourceIds": ["source_1"], "usableInScript": true }], "sources": [{ "sourceId": "source_1", "title": "Official source", "url": "https://example.org/report", "domain": "example.org" }], "openQuestions": [] },
   "revisionInstructions": []
 }
 ```
@@ -271,29 +344,35 @@ LLM_NOT_CONFIGURED` or `REVIEW_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or
 
 Purpose: produce a new script version from explicit review/user instructions. Responsible agent: Scriptwriter Agent. Consumed by: Script Editor after “Send back to Scriptwriter” or “Write new version.” The Phase 3 UI preserves the current draft, calls this endpoint, and stores version lineage locally.
 
-Required: `projectId`, topic/language/duration/audience, `referenceAnalysis`, `currentScript`, and at least one `revisionInstructions` item. Optional: `preserveSectionIds`. Loading UI: “Writing a new version.” Retry: user-triggered and idempotent for the same script version/instructions.
+Required: the same `projectId`, `creativeBrief`, `referenceBlueprint`,
+`factPack`, language, and duration used for generation, plus `currentScript` and
+at least one `revisionInstructions` item. Optional: `preserveSectionIds`.
+Loading UI: “Writing a new version.” Retry: user-triggered and idempotent for the
+same script version/instructions.
 
 Request:
 
 ```json
 {
   "projectId": "project_01JZ8P",
-  "topic": "Why the United States cannot abandon Taiwan",
+  "creativeBrief": { "topic": "Why the United States cannot abandon Taiwan", "angle": "Explain system consequences", "targetAudience": "Korean viewers interested in geopolitics", "viewerGoal": "Understand why it matters", "desiredTakeaway": "Withdrawal has wider consequences", "tone": "Clear and informed", "language": "English", "mustInclude": [], "mustAvoid": [], "callToAction": "" },
   "targetLanguage": "English",
   "targetDurationSeconds": 60,
-  "audience": "Curious general audience interested in geopolitics",
-  "referenceAnalysis": {
+  "referenceBlueprint": {
     "analysisId": "an_01JZ8R",
     "hookType": "Counter-intuitive claim",
+    "hookPurpose": "Create curiosity",
     "tone": "Urgent, informed",
     "pacing": "Fast opening, decisive close",
     "retentionTechniques": ["Expectation reversal"],
-    "doNotCopy": ["Reference examples", "Distinctive sentence sequences"],
+    "ending": "Resolve the opening promise",
     "structure": [
-      { "label": "Hook", "start": 0, "end": 5, "note": "Create curiosity" },
-      { "label": "Development", "start": 5, "end": 60, "note": "Develop and resolve the new topic" }
+      { "label": "Hook", "start": 0, "end": 5, "purpose": "Create curiosity" },
+      { "label": "Context", "start": 5, "end": 15, "purpose": "Set up the issue" },
+      { "label": "Conclusion (Ending)", "start": 15, "end": 60, "purpose": "Develop and resolve the new topic" }
     ]
   },
+  "factPack": { "researchId": "research_01", "summary": "Grounded claims", "facts": [{ "factId": "fact_1", "claim": "A sourced claim", "explanation": "Why it matters", "confidence": "high", "sourceIds": ["source_1"], "usableInScript": true }, { "factId": "fact_2", "claim": "A second claim", "explanation": "Why it matters", "confidence": "medium", "sourceIds": ["source_1"], "usableInScript": true }, { "factId": "fact_3", "claim": "A third claim", "explanation": "Why it matters", "confidence": "high", "sourceIds": ["source_1"], "usableInScript": true }], "sources": [{ "sourceId": "source_1", "title": "Official source", "url": "https://example.org/report", "domain": "example.org" }], "openQuestions": [] },
   "currentScript": {
     "scriptId": "sc_01JZ8S",
     "version": 1,

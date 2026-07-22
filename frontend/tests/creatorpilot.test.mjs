@@ -5,6 +5,7 @@ import {
   createProject,
   createStore,
   parseRoute,
+  referenceBlueprintFromAnalysis,
   referenceTitleFromTranscript,
   routeFor,
   updatePipeline,
@@ -16,12 +17,16 @@ import {
   generateScript,
   generateStoryboard,
   renderVideo,
+  researchTopic,
   reviewOriginality,
 } from "../mock-services.mjs";
 import { createServices, getServiceConfig } from "../service-client.mjs";
 import { errorNotice } from "../components.mjs";
+import { renderDashboard } from "../pages/dashboard.mjs";
+import { renderAnalysis } from "../pages/analysis.mjs";
 import { renderReview } from "../pages/review.mjs";
 import { renderProduction } from "../pages/production.mjs";
+import { renderResearch } from "../pages/research.mjs";
 
 globalThis.location = { search: "?fast=1" };
 
@@ -65,6 +70,14 @@ test("the local store deletes a single project", () => {
   assert.equal(store.getState().activeProjectId, null);
 });
 
+test("the dashboard offers per-project deletion", () => {
+  const store = createStore(memoryStorage());
+  store.addProject(createProject({ id: "project-del", topic: "Delete me" }));
+  const html = renderDashboard(store.getState());
+  assert.match(html, /data-action="delete-project"/);
+  assert.match(html, /data-project-id="project-del"/);
+});
+
 test("pipeline updates preserve every other agent state", () => {
   const project = createProject();
   const pipeline = updatePipeline(project, "analyst", "in_progress", "Mapping structure");
@@ -90,12 +103,15 @@ test("the complete mock service chain returns a production package", async () =>
   });
   project.transcript = await extractTranscript(project);
   project.analysis = await analyzeReference(project);
+  project.referenceBlueprint = referenceBlueprintFromAnalysis(project.analysis);
+  project.research = await researchTopic(project);
   project.generatedScript = await generateScript(project);
   project.originalityReview = await reviewOriginality(project);
   project.storyboard = await generateStoryboard(project);
   const updates = [];
   project.render = await renderVideo(project, (progress) => updates.push(progress));
   assert.equal(project.analysis.structure.length, 6);
+  assert.equal(project.research.facts.length, 3);
   assert.equal(project.generatedScript.sections.length, 7);
   assert.ok(wordCount(project.generatedScript) > 60);
   assert.equal(project.originalityReview.status, "passed");
@@ -105,6 +121,23 @@ test("the complete mock service chain returns a production package", async () =>
   assert.equal(project.render.completed, true);
   assert.equal(project.analysis.safety.longSourceExcerptsIncluded, false);
   assert.ok(project.analysis.confidence > 0 && project.analysis.confidence <= 1);
+  assert.match(project.referenceBlueprint.narrativeEngine, /system-level possibility/);
+  assert.match(project.referenceBlueprint.informationPattern, /Assumption/);
+});
+
+test("story analysis presents simple storytelling logic without a timeline", async () => {
+  const project = createProject({ id: "project-dna-ui", topic: "A new topic", language: "English" });
+  project.transcript = await extractTranscript(project);
+  project.analysis = await analyzeReference(project);
+  const html = renderAnalysis(project);
+  assert.match(html, /How this video tells its story/);
+  assert.match(html, /How it opens/);
+  assert.match(html, /What moves it forward/);
+  assert.match(html, /Why viewers keep watching/);
+  assert.match(html, /Reusable story blueprint/);
+  assert.match(html, /Expectation reversal/);
+  assert.doesNotMatch(html, /Retention map|Emotional Arc|Story structure|structure-timeline/);
+  assert.match(html, /<details><summary>View mock transcript<\/summary>/);
 });
 
 test("mock services expose retryable named failures", async () => {
@@ -119,6 +152,7 @@ test("service configuration defaults safely to mock mode", () => {
     services: {
       transcript: "mock",
       analysis: "mock",
+      research: "mock",
       script: "mock",
       review: "mock",
       storyboard: "mock",
@@ -143,6 +177,33 @@ test("API mode maps transcript extraction to the documented endpoint", async () 
   assert.equal(calls[0].url, "https://api.example.test/api/transcripts/extract");
   assert.equal(JSON.parse(calls[0].options.body).projectId, "project-api");
   assert.equal(result.text, "Transcript");
+});
+
+test("Research API sends only the tailored brief and compact blueprint", async () => {
+  let call;
+  const services = createServices({ services: { research: "api" }, apiBaseUrl: "https://api.example.test" }, async (url, options) => {
+    call = { url, body: JSON.parse(options.body) };
+    return { ok: true, json: async () => ({ data: { researchId: "research_api", facts: [], sources: [], openQuestions: [] } }) };
+  });
+  const project = createProject({ id: "project-research-api", topic: "A tailored topic", language: "English" });
+  project.analysis = await analyzeReference(project);
+  project.referenceBlueprint = referenceBlueprintFromAnalysis(project.analysis);
+  await services.researchTopic(project);
+  assert.equal(call.url, "https://api.example.test/api/research/topic");
+  assert.equal(call.body.creativeBrief.topic, "A tailored topic");
+  assert.equal(call.body.referenceBlueprint.structure[0].label, "Hook");
+  assert.equal(Object.prototype.hasOwnProperty.call(call.body, "transcript"), false);
+});
+
+test("Research screen keeps citations visible and clickable", async () => {
+  const project = createProject({ id: "project-research-ui", topic: "A tailored topic", language: "English" });
+  project.analysis = await analyzeReference(project);
+  project.referenceBlueprint = referenceBlueprintFromAnalysis(project.analysis);
+  project.research = await researchTopic(project);
+  const html = renderResearch(project);
+  assert.match(html, /Fact Pack/);
+  assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+  assert.match(html, /Not a factual guarantee/);
 });
 
 test("mixed mode calls only transcript through the API", async () => {
@@ -209,11 +270,11 @@ test("Phase 2 mixed mode uses API transcript and analysis while later agents sta
   project.generatedScript = await services.generateScript(project);
   assert.equal(calls.length, 2);
   assert.equal(calls[1].url, "http://127.0.0.1:8787/api/analysis/reference");
-  assert.equal(calls[1].body.analysisLanguage, "Korean");
+  assert.equal(calls[1].body.analysisLanguage, "English");
   assert.equal(project.generatedScript.version, 1);
 });
 
-test("Phase 3 mixed mode sends abstract analysis to the Scriptwriter without a transcript", async () => {
+test("Scriptwriter API receives the tailored brief, compact blueprint, and Fact Pack without a transcript", async () => {
   const calls = [];
   const services = createServices(
     {
@@ -235,10 +296,14 @@ test("Phase 3 mixed mode sends abstract analysis to the Scriptwriter without a t
   const project = createProject({ id: "project-phase-3", topic: "A new topic", language: "English" });
   project.transcript = { transcriptId: "tr_private", text: "Raw reference wording must not be sent." };
   project.analysis = await analyzeReference(project);
+  project.referenceBlueprint = referenceBlueprintFromAnalysis(project.analysis);
+  project.research = await researchTopic(project);
   project.generatedScript = await services.generateScript(project);
   assert.equal(calls[0].url, "http://127.0.0.1:8787/api/scripts/generate");
   assert.equal(Object.prototype.hasOwnProperty.call(calls[0].body, "transcript"), false);
-  assert.equal(calls[0].body.referenceAnalysis.analysisId, project.analysis.analysisId);
+  assert.equal(calls[0].body.referenceBlueprint.analysisId, project.analysis.analysisId);
+  assert.equal(calls[0].body.creativeBrief.targetAudience, project.creativeBrief.targetAudience);
+  assert.equal(calls[0].body.factPack.researchId, project.research.researchId);
   assert.deepEqual(calls[0].body.revisionInstructions, []);
   assert.equal(project.generatedScript.scriptId, "script_api_v1");
 });
@@ -264,6 +329,8 @@ test("Scriptwriter revision sends version lineage, instructions, and stable-ID p
   );
   const project = createProject({ id: "project-revision", topic: "A new topic", language: "English" });
   project.analysis = await analyzeReference(project);
+  project.referenceBlueprint = referenceBlueprintFromAnalysis(project.analysis);
+  project.research = await researchTopic(project);
   project.generatedScript = {
     scriptId: "script_api_v1",
     title: "First script",

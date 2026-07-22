@@ -1,6 +1,7 @@
 import {
   createProject,
   createStore,
+  referenceBlueprintFromAnalysis,
   parseRoute,
   referenceTitleFromTranscript,
   routeFor,
@@ -12,6 +13,7 @@ import {
   extractTranscript,
   generateScript,
   generateStoryboard,
+  researchTopic,
   renderVideo,
   reviewOriginality,
   reviseScript,
@@ -20,6 +22,7 @@ import { appShell } from "./components.mjs";
 import { renderDashboard } from "./pages/dashboard.mjs";
 import { renderNewProject } from "./pages/new-project.mjs";
 import { renderAnalysis } from "./pages/analysis.mjs";
+import { renderResearch } from "./pages/research.mjs";
 import { renderScriptEditor } from "./pages/script-editor.mjs";
 import { renderReview } from "./pages/review.mjs";
 import { renderProduction } from "./pages/production.mjs";
@@ -30,6 +33,7 @@ const runningTasks = new Set();
 let newProjectError = null;
 let newProjectDraft = {};
 let lastRouteKey = "";
+let autosaveTimer = null;
 
 function currentContext() {
   const route = parseRoute();
@@ -42,6 +46,7 @@ function pageFor(route, project) {
   if (route.name === "new") return renderNewProject(newProjectDraft, newProjectError);
   if (!project) return `<section class="not-found"><p class="eyebrow">Project unavailable</p><h1>This production could not be found.</h1><p>It may have been cleared from this browser.</p><a class="button button-primary" href="${routeFor("dashboard")}">Return to dashboard</a></section>`;
   if (route.name === "analysis") return renderAnalysis(project);
+  if (route.name === "research") return renderResearch(project);
   if (route.name === "script") return renderScriptEditor(project);
   if (route.name === "review") return renderReview(project);
   if (route.name === "production") return renderProduction(project);
@@ -144,6 +149,32 @@ async function ensureScript(project, { force = false } = {}) {
       render({ preserveFocus: true });
     } catch (error) {
       failProject(current, "writer", error);
+    }
+  });
+}
+
+async function ensureResearch(project) {
+  await runTask(`research:${project.id}`, async () => {
+    let current = store.getProject(project.id);
+    if (current.research) return;
+    try {
+      const referenceBlueprint = current.referenceBlueprint || referenceBlueprintFromAnalysis(current.analysis);
+      current = store.updateProject(project.id, {
+        error: null,
+        status: "researching",
+        referenceBlueprint,
+        pipeline: updatePipeline(current, "researcher", "in_progress", "Checking current sources for your angle"),
+      });
+      render({ preserveFocus: true });
+      const research = await researchTopic(current);
+      current = store.updateProject(project.id, {
+        research,
+        status: "research_ready",
+        pipeline: updatePipeline(current, "researcher", "completed", `${research.facts.length} sourced claims ready`),
+      });
+      render({ preserveFocus: true });
+    } catch (error) {
+      failProject(current, "researcher", error);
     }
   });
 }
@@ -257,7 +288,9 @@ async function startRender(project) {
 function ensureRouteData(route, project) {
   if (!project || project.error) return;
   if (route.name === "analysis" && !project.analysis) ensureAnalysis(project);
-  if (route.name === "script" && !project.generatedScript) ensureScript(project);
+  if (route.name === "research" && !project.research) ensureResearch(project);
+  if (route.name === "script" && !project.research) navigate(routeFor("research", project.id));
+  else if (route.name === "script" && !project.generatedScript) ensureScript(project);
   if (route.name === "review" && !project.originalityReview) ensureReview(project);
   if (route.name === "production" && !project.storyboard.length) ensureStoryboard(project);
 }
@@ -284,14 +317,47 @@ function saveScriptForm(project) {
   });
 }
 
+function quietSaveScript(projectId) {
+  const form = document.querySelector("#script-form");
+  const project = store.getProject(projectId);
+  if (!form || !project?.generatedScript) return;
+  const sections = project.generatedScript.sections.map((section) => ({
+    ...section,
+    text: form.querySelector(`[data-section-id="${section.id}"] textarea`).value.trim(),
+  }));
+  const title = form.querySelector("#script-title").value.trim() || project.topic;
+  const patch = { generatedScript: { ...project.generatedScript, title, sections }, title };
+  if (project.originalityReview) {
+    patch.originalityReview = null;
+    patch.status = "script_generated";
+    patch.pipeline = updatePipeline(project, "reviewer", "waiting", "Waiting for the updated script");
+  }
+  store.updateProject(projectId, patch);
+}
+
+function scheduleScriptAutosave() {
+  const { project } = currentContext();
+  if (!project) return;
+  const stateNode = document.querySelector("#autosave-state");
+  if (stateNode) stateNode.textContent = "Saving…";
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    quietSaveScript(project.id);
+    const savedNode = document.querySelector("#autosave-state");
+    if (savedNode) savedNode.textContent = "Auto-saved locally";
+  }, 600);
+}
+
 app.addEventListener("submit", (event) => {
   event.preventDefault();
   if (event.target.id === "reference-form") {
     const values = Object.fromEntries(new FormData(event.target));
     newProjectDraft = values;
     const validUrl = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(values.referenceUrl || "");
-    if (!validUrl || !values.topic?.trim()) {
-      newProjectError = !validUrl ? "Enter a valid YouTube URL." : "Enter a topic for the new video.";
+    const requiredBrief = ["topic", "angle", "targetAudience", "viewerGoal", "desiredTakeaway", "tone"];
+    const missingBrief = requiredBrief.find((field) => !values[field]?.trim());
+    if (!validUrl || missingBrief) {
+      newProjectError = !validUrl ? "Enter a valid YouTube URL." : `Complete the ${missingBrief.replace(/([A-Z])/g, " $1").toLowerCase()} field so the result can be tailored.`;
       render({ preserveFocus: true });
       return;
     }
@@ -308,11 +374,16 @@ app.addEventListener("submit", (event) => {
 });
 
 app.addEventListener("input", (event) => {
+  if (event.target.matches("#script-title")) {
+    scheduleScriptAutosave();
+    return;
+  }
   if (!event.target.matches("[data-script-section]")) return;
   const form = event.target.form;
   const text = [...form.querySelectorAll("[data-script-section]")].map((field) => field.value).join(" ");
   const display = form.querySelector("#word-count");
   if (display) display.textContent = text.trim().split(/\s+/).filter(Boolean).length;
+  scheduleScriptAutosave();
 });
 
 app.addEventListener("change", (event) => {
@@ -328,11 +399,22 @@ app.addEventListener("change", (event) => {
 });
 
 app.addEventListener("click", async (event) => {
+  const sectionLink = event.target.closest(".section-nav a[href^='#section-']");
+  if (sectionLink) {
+    event.preventDefault();
+    const target = document.querySelector(sectionLink.getAttribute("href"));
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.focus({ preventScroll: true });
+    }
+    return;
+  }
   const control = event.target.closest("[data-action]");
   if (!control) return;
   const action = control.dataset.action;
   const { route, project } = currentContext();
-  if (!project && !["clear-projects"].includes(action)) return;
+  if (!project && !["clear-projects", "delete-project"].includes(action)) return;
+  if (action === "research-topic") navigate(routeFor("research", project.id));
   if (action === "generate-script") navigate(routeFor("script", project.id));
   if (action === "regenerate-script") {
     const saved = saveScriptForm(project);
@@ -389,6 +471,11 @@ app.addEventListener("click", async (event) => {
       ensureScript(current);
     }
   }
+  if (action === "retry-research") {
+    store.updateProject(project.id, { error: null, research: null, pipeline: updatePipeline(project, "researcher", "waiting", "Retry queued") });
+    render({ preserveFocus: true });
+    ensureResearch(store.getProject(project.id));
+  }
   if (action === "retry-review") {
     store.updateProject(project.id, { error: null });
     render({ preserveFocus: true });
@@ -402,6 +489,15 @@ app.addEventListener("click", async (event) => {
   if (action === "retry-render") {
     store.updateProject(project.id, { error: null });
     startRender(store.getProject(project.id));
+  }
+  if (action === "delete-project") {
+    const target = project || store.getProject(control.dataset.projectId);
+    if (!target) return;
+    const confirmed = window.confirm(`Delete "${target.title}"? This removes the project from this browser and cannot be undone.`);
+    if (!confirmed) return;
+    store.deleteProject(target.id);
+    if (route.name === "dashboard") render();
+    else navigate(routeFor("dashboard"));
   }
   if (action === "clear-projects") {
     store.clearProjects();

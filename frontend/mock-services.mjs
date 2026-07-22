@@ -54,15 +54,72 @@ export async function analyzeReference(project = {}) {
     doNotCopy: ["Reference-specific examples", "Distinctive analogies", "Original sentence sequences"],
     confidence: 0.92,
     estimatedOriginalDuration: 58,
+    hookMechanics: {
+      trigger: "Expectation reversal",
+      curiosityGap: "If the obvious solution is incomplete, what alternative could work?",
+      promisedPayoff: "Reveal the overlooked mechanism and why it changes the larger system.",
+      deliveryPattern: "Challenge the default answer, withhold the larger implication, then expand it in stages.",
+      evidenceStart: 0,
+      evidenceEnd: 5,
+      evidence: "The opening rejects the expected solution before explaining the alternative.",
+    },
+    narrativeStyle: {
+      primaryMode: "Reframe-driven explainer",
+      narrativeEngine: "A small experiment expands into a system-level possibility while practical risks keep the outcome uncertain.",
+      progression: ["Expected answer", "Hidden alternative", "Working mechanism", "System reframe", "Practical tension", "Future payoff"],
+    },
+    informationFlow: {
+      pattern: "Assumption → alternative → mechanism → scale → objections → implication",
+      explanation: "The explanation delays broad stakes until the viewer understands one concrete mechanism.",
+      sequence: ["Familiar assumption", "Contrasting possibility", "How it works", "Why it scales", "What could fail", "Why it matters"],
+    },
+    retentionMap: [
+      { type: "Expectation reversal", start: 0, end: 5, purpose: "Interrupt the default answer and create a knowledge gap.", evidence: "The opening replaces the familiar solution with an unexplained alternative." },
+      { type: "Progressive reveal", start: 14, end: 39, purpose: "Increase the significance of the idea in two stages.", evidence: "A specific mechanism is explained before its system-level implication." },
+      { type: "Tension reset", start: 39, end: 51, purpose: "Prevent an easy conclusion by introducing constraints.", evidence: "Practical risks appear immediately before the final payoff." },
+    ],
+    emotionalArc: [
+      { phase: "Surprise", start: 0, end: 14, purpose: "Move the viewer away from the expected answer." },
+      { phase: "Discovery", start: 14, end: 39, purpose: "Reward curiosity with an understandable mechanism and larger implication." },
+      { phase: "Concern", start: 39, end: 51, purpose: "Keep the outcome credible by acknowledging unresolved constraints." },
+      { phase: "Possibility", start: 51, end: 58, purpose: "Resolve the opening with a cautious future-facing payoff." },
+    ],
+    viewerExperience: {
+      entryState: "The viewer expects a familiar solution to a familiar problem.",
+      journey: "Surprise becomes understanding, then cautious concern as the idea scales.",
+      exitState: "The viewer leaves with a broader mental model and a plausible alternative worth considering.",
+    },
     structure: [
       { label: "Hook", start: 0, end: 5, note: "Contradicts the expected solution" },
       { label: "Context", start: 5, end: 14, note: "Introduces the hidden experiment" },
       { label: "Mechanism", start: 14, end: 27, note: "Explains how the idea works" },
       { label: "Reframe", start: 27, end: 39, note: "Expands one building into a city system" },
       { label: "Tension", start: 39, end: 51, note: "Acknowledges cost and risk" },
-      { label: "Conclusion", start: 51, end: 60, note: "Returns to the future stakes" },
+      { label: "Conclusion", start: 51, end: 58, note: "Returns to the future stakes" },
     ],
     safety: { longSourceExcerptsIncluded: false, maxQuotedWords: 0 },
+  };
+}
+
+export async function researchTopic(project = {}) {
+  await wait(620);
+  maybeFail("researchTopic");
+  return {
+    researchId: `research_mock_${project.id}`,
+    summary: `A compact evidence pack tailored to ${project.creativeBrief?.targetAudience || "the selected audience"} and the angle “${project.creativeBrief?.angle || project.topic}.”`,
+    facts: [
+      { factId: "fact_1", claim: "The topic affects systems beyond the most visible headline.", explanation: "The strongest framing connects the immediate event to infrastructure, institutions, and downstream consequences.", confidence: "high", sourceIds: ["source_1"], sourceUrls: ["https://www.oecd.org/"], usableInScript: true },
+      { factId: "fact_2", claim: "Audience understanding improves when the mechanism is explained before the stakes.", explanation: "The narration should establish how the system works, then show what changes if one part fails.", confidence: "medium", sourceIds: ["source_2"], sourceUrls: ["https://ourworldindata.org/"], usableInScript: true },
+      { factId: "fact_3", claim: "Recent primary sources should anchor any precise or time-sensitive claim.", explanation: "Dates, quantities, and policy positions can change, so the final editor should open the linked source before publishing.", confidence: "high", sourceIds: ["source_3"], sourceUrls: ["https://www.un.org/en/"], usableInScript: true },
+    ],
+    sources: [
+      { sourceId: "source_1", title: "OECD", url: "https://www.oecd.org/", domain: "oecd.org" },
+      { sourceId: "source_2", title: "Our World in Data", url: "https://ourworldindata.org/", domain: "ourworldindata.org" },
+      { sourceId: "source_3", title: "United Nations", url: "https://www.un.org/en/", domain: "un.org" },
+    ],
+    openQuestions: ["Which time-sensitive figures should be rechecked immediately before publication?"],
+    searchedAt: new Date().toISOString(),
+    safety: { providerVerifiedSources: true, factualGuarantee: false },
   };
 }
 

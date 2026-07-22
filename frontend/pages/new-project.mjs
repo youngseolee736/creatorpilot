@@ -2,7 +2,7 @@ import { escapeHtml } from "../core.mjs";
 import { icon, pageHeading } from "../components.mjs";
 
 export function renderNewProject(draft = {}, error = null) {
-  return `${pageHeading("New production", "Add the creative starting point.", "CreatorPilot studies storytelling structure, then builds a new script for your topic. It does not copy the original creator's wording.")}
+  return `${pageHeading("New production", "Define the story only you should make.", "CreatorPilot studies a reference's storytelling mechanics, researches your exact angle, then writes from a source-grounded creative brief.")}
     ${error ? `<div class="notice notice-error" role="alert"><strong>Check the project details.</strong><p>${escapeHtml(error)}</p></div>` : ""}
     <form class="reference-form" id="reference-form" novalidate>
       <div class="form-primary">
@@ -18,8 +18,27 @@ export function renderNewProject(draft = {}, error = null) {
           <div class="section-index">02</div><div><h2 id="topic-heading">Original direction</h2><p>Describe the idea the new 60-second video should explain.</p></div>
           <div class="field-group field-span"><label for="project-topic">New video topic</label><textarea class="field-textarea" id="project-topic" name="topic" required maxlength="140" placeholder="Why the United States cannot abandon Taiwan">${escapeHtml(draft.topic || "")}</textarea><span class="field-hint">Be specific enough to guide evidence and visual choices.</span></div>
         </section>
+        <section class="form-section" aria-labelledby="tailoring-heading">
+          <div class="section-index">03</div><div><h2 id="tailoring-heading">Tailored brief</h2><p>Tell the Research Agent who this is for and what the story must accomplish.</p></div>
+          <div class="field-span">
+            <div class="field-group"><label for="project-angle">Specific angle</label><textarea class="field-textarea field-textarea-compact" id="project-angle" name="angle" required maxlength="400" placeholder="Explain the economic and security consequences of withdrawal, without turning it into partisan commentary.">${escapeHtml(draft.angle || "")}</textarea></div>
+            <div class="form-grid">
+              <div class="field-group"><label for="target-audience">Target audience</label><input class="field-input" id="target-audience" name="targetAudience" required maxlength="400" value="${escapeHtml(draft.targetAudience || "")}" placeholder="Korean first-time voters interested in geopolitics" /></div>
+              <div class="field-group"><label for="tone">Tone</label><input class="field-input" id="tone" name="tone" required maxlength="200" value="${escapeHtml(draft.tone || "Clear, informed, conversational")}" /></div>
+            </div>
+            <div class="field-group"><label for="viewer-goal">Viewer goal</label><input class="field-input" id="viewer-goal" name="viewerGoal" required maxlength="400" value="${escapeHtml(draft.viewerGoal || "")}" placeholder="Understand the issue well enough to explain it to someone else" /></div>
+            <div class="field-group"><label for="desired-takeaway">Desired takeaway</label><textarea class="field-textarea field-textarea-compact" id="desired-takeaway" name="desiredTakeaway" required maxlength="500" placeholder="Leaving would affect more than one country; it would reshape regional trust and supply chains.">${escapeHtml(draft.desiredTakeaway || "")}</textarea></div>
+            <details class="brief-options"><summary>Editorial guardrails <span>Optional</span></summary>
+              <div class="form-grid">
+                <div class="field-group"><label for="must-include">Must include</label><textarea class="field-textarea field-textarea-compact" id="must-include" name="mustInclude" maxlength="1200" placeholder="One item per line">${escapeHtml(draft.mustInclude || "")}</textarea></div>
+                <div class="field-group"><label for="must-avoid">Must avoid</label><textarea class="field-textarea field-textarea-compact" id="must-avoid" name="mustAvoid" maxlength="1200" placeholder="Partisan framing&#10;Unverified casualty estimates">${escapeHtml(draft.mustAvoid || "")}</textarea></div>
+              </div>
+              <div class="field-group"><label for="call-to-action">Call to action</label><input class="field-input" id="call-to-action" name="callToAction" maxlength="300" value="${escapeHtml(draft.callToAction || "")}" placeholder="Invite viewers to follow for more one-minute explainers" /></div>
+            </details>
+          </div>
+        </section>
         <section class="form-section" aria-labelledby="output-heading">
-          <div class="section-index">03</div><div><h2 id="output-heading">Output</h2><p>These settings stay editable before rendering.</p></div>
+          <div class="section-index">04</div><div><h2 id="output-heading">Output</h2><p>These settings stay editable before rendering.</p></div>
           <div class="form-grid field-span">
             <div class="field-group"><label for="language">Target language</label><select class="field-select" id="language" name="language"><option${draft.language !== "English" ? " selected" : ""}>Korean</option><option${draft.language === "English" ? " selected" : ""}>English</option></select></div>
             <div class="field-group"><label for="duration">Target duration</label><div class="field-unit"><input class="field-input" id="duration" name="duration" type="number" min="15" max="180" value="${escapeHtml(draft.duration || 60)}" /><span>seconds</span></div></div>
@@ -27,7 +46,7 @@ export function renderNewProject(draft = {}, error = null) {
           </div>
         </section>
       </div>
-      <aside class="form-aside"><div class="ethics-note"><span class="note-mark">CP</span><p class="eyebrow">Originality by design</p><h2>Structure is a reference, not a template.</h2><p>The analyst identifies pacing, hook mechanics, and audience strategy. The Scriptwriter creates new language for your topic, and the Reviewer flags potential phrase overlap before production.</p><ul><li>${icon("check", 16)}No source wording is intentionally reused</li><li>${icon("check", 16)}Every draft receives a similarity review</li><li>${icon("check", 16)}You approve the script before video production</li></ul></div></aside>
+      <aside class="form-aside"><div class="ethics-note"><span class="note-mark">CP</span><p class="eyebrow">Tailored by design</p><h2>Structure, facts, and intent stay separate.</h2><p>The Analyst extracts only story mechanics. The Research Agent finds current sources for your exact angle. The Scriptwriter receives both, plus your creative decisions.</p><ul><li>${icon("check", 16)}Target audience comes from you, not the reference</li><li>${icon("check", 16)}Claims stay attached to reviewable sources</li><li>${icon("check", 16)}The final draft still receives similarity review</li></ul></div></aside>
       <div class="form-submit"><a class="button button-secondary" href="#/dashboard">Cancel</a><button class="button button-primary" type="submit">Analyze reference ${icon("arrow")}</button></div>
     </form>`;
 }

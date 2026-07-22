@@ -1,6 +1,6 @@
 # CreatorPilot Backend Handoff Map
 
-Status: Phase 6 transcript extraction, Script Analyst, Scriptwriter, Originality
+Status: Phase 7 transcript extraction, Script Analyst, Research Agent, Scriptwriter, Originality
 Reviewer, Storyboard, and Video Producer boundaries implemented.
 
 ## Runtime boundary
@@ -44,7 +44,7 @@ window.CREATORPILOT_CONFIG = Object.freeze({
 The backend selects `LLM_PROVIDER=openai-compatible`. `LLM_API_BASE_URL`,
 `LLM_API_KEY`, and `LLM_MODEL` are required when a real analysis, Scriptwriter,
 Reviewer, or Storyboard endpoint is called. `LLM_TIMEOUT_MS` defaults to 30000.
-Each Agent first reads its `ANALYST_LLM_*`, `SCRIPTWRITER_LLM_*`,
+Each Agent first reads its `ANALYST_LLM_*`, `RESEARCH_LLM_*`, `SCRIPTWRITER_LLM_*`,
 `REVIEWER_LLM_*`, or `STORYBOARD_LLM_*` override and falls back field-by-field
 to the shared `LLM_*` values. These variables are server-only. Video API mode is
 deliberately isolated from all LLM settings and requires `RENDER_API_BASE_URL`,
@@ -61,6 +61,7 @@ remain separate upstream responsibilities.
 |---|---|---|---|---|---|---|---|
 | `extractTranscript(project)` | `frontend/mock-services.mjs` | `POST /api/transcripts/extract` | `app.js#ensureAnalysis`, `pages/analysis.mjs`, shared pipeline | Extracting reference transcript | Inline agent error with Retry; distinguish invalid/private/no transcript from transient provider failure | No | Cache by canonical video ID + caption language; respect transcript retention policy |
 | `analyzeReference(project)` | same | `POST /api/analysis/reference` | `app.js#ensureAnalysis`, `pages/analysis.mjs` | Mapping hook, pacing, and structure | Retry for transient model errors; invalid/short transcript requires new source | No | Cache by transcript content hash + analyzer version |
+| `researchTopic(project)` | same | `POST /api/research/topic` | `app.js#ensureResearch`, `pages/research.mjs` | Checking current sources for the tailored angle | Retry transient web-search errors; never promote uncited claims | No | Cache by exact brief + blueprint within the running backend |
 | `generateScript(project)` | same | `POST /api/scripts/generate` | `app.js#ensureScript`, `pages/script-editor.mjs` | Drafting original narration / Writing a new version | Retry without duplicate versions; show unsupported brief/language separately | No | Do not shared-cache creative output; store immutable result per project/version |
 | `reviewOriginality(project)` | same | `POST /api/scripts/review` | `app.js#ensureReview`, `pages/review.mjs` | Comparing language and story structure | Retry; never convert an unavailable review into a pass | No | Cache by reference hash + exact script hash + reviewer version |
 | `generateStoryboard(project)` | same | `POST /api/storyboards/generate` | `app.js#ensureStoryboard`, `pages/production.mjs` | Planning scenes and visual evidence | Retry; reject non-passed or stale review | No | Store by approved script/review ID; invalidate when script changes |
@@ -101,18 +102,17 @@ Current response:
   "hookType": "Counter-intuitive claim",
   "hookDuration": 5,
   "hookPurpose": "Challenge the expected answer and create curiosity.",
-  "targetAudience": "Curious general audience interested in cities and technology",
   "tone": "Urgent, informed, optimistic",
-  "contentPromise": "Explain how an overlooked mechanism changes the familiar problem.",
   "pacing": "Fast opening, measured evidence, decisive close",
-  "retentionTechniques": ["Expectation reversal", "Concrete visual examples", "Open-loop question", "Future-facing payoff"],
-  "openLoops": ["Delay the opening implication until the conclusion."],
-  "transitions": ["Move from assumption to mechanism, tension, and resolution."],
   "callToAction": "Invite the viewer to reconsider the obvious solution",
   "reusablePatterns": ["Open with an expectation reversal", "Escalate from example to system stakes"],
   "doNotCopy": ["Reference-specific examples", "Distinctive analogies", "Original sentence sequences"],
   "confidence": 0.88,
   "estimatedOriginalDuration": 58,
+  "hookMechanics": { "trigger": "Expectation reversal", "curiosityGap": "The alternative is unexplained.", "promisedPayoff": "Reveal the mechanism and larger implication.", "deliveryPattern": "Challenge, delay, reveal, resolve.", "evidenceStart": 0, "evidenceEnd": 5, "evidence": "The expected solution is rejected before context is supplied." },
+  "narrativeStyle": { "primaryMode": "Reframe-driven explainer", "narrativeEngine": "A small mechanism expands into system-level stakes.", "progression": ["Assumption", "Alternative", "Mechanism", "Stakes", "Payoff"] },
+  "informationFlow": { "pattern": "Assumption → mechanism → stakes → payoff", "explanation": "The mechanism is understood before the stakes expand.", "sequence": ["Assumption", "Mechanism", "Stakes", "Payoff"] },
+  "retentionMap": [{ "type": "Open loop", "start": 0, "end": 5, "purpose": "Create an unresolved question.", "evidence": "The answer is delayed." }],
   "structure": [
     { "label": "Hook", "start": 0, "end": 5, "note": "Contradicts the expected solution" },
     { "label": "Context", "start": 5, "end": 14, "note": "Introduces the hidden experiment" },
@@ -125,9 +125,10 @@ Current response:
 }
 ```
 
-The UI consumes the original summary fields and each structure item, then shows
-the optional summary, hook purpose, reusable patterns, and confidence without a
-layout redesign. The backend generates `analysisId` and safety metadata, rejects
+The UI presents five plain-English storytelling questions and a short reusable
+story blueprint while keeping timing and the transcript out of the primary
+reading path. The backend generates
+`analysisId` and safety metadata, rejects
 long source excerpts, validates timeline consistency, strips unknown fields, and
 makes at most one JSON repair attempt. The transcript is sent to the configured
 LLM but is not stored by this backend. Analysis is reusable only for the exact

@@ -7,11 +7,20 @@ function createCorsMiddleware(frontendOrigin) {
     const origin = req.get("Origin");
     res.vary("Origin");
 
-    if (origin && origin.replace(/\/$/, "") !== allowedOrigin) {
+    let sameOrigin = false;
+    if (origin) {
+      try {
+        sameOrigin = new URL(origin).host === req.get("host");
+      } catch {
+        sameOrigin = false;
+      }
+    }
+
+    if (origin && !sameOrigin && origin.replace(/\/$/, "") !== allowedOrigin) {
       return next(new AppError(403, "ORIGIN_NOT_ALLOWED", "This browser origin is not allowed to call CreatorPilot.", false));
     }
 
-    if (origin) res.set("Access-Control-Allow-Origin", allowedOrigin);
+    if (origin) res.set("Access-Control-Allow-Origin", sameOrigin ? origin : allowedOrigin);
     res.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     res.set("Access-Control-Allow-Headers", "Content-Type,Accept");
     res.set("Access-Control-Max-Age", "600");

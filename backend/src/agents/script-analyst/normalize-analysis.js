@@ -4,13 +4,12 @@ const REQUIRED_STRINGS = [
   "summary",
   "hookType",
   "hookPurpose",
-  "targetAudience",
   "tone",
-  "contentPromise",
   "pacing",
   "callToAction",
 ];
-const REQUIRED_ARRAYS = ["retentionTechniques", "openLoops", "transitions", "reusablePatterns", "doNotCopy"];
+const REQUIRED_ARRAYS = ["reusablePatterns", "doNotCopy", "retentionMap"];
+const REQUIRED_OBJECTS = ["hookMechanics", "narrativeStyle", "informationFlow"];
 
 function invalid(path, reason) {
   return new AppError(
@@ -51,6 +50,23 @@ function finiteNumber(value, path, { min = 0, max = Number.MAX_SAFE_INTEGER } = 
   return Math.round(number * 1000) / 1000;
 }
 
+function plainObject(value, path) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid(path, "invalid_object");
+  return value;
+}
+
+function timedObservation(value, path, duration, fields) {
+  const item = plainObject(value, path);
+  const start = finiteNumber(item.start, `${path}.start`, { min: 0, max: duration });
+  const end = finiteNumber(item.end, `${path}.end`, { min: 0, max: duration });
+  if (end < start) throw invalid(`${path}.end`, "must_follow_start");
+  return {
+    ...Object.fromEntries(fields.map((field) => [field, stringField(item[field], `${path}.${field}`, 300)])),
+    start,
+    end,
+  };
+}
+
 function normalizedWords(value) {
   return String(value || "").toLowerCase().match(/[\p{L}\p{N}']+/gu) || [];
 }
@@ -85,17 +101,17 @@ function normalizeAnalysis(raw, input) {
   for (const field of REQUIRED_ARRAYS) {
     if (!(field in raw)) throw invalid(field, "required");
   }
+  for (const field of REQUIRED_OBJECTS) {
+    if (!(field in raw)) throw invalid(field, "required");
+  }
   for (const field of ["hookDuration", "confidence", "estimatedOriginalDuration", "structure"]) {
     if (!(field in raw)) throw invalid(field, "required");
   }
 
   const normalized = Object.fromEntries(REQUIRED_STRINGS.map((field) => [field, stringField(raw[field], field)]));
   normalized.hookDuration = finiteNumber(raw.hookDuration, "hookDuration", { min: 0, max: 30 });
-  normalized.retentionTechniques = stringArray(raw.retentionTechniques, "retentionTechniques", { minItems: 1 });
-  normalized.openLoops = stringArray(raw.openLoops, "openLoops");
-  normalized.transitions = stringArray(raw.transitions, "transitions");
-  normalized.reusablePatterns = stringArray(raw.reusablePatterns, "reusablePatterns", { minItems: 1 });
-  normalized.doNotCopy = stringArray(raw.doNotCopy, "doNotCopy", { minItems: 1 });
+  normalized.reusablePatterns = stringArray(raw.reusablePatterns, "reusablePatterns", { minItems: 2, maxItems: 3 });
+  normalized.doNotCopy = stringArray(raw.doNotCopy, "doNotCopy", { minItems: 1, maxItems: 3 });
   normalized.confidence = finiteNumber(raw.confidence, "confidence", { min: 0, max: 1 });
 
   const reportedDuration = finiteNumber(raw.estimatedOriginalDuration, "estimatedOriginalDuration", { min: 1, max: 7200 });
@@ -104,7 +120,45 @@ function normalizeAnalysis(raw, input) {
     ? Math.round(sourceDuration * 1000) / 1000
     : reportedDuration;
 
-  if (!Array.isArray(raw.structure) || raw.structure.length < 2 || raw.structure.length > 24) {
+  const hookMechanics = plainObject(raw.hookMechanics, "hookMechanics");
+  normalized.hookMechanics = {
+    trigger: stringField(hookMechanics.trigger, "hookMechanics.trigger", 300),
+    curiosityGap: stringField(hookMechanics.curiosityGap, "hookMechanics.curiosityGap", 300),
+    promisedPayoff: stringField(hookMechanics.promisedPayoff, "hookMechanics.promisedPayoff", 300),
+    deliveryPattern: stringField(hookMechanics.deliveryPattern, "hookMechanics.deliveryPattern", 300),
+    evidenceStart: finiteNumber(hookMechanics.evidenceStart, "hookMechanics.evidenceStart", { min: 0, max: normalized.estimatedOriginalDuration }),
+    evidenceEnd: finiteNumber(hookMechanics.evidenceEnd, "hookMechanics.evidenceEnd", { min: 0, max: normalized.estimatedOriginalDuration }),
+    evidence: stringField(hookMechanics.evidence, "hookMechanics.evidence", 300),
+  };
+  if (normalized.hookMechanics.evidenceEnd < normalized.hookMechanics.evidenceStart) {
+    throw invalid("hookMechanics.evidenceEnd", "must_follow_start");
+  }
+
+  const narrativeStyle = plainObject(raw.narrativeStyle, "narrativeStyle");
+  normalized.narrativeStyle = {
+    primaryMode: stringField(narrativeStyle.primaryMode, "narrativeStyle.primaryMode", 160),
+    narrativeEngine: stringField(narrativeStyle.narrativeEngine, "narrativeStyle.narrativeEngine", 500),
+    progression: stringArray(narrativeStyle.progression, "narrativeStyle.progression", { minItems: 2, maxItems: 10 }),
+  };
+
+  const informationFlow = plainObject(raw.informationFlow, "informationFlow");
+  normalized.informationFlow = {
+    pattern: stringField(informationFlow.pattern, "informationFlow.pattern", 200),
+    explanation: stringField(informationFlow.explanation, "informationFlow.explanation", 500),
+    sequence: stringArray(informationFlow.sequence, "informationFlow.sequence", { minItems: 2, maxItems: 10 }),
+  };
+
+  if (!Array.isArray(raw.retentionMap) || raw.retentionMap.length < 1 || raw.retentionMap.length > 3) {
+    throw invalid("retentionMap", "invalid_array");
+  }
+  normalized.retentionMap = raw.retentionMap.map((item, index) => timedObservation(
+    item,
+    `retentionMap.${index}`,
+    normalized.estimatedOriginalDuration,
+    ["type", "purpose", "evidence"],
+  )).sort((left, right) => left.start - right.start);
+
+  if (!Array.isArray(raw.structure) || raw.structure.length < 3 || raw.structure.length > 6) {
     throw invalid("structure", "invalid_array");
   }
   const structureDrafts = raw.structure.map((section, index) => {
@@ -128,7 +182,8 @@ function normalizeAnalysis(raw, input) {
       ? normalized.estimatedOriginalDuration
       : Math.round((timelineEnd + (normalized.estimatedOriginalDuration * weights[index]) / totalWeight) * 1000) / 1000;
     if (timelineEnd <= start) throw invalid(`structure.${index}`, "duration_too_small");
-    return { label: section.label, start, end: timelineEnd, note: section.note };
+    const label = index === 0 ? "Hook" : index === 1 ? "Context" : index === structureDrafts.length - 1 ? "Conclusion (Ending)" : section.label;
+    return { label, start, end: timelineEnd, note: section.note };
   });
   normalized.hookDuration = Math.min(normalized.hookDuration, normalized.structure[0].end);
 

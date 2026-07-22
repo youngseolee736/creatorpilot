@@ -11,7 +11,7 @@ export function renderScriptEditor(project) {
   return `${pageHeading("Scriptwriter Agent · Draft ready", "Shape the narration before review.", "Edit any section directly. Saved changes remain attached to this project.", `<button class="button button-secondary" type="button" data-action="regenerate-script">${icon("retry")}New version</button>`)}
     <form id="script-form" class="editor-layout">
       <section class="script-workspace">
-        <div class="editor-toolbar"><div><span>Draft ${script.version}</span><span>Auto-saved locally</span></div><div><span><strong id="word-count">${count}</strong> words</span><span><strong>${script.estimatedSeconds}</strong> sec</span></div></div>
+        <div class="editor-toolbar"><div><span>Draft ${script.version}</span><span id="autosave-state">Auto-saved locally</span></div><div><span><strong id="word-count">${count}</strong> words</span><span><strong>${script.estimatedSeconds}</strong> sec</span></div></div>
         <div class="title-field"><label for="script-title">Video title</label><textarea id="script-title" name="title" rows="4" maxlength="120">${escapeHtml(script.title)}</textarea></div>
         <div class="script-document" aria-label="Full narration, divided into editable script sections">
           <div class="document-heading"><p class="eyebrow">Full narration</p><span>Edit by production section</span></div>
