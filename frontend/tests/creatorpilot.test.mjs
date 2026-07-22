@@ -115,7 +115,7 @@ test("hash routes round-trip project workspaces", () => {
 
 test("the complete mock service chain returns a production package", async () => {
   const project = createProject({
-    topic: "Why the United States cannot abandon Taiwan",
+    topic: "Why procrastination is not laziness",
     referenceUrl: "https://youtube.com/watch?v=example",
     language: "English",
   });

@@ -194,13 +194,13 @@ export async function reviewOriginality(project) {
     overlaps: [
       {
         reference: "The real breakthrough is not a single floating building.",
-        generated: "Support is therefore not only a promise to one partner.",
+        generated: "Putting things off is not a character flaw; it is your brain dodging a feeling.",
         risk: "Low",
         note: "Shared contrast construction, but different wording, meaning, and placement.",
       },
       {
         reference: "The cities that prepare now may not have to retreat later.",
-        generated: "Walking away might look simpler today, but it would make every future crisis harder.",
+        generated: "Starting small feels pointless today, but it is exactly what makes tomorrow's work easier.",
         risk: "Low",
         note: "Both close on future consequences; revise only if a more distinct cadence is desired.",
       },
@@ -220,14 +220,14 @@ export async function generateStoryboard(project) {
     text: `Scene ${index + 1} narration for ${project.topic}.`,
   }));
   const scenes = [
-    [0, 5, "Animated maritime map with a narrow passage highlighted", "The line ships cannot cross", "map ocean shipping corridor aerial"],
-    [5, 12, "Presenter silhouette facing a layered regional map", "More than one headline", "presenter geopolitical map studio"],
-    [12, 19, "Container ships moving through a busy port", "Trade routes converge here", "container port aerial vertical"],
-    [19, 27, "Close-up montage of advanced semiconductor production", "Manufacturing at global scale", "semiconductor factory clean room"],
-    [27, 35, "Supply chain nodes illuminate across a world map", "A local shock travels", "global supply chain network animation"],
-    [35, 43, "Factory lines pause as shipping indicators turn amber", "Factories · prices · alliances", "factory supply disruption cinematic"],
-    [43, 51, "Diplomatic handshake and joint exercise archival-style montage", "Long-term agreements matter", "alliance diplomacy handshake security"],
-    [51, 60, "Map pulls back as multiple routes remain connected", "Today's choice shapes tomorrow", "connected world routes hopeful ending"],
+    [0, 5, "Animated alarm clock with phone notifications piling up", "You know you should start", "alarm clock phone notifications morning"],
+    [5, 12, "Presenter at a desk glancing at a growing to-do list", "It's not about being lazy", "presenter desk to-do list studio"],
+    [12, 19, "Brain illustration with emotion and logic regions lighting up", "Your brain avoids feelings", "brain regions animation illustration"],
+    [19, 27, "Person cleaning the entire kitchen instead of working", "Suddenly everything else is urgent", "person cleaning kitchen procrastination"],
+    [27, 35, "A guilt spiral visualized as looping arrows", "Avoid, guilt, repeat", "circular arrows loop animation"],
+    [35, 43, "Timer set to five minutes beside an open notebook", "Start smaller than you think", "timer five minutes notebook desk"],
+    [43, 51, "Checkmarks appearing on a simple habit tracker", "Tiny wins rewire the habit", "habit tracker checkmarks close up"],
+    [51, 60, "Presenter relaxed, finishing work as the sun sets", "Starting is the whole trick", "relaxed person finishing work sunset"],
   ];
   return scenes.map(([start, end, visual, caption, query], index) => ({
     id: `scene-${index + 1}`,

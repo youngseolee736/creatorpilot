@@ -16,18 +16,18 @@ export function renderNewProject(draft = {}, error = null) {
         </section>
         <section class="form-section" aria-labelledby="topic-heading">
           <div class="section-index">02</div><div><h2 id="topic-heading">Original direction</h2><p>Describe the idea the new 60-second video should explain.</p></div>
-          <div class="field-group field-span"><label for="project-topic">New video topic</label><textarea class="field-textarea" id="project-topic" name="topic" required maxlength="140" placeholder="Why the United States cannot abandon Taiwan">${escapeHtml(draft.topic || "")}</textarea><span class="field-hint">Be specific enough to guide evidence and visual choices.</span></div>
+          <div class="field-group field-span"><label for="project-topic">New video topic</label><textarea class="field-textarea" id="project-topic" name="topic" required maxlength="140" placeholder="Why procrastination is not laziness">${escapeHtml(draft.topic || "")}</textarea><span class="field-hint">Be specific enough to guide evidence and visual choices.</span></div>
         </section>
         <section class="form-section" aria-labelledby="tailoring-heading">
           <div class="section-index">03</div><div><h2 id="tailoring-heading">Tailored brief</h2><p>Tell the Research Agent who this is for and what the story must accomplish.</p></div>
           <div class="field-span">
-            <div class="field-group"><label for="project-angle">Specific angle</label><textarea class="field-textarea field-textarea-compact" id="project-angle" name="angle" required maxlength="400" placeholder="Explain the economic and security consequences of withdrawal, without turning it into partisan commentary.">${escapeHtml(draft.angle || "")}</textarea></div>
+            <div class="field-group"><label for="project-angle">Specific angle</label><textarea class="field-textarea field-textarea-compact" id="project-angle" name="angle" required maxlength="400" placeholder="Explain the psychology behind procrastination and share simple habits to beat it, without sounding preachy.">${escapeHtml(draft.angle || "")}</textarea></div>
             <div class="form-grid">
-              <div class="field-group"><label for="target-audience">Target audience</label><input class="field-input" id="target-audience" name="targetAudience" required maxlength="400" value="${escapeHtml(draft.targetAudience || "")}" placeholder="Korean first-time voters interested in geopolitics" /></div>
+              <div class="field-group"><label for="target-audience">Target audience</label><input class="field-input" id="target-audience" name="targetAudience" required maxlength="400" value="${escapeHtml(draft.targetAudience || "")}" placeholder="University students and young professionals in their 20s" /></div>
               <div class="field-group"><label for="tone">Tone</label><input class="field-input" id="tone" name="tone" required maxlength="200" value="${escapeHtml(draft.tone || "Clear, informed, conversational")}" /></div>
             </div>
             <div class="field-group"><label for="viewer-goal">Viewer goal</label><input class="field-input" id="viewer-goal" name="viewerGoal" required maxlength="400" value="${escapeHtml(draft.viewerGoal || "")}" placeholder="Understand the issue well enough to explain it to someone else" /></div>
-            <div class="field-group"><label for="desired-takeaway">Desired takeaway</label><textarea class="field-textarea field-textarea-compact" id="desired-takeaway" name="desiredTakeaway" required maxlength="500" placeholder="Leaving would affect more than one country; it would reshape regional trust and supply chains.">${escapeHtml(draft.desiredTakeaway || "")}</textarea></div>
+            <div class="field-group"><label for="desired-takeaway">Desired takeaway</label><textarea class="field-textarea field-textarea-compact" id="desired-takeaway" name="desiredTakeaway" required maxlength="500" placeholder="Procrastination is an emotional regulation problem, not a time problem — and small habits can fix it.">${escapeHtml(draft.desiredTakeaway || "")}</textarea></div>
             <details class="brief-options"><summary>Editorial guardrails <span>Optional</span></summary>
               <div class="form-grid">
                 <div class="field-group"><label for="must-include">Must include</label><textarea class="field-textarea field-textarea-compact" id="must-include" name="mustInclude" maxlength="1200" placeholder="One item per line">${escapeHtml(draft.mustInclude || "")}</textarea></div>
