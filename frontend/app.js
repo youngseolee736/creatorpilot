@@ -7,6 +7,7 @@ import {
   routeFor,
   updatePipeline,
   wordCount,
+  youtubeVideoId,
 } from "./core.mjs";
 import {
   analyzeReference,
@@ -17,6 +18,7 @@ import {
   renderVideo,
   reviewOriginality,
   reviseScript,
+  synthesizeReferences,
 } from "./service-client.mjs";
 import { appShell } from "./components.mjs";
 import { renderDashboard } from "./pages/dashboard.mjs";
@@ -105,35 +107,81 @@ async function ensureAnalysis(project) {
   await runTask(`analysis:${project.id}`, async () => {
     let current = store.getProject(project.id);
     try {
-      if (!current.transcript) {
+      const references = current.references || [];
+      const missingTranscripts = references.filter((reference) => !reference.transcript);
+      if (missingTranscripts.length) {
         current = store.updateProject(project.id, {
           status: "analyzing",
           error: null,
-          pipeline: updatePipeline(current, "transcript", "in_progress", "Extracting reference transcript"),
+          pipeline: updatePipeline(current, "transcript", "in_progress", `Extracting ${missingTranscripts.length} reference transcripts`),
         });
         render({ preserveFocus: true });
-        const transcript = await extractTranscript(current);
-        current = store.updateProject(project.id, {
-          transcript,
-          referenceTitle: referenceTitleFromTranscript(transcript, current.referenceTitle),
-          pipeline: updatePipeline(current, "transcript", "completed", `${transcript.wordCount} words extracted`),
+        const transcriptResults = await Promise.allSettled(missingTranscripts.map(async (reference) => ({
+          referenceId: reference.referenceId,
+          transcript: await extractTranscript(current, reference),
+        })));
+        const completedTranscripts = new Map(transcriptResults.filter((result) => result.status === "fulfilled").map((result) => [result.value.referenceId, result.value.transcript]));
+        const nextReferences = current.references.map((item) => {
+          const transcript = completedTranscripts.get(item.referenceId);
+          return transcript ? { ...item, transcript, title: referenceTitleFromTranscript(transcript, item.title) } : item;
         });
+        const firstTranscript = nextReferences[0]?.transcript || current.transcript;
+        current = store.updateProject(project.id, {
+          references: nextReferences,
+          transcript: firstTranscript,
+          referenceTitle: nextReferences[0]?.title || current.referenceTitle,
+          pipeline: updatePipeline(current, "transcript", "completed", `${nextReferences.filter((reference) => reference.transcript).length} of ${references.length} transcripts ready`),
+        });
+        const transcriptFailure = transcriptResults.find((result) => result.status === "rejected");
+        if (transcriptFailure) throw transcriptFailure.reason;
       }
+
+      current = store.getProject(project.id);
+      const missingAnalyses = current.references.filter((reference) => !hasStoryLogic(reference.analysis));
+      if (missingAnalyses.length) {
+        current = store.updateProject(project.id, {
+          pipeline: updatePipeline(current, "analyst", "in_progress", `Analyzing ${missingAnalyses.length} references independently`),
+        });
+        render({ preserveFocus: true });
+        const analysisResults = await Promise.allSettled(missingAnalyses.map(async (reference) => ({
+          referenceId: reference.referenceId,
+          analysis: await analyzeReference(current, reference),
+        })));
+        const completedAnalyses = new Map(analysisResults.filter((result) => result.status === "fulfilled").map((result) => [result.value.referenceId, result.value.analysis]));
+        const nextReferences = current.references.map((item) => completedAnalyses.has(item.referenceId) ? { ...item, analysis: completedAnalyses.get(item.referenceId) } : item);
+        current = store.updateProject(project.id, {
+          references: nextReferences,
+          pipeline: updatePipeline(current, "analyst", "in_progress", `${nextReferences.filter((reference) => hasStoryLogic(reference.analysis)).length} of ${current.references.length} analyses ready`),
+        });
+        const analysisFailure = analysisResults.find((result) => result.status === "rejected");
+        if (analysisFailure) throw analysisFailure.reason;
+      }
+
+      current = store.getProject(project.id);
       if (!hasStoryLogic(current.analysis)) {
         current = store.updateProject(project.id, {
-          pipeline: updatePipeline(current, "analyst", "in_progress", "Mapping hook, pacing, and structure"),
+          pipeline: updatePipeline(
+            current,
+            "analyst",
+            "in_progress",
+            current.references.length > 1
+              ? (current.analysisDepth === "deep" ? "Comparing two blueprints with the Final Judge" : "Combining the strongest story patterns")
+              : "Preparing the story blueprint",
+          ),
         });
         render({ preserveFocus: true });
-        const analysis = await analyzeReference(current);
+        const analysis = current.references.length >= 3
+          ? await synthesizeReferences(current)
+          : current.references[0]?.analysis;
         current = store.updateProject(project.id, {
           analysis,
           status: "reference_added",
-          pipeline: updatePipeline(current, "analyst", "completed", "Structure mapped for adaptation"),
+          pipeline: updatePipeline(current, "analyst", "completed", `${current.references.length} references combined`),
         });
       }
       render({ preserveFocus: true });
     } catch (error) {
-      const stepId = current.transcript ? "analyst" : "transcript";
+      const stepId = current.references?.every((reference) => reference.transcript) ? "analyst" : "transcript";
       failProject(current, stepId, error);
     }
   });
@@ -161,7 +209,7 @@ async function ensureScript(project, { force = false } = {}) {
       current = store.updateProject(project.id, {
         error: null,
         generatedScript: force ? null : current.generatedScript,
-        pipeline: updatePipeline(current, "writer", "in_progress", force ? "Writing a new version" : "Drafting original narration"),
+        pipeline: updatePipeline(current, "writer", "in_progress", current.analysisDepth === "deep" ? "Comparing two drafts with the Writing Judge" : (force ? "Writing a new version" : "Drafting original narration")),
       });
       render({ preserveFocus: true });
       const generatedScript = await generateScript(current);
@@ -189,7 +237,7 @@ async function ensureResearch(project) {
         research: null,
         status: "researching",
         referenceBlueprint,
-        pipeline: resetResearchPipeline(current, "in_progress", "Testing the claim with current evidence"),
+        pipeline: resetResearchPipeline(current, "in_progress", current.analysisDepth === "deep" ? "Comparing two research cases with the Research Judge" : "Testing the claim with current evidence"),
       });
       render({ preserveFocus: true });
       const research = await researchTopic(current);
@@ -243,7 +291,7 @@ async function ensureScriptRevision(project, revisionInstructions) {
       current = store.updateProject(project.id, {
         error: null,
         pendingRevisionInstructions: instructions,
-        pipeline: updatePipeline(current, "writer", "in_progress", "Writing a new version"),
+        pipeline: updatePipeline(current, "writer", "in_progress", current.analysisDepth === "deep" ? "Comparing two revised drafts with the Writing Judge" : "Writing a new version"),
       });
       render({ preserveFocus: true });
       const generatedScript = await reviseScript(current, instructions);
@@ -406,11 +454,20 @@ app.addEventListener("submit", (event) => {
   if (event.target.id === "reference-form") {
     const values = Object.fromEntries(new FormData(event.target));
     newProjectDraft = values;
-    const validUrl = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(values.referenceUrl || "");
-    const requiredBrief = ["topic", "angle", "targetAudience", "viewerGoal", "desiredTakeaway", "tone"];
-    const missingBrief = requiredBrief.find((field) => !values[field]?.trim());
-    if (!validUrl || missingBrief) {
-      newProjectError = !validUrl ? "Enter a valid YouTube URL." : `Complete the ${missingBrief.replace(/([A-Z])/g, " $1").toLowerCase()} field so the result can be tailored.`;
+    const urls = [1, 2, 3, 4, 5].map((position) => values[`referenceUrl${position}`]?.trim()).filter(Boolean);
+    const requiredUrls = [1, 2, 3].map((position) => values[`referenceUrl${position}`]?.trim()).filter(Boolean);
+    const videoIds = urls.map(youtubeVideoId);
+    const validUrl = videoIds.every(Boolean);
+    const uniqueUrls = new Set(videoIds).size === videoIds.length;
+    const missingBrief = !values.topic?.trim();
+    if (requiredUrls.length < 3 || !validUrl || !uniqueUrls || missingBrief) {
+      newProjectError = requiredUrls.length < 3
+        ? "Add all three required YouTube references."
+        : !validUrl
+          ? "Use valid YouTube URLs for every reference."
+          : !uniqueUrls
+            ? "Each reference must use a different YouTube URL."
+            : "Describe the new video topic so the result can be tailored.";
       render({ preserveFocus: true });
       return;
     }
@@ -477,7 +534,18 @@ app.addEventListener("click", async (event) => {
       reviewer: { status: "waiting", detail: "Waiting for the previous stage" },
       producer: { status: "waiting", detail: "Waiting for the previous stage" },
     };
-    store.updateProject(project.id, { error: null, analysis: null, referenceBlueprint: null, research: null, generatedScript: null, originalityReview: null, storyboard: null, render: null, pipeline });
+    store.updateProject(project.id, {
+      error: null,
+      analysis: null,
+      references: project.references.map((reference) => ({ ...reference, analysis: null })),
+      referenceBlueprint: null,
+      research: null,
+      generatedScript: null,
+      originalityReview: null,
+      storyboard: null,
+      render: null,
+      pipeline,
+    });
     render({ preserveFocus: true });
     ensureAnalysis(store.getProject(project.id));
   }
@@ -546,7 +614,7 @@ app.addEventListener("click", async (event) => {
       storyboard: null,
       render: null,
       pipeline: {
-        ...updatePipeline(project, project.transcript ? "analyst" : "transcript", "waiting", "Retry queued"),
+        ...updatePipeline(project, project.references?.every((reference) => reference.transcript) ? "analyst" : "transcript", "waiting", "Retry queued"),
         researcher: { status: "waiting", detail: "Waiting for the new analysis" },
         writer: { status: "waiting", detail: "Waiting for the previous stage" },
         reviewer: { status: "waiting", detail: "Waiting for the previous stage" },

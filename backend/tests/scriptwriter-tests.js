@@ -154,6 +154,57 @@ test("creates a validated version-one script", async () => {
   assert.ok(Math.abs(result.body.data.estimatedSeconds - 60) <= 2);
 });
 
+test("deep writing creates two independent drafts and a judged script", async () => {
+  const requestBody = validRequest({ analysisMode: "deep" });
+  const output = JSON.stringify(validCandidate(requestBody));
+  const candidateA = new FakeProvider(output);
+  const candidateB = new FakeProvider(output);
+  const judge = new FakeProvider(output);
+  const writer = new Scriptwriter({ provider: new FakeProvider(output), candidateAProvider: candidateA, candidateBProvider: candidateB, judgeProvider: judge });
+  const result = await writer.generate(requestBody);
+  assert.equal(result.ensemble.mode, "deep");
+  assert.equal(result.ensemble.candidates.length, 2);
+  assert.equal(result.ensemble.judgment.winner, "hybrid");
+  assert.equal(result.ensemble.degraded, false);
+  assert.equal(candidateA.calls.length, 1);
+  assert.equal(candidateB.calls.length, 1);
+  assert.equal(judge.calls.length, 1);
+  assert.match(judge.calls[0][0].content, /final Writing Judge/);
+});
+
+test("deep writing keeps one validated draft when the other stops", async () => {
+  const requestBody = validRequest({ analysisMode: "deep" });
+  const output = JSON.stringify(validCandidate(requestBody));
+  const writer = new Scriptwriter({
+    provider: new FakeProvider(output),
+    candidateAProvider: new FakeProvider(new Error("candidate stopped")),
+    candidateBProvider: new FakeProvider(output),
+    judgeProvider: new FakeProvider(output),
+  });
+  const result = await writer.generate(requestBody);
+  assert.equal(result.ensemble.degraded, true);
+  assert.equal(result.ensemble.candidates.length, 1);
+  assert.equal(result.ensemble.judgment.winner, "candidate-b");
+});
+
+test("deep writing keeps a draft when the Writing Judge stops", async () => {
+  const requestBody = validRequest({ analysisMode: "deep" });
+  const output = JSON.stringify(validCandidate(requestBody));
+  const writer = new Scriptwriter({
+    provider: new FakeProvider(output),
+    candidateAProvider: new FakeProvider(output),
+    candidateBProvider: new FakeProvider(output),
+    judgeProvider: new FakeProvider(new Error("judge stopped")),
+  });
+  const result = await writer.generate(requestBody);
+  assert.equal(result.ensemble.degraded, true);
+  assert.equal(result.ensemble.judgment.winner, "candidate-a");
+});
+
+test("rejects an unsupported Scriptwriter analysis mode", async () => {
+  assert.throws(() => new Scriptwriter({ provider: new FakeProvider("{}") }).generate(validRequest({ analysisMode: "maximum" })), (error) => error.code === "INVALID_SCRIPT_BRIEF" && error.details[0].field === "analysisMode");
+});
+
 test("scales the abstract structure to the requested duration", async () => {
   const requestBody = validRequest({ targetDurationSeconds: 30 });
   const output = validCandidate(requestBody, 18);

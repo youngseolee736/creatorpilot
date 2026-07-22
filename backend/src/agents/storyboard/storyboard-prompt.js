@@ -9,7 +9,7 @@ Return one JSON object only, with no Markdown or commentary. It must contain a s
 - searchQuery: concise discovery query for licensed stock or an original/generative production brief
 - transition: restrained transition into the next scene
 
-Do not output IDs, scene numbers, start/end times, durations, narration, script text, provider names, URLs, licensing claims, or legal conclusions. Do not rewrite or summarize the narration. Search queries are proposals only; never state that footage is available, cleared, or licensed. Follow the visual constraints while avoiding graphic, deceptive, or unsupported imagery.`;
+Write each caption in the same language as its narration. Keep visual, searchQuery, and transition production directions in English so production tools receive consistent instructions. Do not output IDs, scene numbers, start/end times, durations, narration, script text, provider names, URLs, licensing claims, or legal conclusions. Do not rewrite or summarize the narration. Search queries are proposals only; never state that footage is available, cleared, or licensed. Follow the visual constraints while avoiding graphic, deceptive, or unsupported imagery.`;
 
 const STORYBOARD_REPAIR_SYSTEM_PROMPT = `${STORYBOARD_SYSTEM_PROMPT}
 

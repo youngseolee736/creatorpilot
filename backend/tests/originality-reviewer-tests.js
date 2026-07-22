@@ -123,6 +123,32 @@ test("returns a validated backend-controlled originality review", async () => {
   assert.match(result.body.data.disclaimer, /not a copyright or legal determination/);
 });
 
+test("preserves the selected language for reviewer guidance", () => {
+  const input = validateReviewRequest(validRequest({ reviewLanguage: "Korean" }));
+  assert.equal(input.reviewLanguage, "Korean");
+});
+
+test("validates overlap evidence against the complete reference set", async () => {
+  const base = validRequest();
+  const requestBody = validRequest({
+    referenceTranscripts: [
+      base.referenceTranscript,
+      { transcriptId: "transcript-review-2", text: "A second source builds tension with one unanswered comparison before the ending." },
+      { transcriptId: "transcript-review-3", text: "A third source moves from a familiar belief to a concrete consequence." },
+    ],
+    referenceAnalyses: [base.referenceAnalysis, { ...base.referenceAnalysis, analysisId: "analysis-review-2" }, { ...base.referenceAnalysis, analysisId: "analysis-review-3" }],
+  });
+  const candidate = validCandidate({ overlaps: [{
+    reference: "one unanswered comparison",
+    generated: "The most valuable room",
+    risk: "Low",
+    note: "The phrases play different roles and share no distinctive wording.",
+  }] });
+  const result = await endpointResult(requestBody, JSON.stringify(candidate));
+  assert.equal(result.status, 200);
+  assert.equal(result.body.data.overlaps[0].reference, "one unanswered comparison");
+});
+
 test("enforces phrase-risk thresholds on the server", async () => {
   const requestBody = validRequest({ thresholds: { minimumOverall: 80, maximumPhraseOverlapRisk: "low" } });
   const candidate = validCandidate({ overlaps: [{

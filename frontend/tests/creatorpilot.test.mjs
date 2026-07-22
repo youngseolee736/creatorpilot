@@ -10,6 +10,7 @@ import {
   routeFor,
   updatePipeline,
   wordCount,
+  youtubeVideoId,
 } from "../core.mjs";
 import {
   analyzeReference,
@@ -19,6 +20,7 @@ import {
   renderVideo,
   researchTopic,
   reviewOriginality,
+  synthesizeReferences,
 } from "../mock-services.mjs";
 import { createServices, getServiceConfig } from "../service-client.mjs";
 import { errorNotice, pipeline } from "../components.mjs";
@@ -28,6 +30,7 @@ import { renderReview } from "../pages/review.mjs";
 import { renderProduction } from "../pages/production.mjs";
 import { renderResearch } from "../pages/research.mjs";
 import { renderScriptEditor } from "../pages/script-editor.mjs";
+import { renderNewProject } from "../pages/new-project.mjs";
 
 globalThis.location = { search: "?fast=1" };
 
@@ -48,6 +51,98 @@ test("new projects use the complete waiting pipeline", () => {
   assert.ok(Object.values(project.pipeline).every((step) => step.status === "waiting"));
   assert.equal(project.duration, 60);
   assert.equal(project.format, "9:16");
+});
+
+test("new production intake shows three required and two optional references", () => {
+  const html = renderNewProject();
+  assert.equal((html.match(/name="referenceUrl[1-5]"/g) || []).length, 5);
+  assert.equal((html.match(/<span class="requirement-label">Required<\/span>/g) || []).length, 3);
+  assert.equal((html.match(/<span class="requirement-label">Optional<\/span>/g) || []).length, 2);
+  assert.match(html, /3 required · up to 5 total/);
+  assert.match(html, /Deep analysis/);
+  assert.match(html, /Two independent candidates \+ final Judge/);
+});
+
+test("project state preserves three to five independent references", () => {
+  const project = createProject({
+    topic: "A new topic",
+    referenceUrl1: "https://youtu.be/one",
+    referenceUrl2: "https://youtu.be/two",
+    referenceUrl3: "https://youtu.be/three",
+    referenceUrl4: "https://youtu.be/four",
+  });
+  assert.equal(project.references.length, 4);
+  assert.deepEqual(project.references.map((reference) => reference.required), [true, true, true, false]);
+  assert.equal(project.referenceUrl, "https://youtu.be/one");
+});
+
+test("deep analysis selection persists with the project", () => {
+  const project = createProject({ topic: "A new topic", analysisDepth: "deep" });
+  assert.equal(project.analysisDepth, "deep");
+  assert.equal(createProject({ topic: "A new topic" }).analysisDepth, "standard");
+});
+
+test("YouTube references are compared by video identity", () => {
+  assert.equal(youtubeVideoId("https://youtu.be/abc123?t=4"), "abc123");
+  assert.equal(youtubeVideoId("https://www.youtube.com/watch?v=abc123&feature=share"), "abc123");
+  assert.equal(youtubeVideoId("https://example.com/watch?v=abc123"), null);
+});
+
+test("mock synthesis combines three independent analyses", async () => {
+  const project = createProject({
+    id: "project-synthesis",
+    topic: "A new topic",
+    language: "English",
+    referenceUrl1: "https://youtu.be/one",
+    referenceUrl2: "https://youtu.be/two",
+    referenceUrl3: "https://youtu.be/three",
+  });
+  for (const reference of project.references) {
+    reference.transcript = await extractTranscript(project, reference);
+    reference.analysis = await analyzeReference(project, reference);
+  }
+  const synthesis = await synthesizeReferences(project);
+  assert.equal(synthesis.referenceCount, 3);
+  assert.equal(synthesis.sourceAnalysisIds.length, 3);
+  assert.match(synthesis.summary, /3 references/);
+});
+
+test("deep mock synthesis exposes a concise model comparison", async () => {
+  const project = createProject({ id: "project-deep", topic: "A new topic", language: "English", analysisDepth: "deep" });
+  project.references = [1, 2, 3].map((position) => ({ referenceId: `reference-${position}`, analysis: { analysisId: `analysis-${position}`, hookType: "Question" } }));
+  const synthesis = await synthesizeReferences(project);
+  project.analysis = synthesis;
+  const html = renderAnalysis(project);
+  assert.equal(synthesis.ensemble.candidates.length, 2);
+  assert.match(html, /How the models compared/);
+  assert.match(html, /Final Judge/);
+  assert.match(html, /Combined decision/);
+});
+
+test("deep mode continues through Research and Scriptwriter comparisons", async () => {
+  const project = createProject({ id: "project-deep-pipeline", topic: "Why a surprising contender can be the best", language: "English", analysisDepth: "deep" });
+  project.research = await researchTopic(project);
+  project.generatedScript = await generateScript(project);
+  const researchHtml = renderResearch(project);
+  const scriptHtml = renderScriptEditor(project);
+  assert.equal(project.research.ensemble.candidates.length, 2);
+  assert.equal(project.generatedScript.ensemble.candidates.length, 2);
+  assert.match(researchHtml, /How the research models compared/);
+  assert.match(researchHtml, /Research Judge/);
+  assert.match(scriptHtml, /How the writing models compared/);
+  assert.match(scriptHtml, /Writing Judge/);
+});
+
+test("Korean target language localizes generated mock content", async () => {
+  const project = createProject({ id: "project-korean", topic: "손흥민이 최고의 선수인 이유", language: "Korean", referenceUrl: "https://youtu.be/example" });
+  project.analysis = await analyzeReference(project);
+  project.research = await researchTopic(project);
+  project.generatedScript = await generateScript(project);
+  project.originalityReview = await reviewOriginality(project);
+  assert.match(project.analysis.summary, /예상|근거/);
+  assert.match(project.research.summary, /근거|비교/);
+  assert.match(project.generatedScript.sections[0].text, /최고|기준/);
+  assert.match(project.originalityReview.summary, /초안|참고/);
 });
 
 test("the local store adds and updates projects", () => {
@@ -340,9 +435,41 @@ test("Phase 2 mixed mode uses API transcript and analysis while later agents sta
   project.generatedScript = await services.generateScript(project);
   assert.equal(calls.length, 2);
   assert.equal(calls[1].url, "http://127.0.0.1:8787/api/analysis/reference");
-  assert.equal(calls[1].body.analysisLanguage, "English");
+  assert.equal(calls[1].body.analysisLanguage, "Korean");
   assert.equal(calls[1].body.targetTopic, project.topic);
   assert.equal(project.generatedScript.version, 1);
+});
+
+test("Deep analysis API request includes the selected ensemble mode", async () => {
+  let call;
+  const services = createServices({ services: { analysis: "api" }, apiBaseUrl: "https://api.example.test" }, async (url, options) => {
+    call = { url, body: JSON.parse(options.body) };
+    return { ok: true, json: async () => ({ data: { analysisId: "synthesis-api" } }) };
+  });
+  const project = createProject({ id: "project-deep-api", topic: "새로운 주제", language: "Korean", analysisDepth: "deep" });
+  project.references = [1, 2, 3].map((position) => ({ referenceId: `reference-${position}`, title: `Reference ${position}`, analysis: { analysisId: `analysis-${position}` } }));
+  await services.synthesizeReferences(project);
+  assert.equal(call.url, "https://api.example.test/api/analysis/synthesize");
+  assert.equal(call.body.analysisMode, "deep");
+  assert.equal(call.body.analysisLanguage, "Korean");
+  assert.equal(call.body.analyses.length, 3);
+});
+
+test("Deep analysis mode is sent to Research and Scriptwriter APIs", async () => {
+  const calls = [];
+  const services = createServices({ services: { research: "api", script: "api" }, apiBaseUrl: "https://api.example.test" }, async (url, options) => {
+    calls.push({ url, body: JSON.parse(options.body) });
+    return { ok: true, json: async () => ({ data: {} }) };
+  });
+  const project = createProject({ id: "project-deep-agents", topic: "A new topic", language: "English", analysisDepth: "deep" });
+  project.referenceBlueprint = {};
+  project.research = {};
+  await services.researchTopic(project);
+  await services.generateScript(project);
+  assert.equal(calls[0].url, "https://api.example.test/api/research/topic");
+  assert.equal(calls[0].body.analysisMode, "deep");
+  assert.equal(calls[1].url, "https://api.example.test/api/scripts/generate");
+  assert.equal(calls[1].body.analysisMode, "deep");
 });
 
 test("Scriptwriter API receives the tailored brief, compact blueprint, and Fact Pack without a transcript", async () => {

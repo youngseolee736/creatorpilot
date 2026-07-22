@@ -1,7 +1,7 @@
-export const STORAGE_KEY = "creatorpilot:v1";
+export const STORAGE_KEY = "creatorpilot:v2";
 
 export const PIPELINE_STEPS = [
-  { id: "transcript", label: "Transcript extracted", agent: "Reference intake" },
+  { id: "transcript", label: "References prepared", agent: "Reference intake" },
   { id: "analyst", label: "Script Analyst", agent: "Structure and retention" },
   { id: "researcher", label: "Research Agent", agent: "Facts and sources" },
   { id: "writer", label: "Scriptwriter", agent: "Original narration" },
@@ -10,7 +10,7 @@ export const PIPELINE_STEPS = [
 ];
 
 export const STATUS_LABELS = {
-  reference_added: "Reference added",
+  reference_added: "References ready",
   analyzing: "Analyzing",
   researching: "Researching",
   research_ready: "Research ready",
@@ -27,6 +27,47 @@ export const STATUS_LABELS = {
 
 export function referenceTitleFromTranscript(transcript, fallback = "Reference video") {
   return String(transcript?.title || "").trim() || fallback;
+}
+
+export function youtubeVideoId(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (host === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] || null;
+    if (host !== "youtube.com" && host !== "m.youtube.com") return null;
+    if (url.searchParams.get("v")) return url.searchParams.get("v");
+    const parts = url.pathname.split("/").filter(Boolean);
+    return ["shorts", "embed", "live"].includes(parts[0]) ? parts[1] || null : null;
+  } catch {
+    return null;
+  }
+}
+
+export function normalizeReferences(input = {}) {
+  const supplied = Array.isArray(input.references)
+    ? input.references
+    : [1, 2, 3, 4, 5]
+      .map((position) => input[`referenceUrl${position}`])
+      .filter((url) => typeof url === "string" && url.trim())
+      .map((url, index) => ({ url, position: index + 1 }));
+  const legacy = supplied.length ? supplied : input.referenceUrl
+    ? [{
+      url: input.referenceUrl,
+      title: input.referenceTitle,
+      transcript: input.transcript,
+      analysis: input.referenceAnalysis || (input.analysis?.referenceCount ? null : input.analysis),
+      position: 1,
+    }]
+    : [];
+  return legacy.slice(0, 5).map((reference, index) => ({
+    referenceId: reference.referenceId || `reference-${index + 1}`,
+    position: index + 1,
+    required: index < 3,
+    url: String(reference.url || "").trim(),
+    title: reference.title || reference.transcript?.title || `Reference ${index + 1}`,
+    transcript: reference.transcript || null,
+    analysis: reference.analysis || null,
+  }));
 }
 
 function pipelineState(overrides = {}) {
@@ -93,20 +134,24 @@ export function referenceBlueprintFromAnalysis(analysis = {}) {
 export function createProject(input = {}) {
   const now = new Date().toISOString();
   const creativeBrief = creativeBriefFromProject(input);
+  const references = normalizeReferences(input);
+  const firstReference = references[0] || null;
   return {
     id: input.id || `project-${Date.now()}`,
     title: input.topic || "Untitled short",
-    referenceUrl: input.referenceUrl || "",
-    referenceTitle: input.referenceTitle || "Reference video",
+    references,
+    referenceUrl: firstReference?.url || input.referenceUrl || "",
+    referenceTitle: firstReference?.title || input.referenceTitle || "Reference video",
     topic: input.topic || "",
     language: input.language || "Korean",
     duration: Number(input.duration || 60),
     format: input.format || "9:16",
+    analysisDepth: input.analysisDepth === "deep" ? "deep" : "standard",
     creativeBrief,
     status: input.status || "reference_added",
     createdAt: input.createdAt || now,
     updatedAt: input.updatedAt || now,
-    transcript: input.transcript || null,
+    transcript: firstReference?.transcript || input.transcript || null,
     analysis: input.analysis || null,
     referenceBlueprint: input.referenceBlueprint || null,
     research: input.research || null,
@@ -126,46 +171,8 @@ export function createProject(input = {}) {
   };
 }
 
-export function seedProjects() {
-  return [
-    createProject({
-      id: "project-archipelago",
-      topic: "Why cities are building floating neighborhoods",
-      referenceUrl: "https://youtube.com/watch?v=demo-floating",
-      referenceTitle: "The next generation of coastal cities",
-      language: "English",
-      status: "completed",
-      updatedAt: "2026-07-17T08:40:00.000Z",
-      pipeline: pipelineState({
-        transcript: { status: "completed", detail: "Transcript ready" },
-        analyst: { status: "completed", detail: "Structure mapped" },
-        researcher: { status: "completed", detail: "Fact Pack approved" },
-        writer: { status: "completed", detail: "Script approved" },
-        reviewer: { status: "completed", detail: "Originality estimate passed" },
-        producer: { status: "completed", detail: "Vertical video ready" },
-      }),
-      render: { progress: 100, stage: "Final video ready", completed: true },
-    }),
-    createProject({
-      id: "project-focus",
-      topic: "The two-minute rule for better focus",
-      referenceUrl: "https://youtube.com/watch?v=demo-focus",
-      referenceTitle: "A productivity habit that actually sticks",
-      status: "revision_required",
-      updatedAt: "2026-07-16T02:15:00.000Z",
-      pipeline: pipelineState({
-        transcript: { status: "completed", detail: "Transcript ready" },
-        analyst: { status: "completed", detail: "Structure mapped" },
-        researcher: { status: "completed", detail: "Fact Pack approved" },
-        writer: { status: "completed", detail: "Draft 1 generated" },
-        reviewer: { status: "revision_required", detail: "Two phrases need revision" },
-      }),
-    }),
-  ];
-}
-
 function initialState() {
-  return { version: 1, projects: seedProjects(), activeProjectId: null };
+  return { version: 1, projects: [], activeProjectId: null };
 }
 
 export function createStore(storage = globalThis.localStorage) {

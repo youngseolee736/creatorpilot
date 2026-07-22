@@ -70,25 +70,40 @@ function makeApiServices(config, fetchImpl) {
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   return {
-    extractTranscript(project) {
+    extractTranscript(project, reference = project.references?.[0]) {
       return post("/api/transcripts/extract", {
-        projectId: project.id,
-        youtubeUrl: project.referenceUrl,
+        projectId: reference?.position > 1 ? `${project.id}_${reference.referenceId}` : project.id,
+        youtubeUrl: reference?.url || project.referenceUrl,
         targetLanguage: project.language,
       });
     },
-    analyzeReference(project) {
+    analyzeReference(project, reference = project.references?.[0]) {
       return post("/api/analysis/reference", {
+        projectId: reference?.position > 1 ? `${project.id}_${reference.referenceId}` : project.id,
+        targetTopic: project.topic,
+        transcript: reference?.transcript || project.transcript,
+        targetDurationSeconds: project.duration,
+        analysisLanguage: project.language,
+      });
+    },
+    synthesizeReferences(project) {
+      return post("/api/analysis/synthesize", {
         projectId: project.id,
         targetTopic: project.topic,
-        transcript: project.transcript,
         targetDurationSeconds: project.duration,
-        analysisLanguage: "English",
+        analysisLanguage: project.language,
+        analysisMode: project.analysisDepth === "deep" ? "deep" : "standard",
+        analyses: (project.references || []).map((reference) => ({
+          referenceId: reference.referenceId,
+          title: reference.title,
+          analysis: reference.analysis,
+        })),
       });
     },
     researchTopic(project) {
       return post("/api/research/topic", {
         projectId: project.id,
+        analysisMode: project.analysisDepth === "deep" ? "deep" : "standard",
         creativeBrief: project.creativeBrief,
         referenceBlueprint: project.referenceBlueprint,
       });
@@ -96,6 +111,7 @@ function makeApiServices(config, fetchImpl) {
     generateScript(project) {
       return post("/api/scripts/generate", {
         projectId: project.id,
+        analysisMode: project.analysisDepth === "deep" ? "deep" : "standard",
         creativeBrief: project.creativeBrief,
         referenceBlueprint: project.referenceBlueprint,
         factPack: project.research,
@@ -107,14 +123,18 @@ function makeApiServices(config, fetchImpl) {
     reviewOriginality(project) {
       return post("/api/scripts/review", {
         projectId: project.id,
+        reviewLanguage: project.language,
         referenceAnalysis: project.analysis,
         referenceTranscript: project.transcript,
+        referenceAnalyses: (project.references || []).map((reference) => reference.analysis).filter(Boolean),
+        referenceTranscripts: (project.references || []).map((reference) => reference.transcript).filter(Boolean),
         script: scriptPayload(project),
       });
     },
     reviseScript(project, revisionInstructions) {
       return post("/api/scripts/revise", {
         projectId: project.id,
+        analysisMode: project.analysisDepth === "deep" ? "deep" : "standard",
         creativeBrief: project.creativeBrief,
         referenceBlueprint: project.referenceBlueprint,
         factPack: project.research,
@@ -183,6 +203,7 @@ export function createServices(runtimeConfig, fetchImpl = globalThis.fetch?.bind
   return {
     extractTranscript: select("transcript", mockServices.extractTranscript, apiServices?.extractTranscript),
     analyzeReference: select("analysis", mockServices.analyzeReference, apiServices?.analyzeReference),
+    synthesizeReferences: select("analysis", mockServices.synthesizeReferences, apiServices?.synthesizeReferences),
     researchTopic: select("research", mockServices.researchTopic, apiServices?.researchTopic),
     generateScript: select("script", mockServices.generateScript, apiServices?.generateScript),
     reviseScript: select("script", mockServices.reviseScript, apiServices?.reviseScript),
@@ -197,6 +218,7 @@ const services = createServices(serviceConfig);
 
 export const extractTranscript = services.extractTranscript;
 export const analyzeReference = services.analyzeReference;
+export const synthesizeReferences = services.synthesizeReferences;
 export const researchTopic = services.researchTopic;
 export const generateScript = services.generateScript;
 export const reviewOriginality = services.reviewOriginality;

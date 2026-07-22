@@ -5,7 +5,7 @@ const { validLanguage } = require("../script-analyst/script-analyst-schema");
 const MIN_TARGET_DURATION = 15;
 const MAX_TARGET_DURATION = 180;
 const MAX_SCRIPT_CHARACTERS = 30000;
-const TOP_LEVEL_FIELDS = new Set(["projectId", "creativeBrief", "referenceBlueprint", "factPack", "targetLanguage", "targetDurationSeconds", "currentScript", "revisionInstructions", "preserveSectionIds"]);
+const TOP_LEVEL_FIELDS = new Set(["projectId", "creativeBrief", "referenceBlueprint", "factPack", "targetLanguage", "targetDurationSeconds", "currentScript", "revisionInstructions", "preserveSectionIds", "analysisMode"]);
 
 function detail(field, reason) { return [{ field, reason }]; }
 function invalid(field, reason, message = "The Scriptwriter brief is invalid.") { throw new AppError(400, "INVALID_SCRIPT_BRIEF", message, false, detail(field, reason)); }
@@ -105,11 +105,13 @@ function validateScriptRequest(request, { revision = false } = {}) {
   if (!validLanguage(targetLanguage) || targetLanguage !== creativeBrief.language) invalid("targetLanguage", "must_match_creative_brief");
   const targetDurationSeconds = Number(request.targetDurationSeconds);
   if (!Number.isInteger(targetDurationSeconds) || targetDurationSeconds < MIN_TARGET_DURATION || targetDurationSeconds > MAX_TARGET_DURATION) invalid("targetDurationSeconds", "unsupported");
+  const analysisMode = request.analysisMode == null ? "standard" : String(request.analysisMode).trim().toLowerCase();
+  if (!["standard", "deep"].includes(analysisMode)) invalid("analysisMode", "invalid_enum");
   if (revision && (!Array.isArray(request.revisionInstructions) || !request.revisionInstructions.length)) throw new AppError(400, "REVISION_INSTRUCTIONS_REQUIRED", "At least one revision instruction is required.", false);
   const revisionInstructions = stringArray(request.revisionInstructions || [], "revisionInstructions", { maxItems: 12, maxLength: 500 });
   const currentScript = revision ? normalizeCurrentScript(request.currentScript) : null;
   if (!revision && request.currentScript != null) invalid("currentScript", "not_allowed_for_initial_draft");
-  return { projectId, topic: creativeBrief.topic, targetLanguage, targetDurationSeconds, audience: creativeBrief.targetAudience, creativeBrief, referenceBlueprint, factPack, currentScript, revisionInstructions, preserveSectionIds: revision ? request.preserveSectionIds !== false : false };
+  return { projectId, topic: creativeBrief.topic, targetLanguage, targetDurationSeconds, audience: creativeBrief.targetAudience, creativeBrief, referenceBlueprint, factPack, currentScript, revisionInstructions, preserveSectionIds: revision ? request.preserveSectionIds !== false : false, analysisMode };
 }
 
 module.exports = { MAX_SCRIPT_CHARACTERS, MAX_TARGET_DURATION, MIN_TARGET_DURATION, validateScriptRequest };

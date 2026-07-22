@@ -2,7 +2,7 @@
 
 ## Product context
 
-CreatorPilot turns a reference YouTube video and a new topic into an original
+CreatorPilot turns three to five reference YouTube videos and a new topic into an original
 60-second vertical-video production plan. It visualizes the work of a Script
 Analyst, Research Agent, Scriptwriter, Originality Reviewer, Storyboard Agent,
 and Video Producer
@@ -10,8 +10,10 @@ without presenting those agents as a chatbot.
 
 ## Primary journey
 
-1. Add a YouTube reference, topic, language, duration, and format.
-2. Extract and analyze the reference transcript and storytelling structure.
+1. Add three required YouTube references, up to two optional references, a topic,
+   language, duration, format, and Standard or Deep analysis depth.
+2. Extract and analyze each reference independently, then synthesize their
+   storytelling structures without combining raw transcript text.
 3. Research the user's tailored angle and review a source-grounded Fact Pack.
 4. Generate and edit an original script constrained to that Fact Pack.
 5. Review potential phrase overlap, clarity, duration, hook, and structure.
@@ -35,6 +37,9 @@ whether revision is required, and what action advances the production.
   lifecycle with a mock fallback.
 - Responsive, accessible HTML, CSS, and native JavaScript modules.
 - Async service interfaces ready to replace with future backend adapters.
+- Optional project-wide Deep mode with two validated candidates and a final
+  Judge in reference synthesis, Research, and Scriptwriter; Standard retains
+  the single-provider path.
 
 ## Out of scope
 
@@ -52,5 +57,7 @@ whether revision is required, and what action advances the production.
 - Transcript extraction, analysis, script generation/revision, originality
   review, storyboarding, and rendering orchestration can use the Express API;
   actual media generation requires an adapter-compatible provider.
+- Deep-role providers are independently configurable server-side and safely
+  fall back to each stage's primary provider when role overrides are absent.
 - UI meaning never relies on color alone; focus, keyboard flow, and status text are
   required.

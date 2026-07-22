@@ -88,6 +88,7 @@ function normalizeReview(raw, input, fingerprint = requestFingerprint(input)) {
     integerScore(raw.scores[field], `scores.${field}`),
   ]));
   const scriptText = input.script.sections.map((section) => section.text).join("\n");
+  const referenceText = (input.referenceTranscripts || [input.referenceTranscript]).map((transcript) => transcript.text).join("\n");
   if (!Array.isArray(raw.overlaps) || raw.overlaps.length > 8) throw invalid("overlaps", "invalid_array");
   const overlaps = raw.overlaps.map((overlap, index) => {
     if (!overlap || typeof overlap !== "object" || Array.isArray(overlap)) {
@@ -95,7 +96,7 @@ function normalizeReview(raw, input, fingerprint = requestFingerprint(input)) {
     }
     const risk = normalizeRisk(overlap.risk, `overlaps.${index}.risk`);
     return {
-      reference: exactExcerpt(overlap.reference, input.referenceTranscript.text, `overlaps.${index}.reference`),
+      reference: exactExcerpt(overlap.reference, referenceText, `overlaps.${index}.reference`),
       generated: exactExcerpt(overlap.generated, scriptText, `overlaps.${index}.generated`),
       risk: `${risk[0].toUpperCase()}${risk.slice(1)}`,
       note: stringField(overlap.note, `overlaps.${index}.note`, 500),

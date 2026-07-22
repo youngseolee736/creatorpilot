@@ -75,6 +75,12 @@ only a model or provide a completely separate endpoint and key:
 ```dotenv
 ANALYST_LLM_MODEL=fast-analysis-model
 
+# Optional Deep analysis roles. Set only MODEL to share the Analyst endpoint/key,
+# or override the full provider configuration for a different vendor.
+ANALYST_A_LLM_MODEL=hook-specialist-model
+ANALYST_B_LLM_MODEL=structure-specialist-model
+ANALYST_JUDGE_LLM_MODEL=strong-judge-model
+
 SCRIPTWRITER_LLM_API_BASE_URL=https://writer-provider.example/v1
 SCRIPTWRITER_LLM_API_KEY=writer-server-side-key
 SCRIPTWRITER_LLM_MODEL=strong-writing-model
@@ -94,6 +100,11 @@ RESEARCH_LLM_API_BASE_URL=https://api.openai.com/v1
 RESEARCH_LLM_API_KEY=research-server-side-key
 RESEARCH_LLM_MODEL=web-search-capable-model
 RESEARCH_LLM_TIMEOUT_MS=300000
+
+# Optional Deep research roles; each must support Responses API web_search.
+RESEARCH_A_LLM_MODEL=direct-evidence-model
+RESEARCH_B_LLM_MODEL=narrative-research-model
+RESEARCH_JUDGE_LLM_MODEL=research-judge-model
 ```
 
 Claim-led full-duration Scriptwriter calls also default to five minutes per
@@ -102,11 +113,33 @@ timeout. Override it independently when needed:
 
 ```dotenv
 SCRIPTWRITER_LLM_TIMEOUT_MS=300000
+
+# Optional Deep writing roles.
+SCRIPTWRITER_A_LLM_MODEL=storytelling-model
+SCRIPTWRITER_B_LLM_MODEL=evidence-writing-model
+SCRIPTWRITER_JUDGE_LLM_MODEL=writing-judge-model
 ```
 
-The supported prefixes are `ANALYST_`, `RESEARCH_`, `SCRIPTWRITER_`, `REVIEWER_`, and
-`STORYBOARD_`; each accepts `LLM_PROVIDER`, `LLM_API_BASE_URL`, `LLM_API_KEY`,
-`LLM_MODEL`, and `LLM_TIMEOUT_MS`. Current LLM adapters must expose the
+Deep analysis is an optional project-wide ensemble. The Analyst compares hook
+and flow blueprints, Research compares a direct-evidence case with a truthful
+narrative case, and Scriptwriter compares story momentum with evidence clarity.
+Each stage validates two parallel candidates before a final Judge creates the
+result. A candidate failure uses the other valid candidate; a Judge failure uses
+the first validated candidate. Blank Deep-role values reuse that stage's main
+provider, which is useful for local development but does not create true model
+diversity. Configure distinct `*_A_LLM_MODEL`, `*_B_LLM_MODEL`, and
+`*_JUDGE_LLM_MODEL` values when independent models are required. Research roles
+must support the OpenAI Responses API `web_search` tool; Analyst and Scriptwriter
+roles use the OpenAI-compatible Chat Completions contract. Deep mode can use
+three calls per stage plus contract-repair calls, so it costs more and takes
+longer than Standard.
+
+The supported prefixes are `ANALYST_`, `ANALYST_A_`, `ANALYST_B_`,
+`ANALYST_JUDGE_`, `RESEARCH_`, `RESEARCH_A_`, `RESEARCH_B_`,
+`RESEARCH_JUDGE_`, `SCRIPTWRITER_`, `SCRIPTWRITER_A_`, `SCRIPTWRITER_B_`,
+`SCRIPTWRITER_JUDGE_`, `REVIEWER_`, and `STORYBOARD_`;
+each accepts `LLM_PROVIDER`, `LLM_API_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and
+`LLM_TIMEOUT_MS`. Current LLM adapters must expose the
 OpenAI-compatible Chat Completions contract. Native Gemini or Anthropic
 contracts require an additional provider adapter.
 

@@ -6,7 +6,7 @@ const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst")
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
 const { StoryboardAgent } = require("../src/agents/storyboard/storyboard");
 const { containsLongExcerpt } = require("../src/agents/script-analyst/normalize-analysis");
-const { MAX_TRANSCRIPT_CHARACTERS, validateAnalysisRequest } = require("../src/agents/script-analyst/script-analyst-schema");
+const { MAX_TRANSCRIPT_CHARACTERS, validateAnalysisRequest, validateSynthesisRequest } = require("../src/agents/script-analyst/script-analyst-schema");
 const { createApp } = require("../src/app");
 const { OpenAICompatibleProvider } = require("../src/services/llm/openai-compatible-provider");
 const { createLLMProvider, resolveLLMConfig } = require("../src/services/llm");
@@ -152,6 +152,20 @@ function analystWith(outputs) {
   return { analyst: new ScriptAnalyst({ provider }), provider };
 }
 
+function validSynthesisRequest(overrides = {}) {
+  return {
+    projectId: "project-synthesis-test",
+    targetTopic: "Why Son Heung-min is outperforming Messi in MLS",
+    targetDurationSeconds: 60,
+    analyses: [1, 2, 3].map((position) => ({
+      referenceId: `reference-${position}`,
+      title: `Reference ${position}`,
+      analysis: { analysisId: `analysis-${position}`, ...validAnalysis() },
+    })),
+    ...overrides,
+  };
+}
+
 async function endpointResult(requestBody, outputs) {
   const { analyst } = analystWith(outputs);
   return request(createApp({ scriptAnalyst: analyst }), "/api/analysis/reference", requestBody);
@@ -163,8 +177,92 @@ test("accepts a valid analysis request", async () => {
   assert.equal(result.body.data.analysisId, "analysis_project-analysis-test");
 });
 
-test("normalizes every analysis output language to English", () => {
-  assert.equal(validateAnalysisRequest(validRequest({ analysisLanguage: "Korean" })).analysisLanguage, "English");
+test("accepts three to five completed analyses for synthesis", () => {
+  const input = validateSynthesisRequest(validSynthesisRequest());
+  assert.equal(input.analyses.length, 3);
+  assert.equal(input.targetDurationSeconds, 60);
+});
+
+test("rejects an unsupported synthesis analysis mode", () => {
+  assert.throws(
+    () => validateSynthesisRequest(validSynthesisRequest({ analysisMode: "debate_forever" })),
+    (error) => error.code === "INVALID_SYNTHESIS_REQUEST" && error.details[0].field === "analysisMode",
+  );
+});
+
+test("rejects fewer than three analyses for synthesis", () => {
+  assert.throws(
+    () => validateSynthesisRequest(validSynthesisRequest({ analyses: validSynthesisRequest().analyses.slice(0, 2) })),
+    (error) => error.code === "INVALID_SYNTHESIS_REQUEST",
+  );
+});
+
+test("returns a target-duration synthesis with source lineage", async () => {
+  const { analyst } = analystWith(JSON.stringify({ ...validAnalysis(), synthesis: { sharedPatterns: [], distinctStrengths: [] } }));
+  const result = await analyst.synthesize(validSynthesisRequest());
+  assert.equal(result.analysisId, "synthesis_project-synthesis-test");
+  assert.equal(result.referenceCount, 3);
+  assert.deepEqual(result.sourceAnalysisIds, ["analysis-1", "analysis-2", "analysis-3"]);
+  assert.equal(result.structure[result.structure.length - 1].end, 60);
+});
+
+test("deep analysis creates independent candidates and a judged blueprint", async () => {
+  const candidateAProvider = new FakeProvider(JSON.stringify(validAnalysis({ summary: "A strong opening creates curiosity before evidence escalates." })));
+  const candidateBProvider = new FakeProvider(JSON.stringify(validAnalysis({ summary: "Clear evidence progression resolves the opening comparison directly." })));
+  const judgeProvider = new FakeProvider(JSON.stringify(validAnalysis({ summary: "A sharp opening leads through clear proof to a direct payoff." })));
+  const analyst = new ScriptAnalyst({ provider: candidateAProvider, candidateAProvider, candidateBProvider, judgeProvider });
+  const result = await analyst.synthesize(validSynthesisRequest({ analysisMode: "deep" }));
+  assert.equal(result.ensemble.mode, "deep");
+  assert.equal(result.ensemble.candidates.length, 2);
+  assert.equal(result.ensemble.judgment.winner, "hybrid");
+  assert.equal(result.ensemble.degraded, false);
+  assert.equal(candidateAProvider.calls.length, 1);
+  assert.equal(candidateBProvider.calls.length, 1);
+  assert.equal(judgeProvider.calls.length, 1);
+  assert.match(judgeProvider.calls[0][1].content, /candidate_a/);
+  assert.match(judgeProvider.calls[0][1].content, /candidate_b/);
+});
+
+test("deep analysis keeps a valid candidate when the other candidate stops", async () => {
+  const stopped = new Error("request timed out");
+  stopped.name = "AbortError";
+  const candidateAProvider = new FakeProvider(stopped);
+  const candidateBProvider = new FakeProvider(JSON.stringify(validAnalysis()));
+  const judgeProvider = new FakeProvider(JSON.stringify(validAnalysis()));
+  const analyst = new ScriptAnalyst({ provider: candidateAProvider, candidateAProvider, candidateBProvider, judgeProvider });
+  const result = await analyst.synthesize(validSynthesisRequest({ analysisMode: "deep" }));
+  assert.equal(result.ensemble.degraded, true);
+  assert.equal(result.ensemble.judgment.winner, "candidate-b");
+  assert.equal(judgeProvider.calls.length, 0);
+});
+
+test("deep analysis keeps a candidate when the Judge stops", async () => {
+  const candidateAProvider = new FakeProvider(JSON.stringify(validAnalysis()));
+  const candidateBProvider = new FakeProvider(JSON.stringify(validAnalysis()));
+  const stopped = new Error("request timed out");
+  stopped.name = "AbortError";
+  const judgeProvider = new FakeProvider(stopped);
+  const analyst = new ScriptAnalyst({ provider: candidateAProvider, candidateAProvider, candidateBProvider, judgeProvider });
+  const result = await analyst.synthesize(validSynthesisRequest({ analysisMode: "deep" }));
+  assert.equal(result.ensemble.degraded, true);
+  assert.equal(result.ensemble.judgment.winner, "candidate-a");
+});
+
+test("exposes the reference synthesis route", async () => {
+  const { analyst } = analystWith(JSON.stringify(validAnalysis()));
+  const result = await request(createApp({ scriptAnalyst: analyst }), "/api/analysis/synthesize", validSynthesisRequest());
+  assert.equal(result.status, 200);
+  assert.equal(result.body.data.referenceCount, 3);
+});
+
+test("gives the Script Analyst a five-minute default deadline", () => {
+  const analyst = new ScriptAnalyst({ llmOptions: { environment: {} } });
+  assert.equal(analyst.provider.timeoutMs, 300000);
+});
+
+test("preserves the requested analysis output language", () => {
+  assert.equal(validateAnalysisRequest(validRequest({ analysisLanguage: "Korean" })).analysisLanguage, "Korean");
+  assert.equal(validateAnalysisRequest(validRequest({ analysisLanguage: "English" })).analysisLanguage, "English");
 });
 
 test("rejects a missing target topic", async () => {
@@ -434,8 +532,8 @@ test("keeps prompt injection text inside the untrusted transcript boundary", asy
   const [systemMessage, userMessage] = provider.calls[0];
   assert.equal(systemMessage.role, "system");
   assert.match(systemMessage.content, /untrusted content/);
-  assert.match(systemMessage.content, /written in English/);
-  assert.match(systemMessage.content, /at most 18 words/);
+  assert.match(systemMessage.content, /written in analysisLanguage/);
+  assert.match(systemMessage.content, /at most 18 space-delimited words/);
   assert.equal(userMessage.role, "user");
   assert.match(userMessage.content, /Ignore previous instructions/);
   assert.doesNotMatch(systemMessage.content, /reveal the system prompt/);

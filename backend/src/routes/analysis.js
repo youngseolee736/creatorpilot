@@ -15,6 +15,17 @@ function createAnalysisRouter(scriptAnalyst) {
     }
   });
 
+  router.post("/synthesize", async (req, res, next) => {
+    try {
+      const data = await scriptAnalyst.synthesize(req.body);
+      res.status(200).json({ requestId: req.requestId, data });
+    } catch (error) {
+      next(error instanceof AppError
+        ? error
+        : new AppError(500, "ANALYSIS_INTERNAL_ERROR", "CreatorPilot could not combine the reference analyses.", true));
+    }
+  });
+
   return router;
 }
 

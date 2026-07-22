@@ -18,13 +18,13 @@ function maybeFail(serviceName) {
   }
 }
 
-export async function extractTranscript(project) {
+export async function extractTranscript(project, reference = project.references?.[0]) {
   await wait(420);
   maybeFail("extractTranscript");
   return {
-    transcriptId: `tr_mock_${project.id}`,
+    transcriptId: `tr_mock_${project.id}_${reference?.referenceId || "reference-1"}`,
     source: "mock",
-    title: project.referenceTitle === "Reference video" ? "How coastal cities could move onto the water" : project.referenceTitle,
+    title: reference?.title && !/^Reference \d+$/.test(reference.title) ? reference.title : `Story reference ${reference?.position || 1}`,
     text: referenceTranscript,
     language: project.language,
     wordCount: 92,
@@ -33,12 +33,12 @@ export async function extractTranscript(project) {
   };
 }
 
-export async function analyzeReference(project = {}) {
+export async function analyzeReference(project = {}, reference = project.references?.[0]) {
   await wait(520);
   maybeFail("analyzeReference");
   const topic = project.topic || "your topic";
-  return {
-    analysisId: `analysis_${project.id || "mock"}`,
+  const result = {
+    analysisId: `analysis_${project.id || "mock"}_${reference?.referenceId || "reference-1"}`,
     summary: "A concise explainer that opens with a reframe, develops the mechanism, and resolves with future stakes.",
     hookType: "Counter-intuitive claim",
     hookDuration: 5,
@@ -105,12 +105,65 @@ export async function analyzeReference(project = {}) {
     ],
     safety: { longSourceExcerptsIncluded: false, maxQuotedWords: 0 },
   };
+  if (project.language !== "Korean") return result;
+  return {
+    ...result,
+    summary: "예상을 뒤집는 도입으로 시작해 근거를 쌓고 미래의 의미로 결론을 맺습니다.",
+    hookType: "예상을 뒤집는 주장",
+    hookPurpose: "익숙한 답을 흔들어 궁금증을 만듭니다.",
+    tone: "긴박하고 명확하며 낙관적",
+    pacing: "빠른 도입, 차분한 근거, 단호한 결론",
+    callToAction: "시청자가 당연한 답을 다시 생각하게 합니다.",
+    reusablePatterns: ["익숙한 예상을 뒤집는 문장으로 시작하세요.", "근거의 중요도를 단계적으로 키우세요.", "처음 제기한 질문에 직접 답하며 끝내세요."],
+    doNotCopy: ["원본 영상의 고유 사례", "특징적인 비유", "원본 문장 배열"],
+    hookMechanics: { ...result.hookMechanics, trigger: "예상 뒤집기", curiosityGap: "당연한 답이 틀렸다면 무엇이 진짜 답인지 궁금하게 만듭니다.", promisedPayoff: "숨겨진 원리와 그것이 전체 판을 바꾸는 이유를 보여줍니다.", deliveryPattern: "기본 답을 흔들고 의미를 잠시 숨긴 뒤 단계적으로 확장합니다.", evidence: "도입부가 익숙한 해결책을 부정한 뒤 대안을 설명합니다." },
+    narrativeStyle: { ...result.narrativeStyle, primaryMode: "관점 전환형 설명", narrativeEngine: "작은 단서가 더 큰 가능성으로 확장되고 현실적 긴장이 결론을 늦춥니다.", progression: ["익숙한 답", "숨겨진 대안", "작동 원리", "더 큰 의미", "현실적 긴장"] },
+    informationFlow: { ...result.informationFlow, pattern: "통념 → 대안 → 원리 → 확장 → 반론 → 의미", explanation: "하나의 구체적 원리를 이해시킨 뒤 더 큰 의미를 공개합니다.", sequence: ["통념", "대안", "작동 방식", "확장", "한계", "결론"] },
+    appliedExamples: { opening: `“${topic}”에 대한 당연한 답을 먼저 뒤집고 검증을 약속하세요.`, build: `“${topic}”의 근거를 중요한 순서로 키우며 답을 너무 빨리 공개하지 마세요.`, payoff: `마지막에 어떤 근거가 “${topic}”의 답을 바꾸는지 분명히 밝히세요.` },
+    structure: result.structure.map((section, index) => ({ ...section, note: ["예상한 답을 뒤집어 궁금증을 만듭니다.", "숨겨진 대안을 소개합니다.", "핵심 원리가 어떻게 작동하는지 설명합니다.", "한 사례를 더 큰 의미로 확장합니다.", "한계와 위험을 인정합니다.", "도입의 질문에 답하며 마무리합니다."][index] })),
+  };
+}
+
+export async function synthesizeReferences(project = {}) {
+  await wait(360);
+  maybeFail("synthesizeReferences");
+  const analyses = (project.references || []).map((reference) => reference.analysis).filter(Boolean);
+  const base = analyses[0] || await analyzeReference(project);
+  const synthesis = {
+    ...base,
+    analysisId: `synthesis_${project.id || "mock"}`,
+    referenceCount: analyses.length,
+    sourceAnalysisIds: analyses.map((analysis) => analysis.analysisId),
+    summary: project.language === "Korean" ? `${analyses.length}개 영상은 관점 전환, 단계적 근거, 명확한 결론이라는 공통 흐름을 사용합니다.` : `${analyses.length} references converge on a sharp reframe, progressive proof, and a decisive payoff.`,
+    estimatedOriginalDuration: Number(project.duration) || 60,
+    synthesis: {
+      sharedPatterns: project.language === "Korean" ? ["명확한 예상 뒤집기로 시작하기", "근거를 단계적으로 강화하기", "처음의 비교에 직접 답하기"] : ["Open with a clear expectation reversal", "Build evidence in escalating steps", "Resolve the original comparison directly"],
+      distinctStrengths: analyses.slice(0, 3).map((analysis) => analysis.hookType),
+    },
+  };
+  if (project.analysisDepth !== "deep") return synthesis;
+  return {
+    ...synthesis,
+    ensemble: {
+      mode: "deep",
+      candidates: [
+        { id: "candidate-a", focus: "Hook and retention", summary: project.language === "Korean" ? "도입의 긴장과 호기심을 더 빠르게 만드는 안입니다." : "Prioritizes immediate tension and a stronger curiosity gap." },
+        { id: "candidate-b", focus: "Flow and clarity", summary: project.language === "Korean" ? "근거가 자연스럽게 이어지고 결론이 명확해지는 안입니다." : "Prioritizes a clean evidence build and an unmistakable payoff." },
+      ],
+      judgment: {
+        winner: "hybrid",
+        reason: project.language === "Korean" ? "A의 강한 도입과 B의 명확한 전개를 결합했습니다." : "Combined Candidate A's stronger opening with Candidate B's clearer evidence flow.",
+        confidence: 0.9,
+      },
+      degraded: false,
+    },
+  };
 }
 
 export async function researchTopic(project = {}) {
   await wait(620);
   maybeFail("researchTopic");
-  return {
+  const result = {
     researchId: `research_mock_${project.id}`,
     summary: `The available evidence supports parts of “${project.topic},” but the strongest conclusion depends on the comparison criteria.`,
     verdict: { status: "partially_supported", headline: "The claim is strongest when impact and efficiency are evaluated together.", explanation: "Some measures support the premise while other measures favor established league leaders." },
@@ -140,6 +193,31 @@ export async function researchTopic(project = {}) {
     searchedAt: new Date().toISOString(),
     safety: { providerVerifiedSources: true, factualGuarantee: false },
   };
+  if (project.analysisDepth === "deep") {
+    result.ensemble = {
+      mode: "deep",
+      candidates: [
+        { id: "candidate-a", focus: "Direct evidence", summary: project.language === "Korean" ? "통계와 직접 비교를 중심으로 주장을 검증했습니다." : "Tests the claim through primary data and fair direct comparisons." },
+        { id: "candidate-b", focus: "Narrative case", summary: project.language === "Korean" ? "주장을 정직하게 살릴 수 있는 더 강한 관점을 찾았습니다." : "Finds the strongest truthful lens that can carry the requested claim." },
+      ],
+      judgment: { winner: "hybrid", reason: project.language === "Korean" ? "직접 비교 근거와 가장 강한 서사적 논리를 검증해 결합했습니다." : "Combined the strongest verified direct evidence with the strongest truthful narrative case.", confidence: 0.9 },
+      degraded: false,
+    };
+  }
+  if (project.language !== "Korean") return result;
+  return {
+    ...result,
+    summary: `현재 근거는 “${project.topic}”의 일부를 지지하지만 결론은 비교 기준에 따라 달라집니다.`,
+    verdict: { ...result.verdict, headline: "영향력과 효율성을 함께 볼 때 주장이 가장 강해집니다.", explanation: "일부 지표는 주장을 지지하지만 다른 지표에서는 기존 선두 선수가 앞섭니다." },
+    narrativeCase: { ...result.narrativeCase, recommendedFrame: "하나의 기록보다 판을 바꾸는 영향력으로 위대함을 정의합니다.", definition: "최고란 경기력과 역할, 존재감으로 팀과 리그를 가장 크게 바꾼 선수입니다.", thesis: `${project.topic}은 단순 누적 기록보다 변화의 영향력으로 평가할 때 설득력이 있습니다.`, whyItProvesClaim: "검증된 경기 근거와 팀·리그에 미친 더 큰 영향을 투명하게 결합합니다.", concession: "주요 경쟁자는 여전히 중요한 전통 지표에서 앞섭니다." },
+    criteria: ["전체 생산성", "90분당 효율", "팀에 미친 영향"],
+    comparisonSet: ["주요 대상", "지목된 경쟁자", "리그 선두권"],
+    comparisons: result.comparisons.map((item) => ({ ...item, metric: "90분당 기여", subject: "주요 대상", benchmark: "지목된 경쟁자", interpretation: "출전 시간이 다를 때는 90분당 지표가 더 공정한 비교를 돕습니다." })),
+    facts: result.facts.map((fact, index) => ({ ...fact, claim: ["누적 기록과 90분당 생산성을 분리하면 비교 결과가 달라집니다.", "역할과 페널티킥 비중은 공격수 비교에 큰 영향을 줍니다.", "모든 기준을 하나로 합친 순위보다 조건을 밝힌 결론이 더 설득력 있습니다."][index], explanation: ["출전 시간이 다른 선수에게 더 공정한 출발점을 만듭니다.", "결과뿐 아니라 그 결과가 만들어진 방식을 구분해야 합니다.", "결론은 대상이 앞서는 기준과 경쟁자가 앞서는 기준을 함께 밝혀야 합니다."][index] })),
+    counterpoint: { ...result.counterpoint, claim: "지목된 경쟁자는 중요한 창의성 지표에서 여전히 앞설 수 있습니다.", explanation: "공정한 결론은 주장이 약해지는 지점도 보여줘야 합니다." },
+    storyFindings: result.storyFindings.map((finding, index) => ({ ...finding, guidance: ["예상 순위를 가장 명확히 흔드는 수치로 시작하세요.", "우승자를 정하기 전에 누적 기록, 비율 지표, 역할을 비교하세요.", "근거가 실제로 지지하는 정확한 기준으로 결론을 맺으세요."][index] })),
+    openQuestions: ["게시 직전에 다시 확인해야 할 시의성 높은 수치는 무엇인가요?"],
+  };
 }
 
 export async function generateScript(project) {
@@ -147,7 +225,39 @@ export async function generateScript(project) {
   maybeFail("generateScript");
   const caseMode = project.research?.narrativeCase?.mode || "reframe";
   const mode = caseMode === "direct" ? "direct_case" : caseMode === "reframe" ? "reframed_case" : "evidence_boundary";
-  return {
+  const withEnsemble = (script) => project.analysisDepth !== "deep" ? script : ({
+    ...script,
+    ensemble: {
+      mode: "deep",
+      candidates: [
+        { id: "candidate-a", focus: "Story and retention", summary: project.language === "Korean" ? "더 강한 도입과 긴장감 있는 전개를 만든 초안입니다." : "Builds a stronger opening and more engaging story momentum." },
+        { id: "candidate-b", focus: "Evidence and clarity", summary: project.language === "Korean" ? "근거와 반론이 더 명확하게 이어지는 초안입니다." : "Makes the evidence, counterpoint, and conclusion easier to follow." },
+      ],
+      judgment: { winner: "hybrid", reason: project.language === "Korean" ? "A의 강한 이야기 흐름과 B의 명확한 근거 전개를 결합했습니다." : "Combined Candidate A's stronger story momentum with Candidate B's clearer evidence flow.", confidence: 0.9 },
+      degraded: false,
+    },
+  });
+  if (project.language === "Korean") {
+    return withEnsemble({
+      scriptId: `script_mock_${project.id}_${(project.generatedScript?.version || 0) + 1}`,
+      claim: project.topic,
+      claimStrategy: { mode, researchStatus: project.research?.verdict?.status || "partially_supported", frame: project.research?.narrativeCase?.recommendedFrame, explanation: "가장 강한 근거와 투명한 기준으로 사용자의 주장을 설득합니다." },
+      usedFactIds: ["fact_1", "fact_2", "fact_3"],
+      title: project.topic,
+      version: (project.generatedScript?.version || 0) + 1,
+      estimatedSeconds: 60,
+      sections: [
+        { id: "hook", label: "Hook", range: "0–5s", text: `${project.topic}. 말도 안 된다고요? 우리가 ‘최고’의 기준부터 제대로 정하면 이야기가 달라집니다.`, factIds: ["fact_1"] },
+        { id: "context", label: "Context", range: "5–15s", text: "공정한 비교는 이름값이 아니라 현재 영향력, 효율, 출전 시간, 그리고 팀에서 맡은 역할을 함께 봐야 합니다.", factIds: ["fact_1"] },
+        { id: "argument-1", label: "Main argument 1", range: "15–27s", text: "누적 기록만 보면 익숙한 답이 나오지만, 90분당 생산성과 실제 경기 기여를 분리하면 격차의 의미가 달라집니다.", factIds: ["fact_2"] },
+        { id: "argument-2", label: "Main argument 2", range: "27–40s", text: "물론 경쟁자가 앞서는 중요한 지표도 있습니다. 그 사실을 인정해야 이 비교가 억지가 아니라 설득력 있는 주장으로 남습니다.", factIds: ["fact_3"] },
+        { id: "argument-3", label: "Main argument 3", range: "40–51s", text: "하지만 최고를 팀과 리그의 기대치를 가장 크게 바꾼 선수로 정의한다면, 단 하나의 기록표만으로 결론낼 수 없습니다.", factIds: ["fact_2"] },
+        { id: "conclusion", label: "Conclusion", range: "51–57s", text: "그 기준에서는 사용자의 주장이 충분히 성립합니다. 중요한 건 누가 더 유명한지가 아니라 무엇을 실제로 바꿨는가입니다.", factIds: ["fact_3"] },
+        { id: "cta", label: "CTA", range: "57–60s", text: "여러분이 생각하는 ‘최고’의 기준은 무엇인가요?", factIds: [] },
+      ],
+    });
+  }
+  return withEnsemble({
     scriptId: `script_mock_${project.id}_${(project.generatedScript?.version || 0) + 1}`,
     claim: project.topic,
     claimStrategy: { mode, researchStatus: project.research?.verdict?.status || "partially_supported", frame: project.research?.narrativeCase?.recommendedFrame, explanation: mode === "direct_case" ? "The script proves the claim with direct evidence." : mode === "evidence_boundary" ? "No honest supporting route was found." : "The script proves the claim through the strongest transparent narrative lens." },
@@ -164,7 +274,7 @@ export async function generateScript(project) {
       { id: "conclusion", label: "Conclusion", range: "51–57s", text: `Under those explicit criteria, the evidence makes ${project.topic.toLowerCase()} a defensible conclusion.`, factIds: ["fact_3"] },
       { id: "cta", label: "CTA", range: "57–60s", text: "Now decide which measure of best matters most to you.", factIds: [] },
     ],
-  };
+  });
 }
 
 export async function reviseScript(project, revisionInstructions = []) {
@@ -186,7 +296,7 @@ export async function reviseScript(project, revisionInstructions = []) {
 export async function reviewOriginality(project) {
   await wait(500);
   maybeFail("reviewOriginality");
-  return {
+  const result = {
     status: "passed",
     overall: 91,
     scores: { hook: 88, structure: 84, clarity: 94, duration: 98 },
@@ -210,6 +320,13 @@ export async function reviewOriginality(project) {
       "Retain the final sentence because it resolves the new topic rather than the source story.",
     ],
     disclaimer: "This similarity review is an originality estimate, not a copyright or legal determination.",
+  };
+  if (project.language !== "Korean") return result;
+  return {
+    ...result,
+    summary: "초안은 참고 영상의 속도감만 활용하고 표현과 주제별 사례는 새롭게 구성했습니다.",
+    overlaps: result.overlaps.map((overlap, index) => ({ ...overlap, note: ["대조 구조는 비슷하지만 단어와 의미, 위치가 모두 다릅니다.", "미래의 결과로 끝나는 공통점이 있지만 문장 흐름과 주제는 구별됩니다."][index] })),
+    instructions: ["근거의 순서는 유지하되 참고 영상의 고유 사례는 사용하지 마세요.", "새 주제의 질문에 직접 답하는 마지막 문장은 유지하세요."],
   };
 }
 

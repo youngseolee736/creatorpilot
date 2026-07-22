@@ -184,7 +184,7 @@ def wait_for(expression, label, timeout=4):
         time.sleep(0.04)
     diagnostics = evaluate(
         "(() => {"
-        "const stored = JSON.parse(localStorage.getItem('creatorpilot:v1') || 'null');"
+        "const stored = JSON.parse(localStorage.getItem('creatorpilot:v2') || 'null');"
         "return {hash: location.hash, text: document.body?.innerText?.slice(0, 800), "
         "project: stored?.projects?.[0] ? {status: stored.projects[0].status, error: stored.projects[0].error, "
         "pipeline: stored.projects[0].pipeline} : null};"
@@ -213,9 +213,9 @@ def capture(name):
 
 browser.command("Page.navigate", {"url": "http://127.0.0.1:4173/?fast=1#/dashboard"})
 wait_for("Boolean(document.body?.textContent.includes('CreatorPilot'))", "application bootstraps")
-evaluate("localStorage.removeItem('creatorpilot:v1')")
+evaluate("localStorage.removeItem('creatorpilot:v2')")
 browser.command("Page.reload", {"ignoreCache": True})
-wait_for("document.querySelectorAll('.project-row').length === 2", "dashboard renders seeded projects")
+wait_for("Boolean(document.querySelector('.empty-state'))", "dashboard starts empty for a new browser profile")
 check(evaluate("document.body.textContent.includes('CreatorPilot')"), "CreatorPilot branding renders")
 check(not evaluate("document.body.textContent.includes('RelocateAI')"), "dashboard has no RelocateAI language")
 check(evaluate("document.activeElement.id === 'page-content'"), "route navigation moves focus to page content")
@@ -226,17 +226,30 @@ browser.command("Input.dispatchKeyEvent", {"type": "keyUp", "key": "Tab", "code"
 check(evaluate("getComputedStyle(document.activeElement).outlineStyle !== 'none'"), "keyboard focus is visibly styled")
 
 # Empty state is a real reachable state for a new browser profile.
-evaluate("localStorage.setItem('creatorpilot:v1', JSON.stringify({version:1,projects:[],activeProjectId:null}))")
+evaluate("localStorage.setItem('creatorpilot:v2', JSON.stringify({version:1,projects:[],activeProjectId:null}))")
 browser.command("Page.reload", {"ignoreCache": True})
 wait_for("Boolean(document.querySelector('.empty-state'))", "new-user empty state renders")
-evaluate("localStorage.removeItem('creatorpilot:v1')")
-browser.command("Page.reload", {"ignoreCache": True})
-wait_for("document.querySelectorAll('.project-row').length === 2", "dashboard recovers seeded projects")
 
 click("a[href='#/projects/new']")
 wait_for("Boolean(document.querySelector('#reference-form'))", "new project route opens")
 capture("new-project-1280")
-set_value("#reference-url", test_youtube_url)
+click("#reference-form button[type='submit']")
+check(evaluate("document.querySelector('[role=\"alert\"]')?.textContent.includes('three required')"), "missing required references show a focused validation error")
+evaluate("document.querySelector('.analysis-depth').scrollIntoView({block:'center'})")
+capture("deep-analysis-selector-1280")
+for width, height, name in ((768, 1024, "tablet"), (390, 844, "mobile")):
+    browser.command("Emulation.setDeviceMetricsOverride", {
+        "width": width, "height": height, "deviceScaleFactor": 1, "mobile": width < 600,
+    })
+    time.sleep(0.08)
+    check(evaluate("document.documentElement.scrollWidth <= window.innerWidth"), f"{name} reference intake has no horizontal overflow")
+    capture(f"new-project-{name}-{width}")
+browser.command("Emulation.setDeviceMetricsOverride", {
+    "width": 1280, "height": 900, "deviceScaleFactor": 1, "mobile": False,
+})
+set_value("#reference-url-1", test_youtube_url)
+set_value("#reference-url-2", "https://youtube.com/watch?v=CPDemo22345")
+set_value("#reference-url-3", "https://youtube.com/watch?v=CPDemo32345")
 set_value("#project-topic", "Why Son Heung-min is outperforming Messi in MLS")
 set_value("#project-angle", "Compare their impact without relying on reputation alone.")
 set_value("#target-audience", "MLS fans comparing the league's biggest attacking stars")
@@ -244,6 +257,7 @@ set_value("#viewer-goal", "Understand which measures strengthen or weaken Son's 
 set_value("#desired-takeaway", "Son's case depends on the metric, while Messi remains stronger in important areas.")
 set_value("#tone", "Clear, informed, conversational")
 set_value("#language", "English")
+click("input[name='analysisDepth'][value='deep']")
 click("#reference-form button[type='submit']")
 
 if expect_transcript_error:
@@ -276,11 +290,15 @@ browser.command("Emulation.setDeviceMetricsOverride", {
     "width": 1280, "height": 900, "deviceScaleFactor": 1, "mobile": False,
 })
 evaluate("window.scrollTo(0, 0)")
-expected_transcript_label = "extracted transcript" if expect_api_transcript else "mock transcript"
-check(evaluate(f"document.querySelector('.transcript-disclosure').textContent.includes({json.dumps(expected_transcript_label)})"), "transcript preview is available")
+check(evaluate("document.querySelector('.transcript-disclosure').textContent.includes('View reference details')"), "reference details are available")
+check(evaluate("document.querySelectorAll('.reference-set-summary li').length === 3"), "all three references remain independently visible")
+check(evaluate("document.querySelector('.ensemble-disclosure') !== null"), "Deep analysis model comparison is available")
+check(evaluate("document.querySelectorAll('.ensemble-candidates article').length === 2"), "two independent analysis candidates are preserved")
+evaluate("document.querySelector('.ensemble-disclosure details').open = true; document.querySelector('.ensemble-disclosure').scrollIntoView({block:'center'})")
+capture("deep-analysis-comparison-1280")
 if expect_api_analysis:
     check(evaluate("document.body.textContent.includes('The story behind the video')"), "real story analysis renders")
-    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].analysis.analysisId.startsWith('analysis_')"), "real normalized analysis persists")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].analysis.analysisId.startsWith('synthesis_')"), "real normalized synthesis persists")
     check(not evaluate("document.body.textContent.includes('Return one JSON object only')"), "system prompt is not displayed")
     if expect_api_research and expect_api_script and expect_api_review and expect_api_storyboard and expect_api_video:
         connection_label = "All 7 production services connected"
@@ -292,8 +310,8 @@ if expect_api_analysis:
         connection_label = "Transcript + analyst + scriptwriter connected" if expect_api_script else "Transcript + analyst connected"
     check(evaluate(f"document.body.textContent.includes({json.dumps(connection_label)})"), "hybrid service state is labeled accurately")
 
-check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].transcript.transcriptId.length > 0"), "transcript extraction persists")
-check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].creativeBrief.angle.includes('reputation alone')"), "creative brief persists")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].transcript.transcriptId.length > 0"), "transcript extraction persists")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].creativeBrief.angle.includes('reputation alone')"), "creative brief persists")
 
 click("[data-action='research-topic']")
 wait_for("document.querySelectorAll('.fact-card').length === 3", "Research Agent completes a three-claim Fact Pack")
@@ -306,16 +324,18 @@ check(evaluate("document.querySelectorAll('.comparison-list article').length ===
 check(evaluate("document.querySelectorAll('.story-findings li').length === 3"), "research maps evidence into story roles")
 check(evaluate("document.querySelectorAll('.fact-list .fact-sources a').length === 3"), "Fact Pack keeps claim-level source links")
 check(evaluate("document.querySelectorAll('.source-list a').length === 3"), "Research page lists provider-verified sources")
+check(evaluate("document.querySelector('.ensemble-disclosure')?.textContent.includes('How the research models compared')"), "Deep research comparison is available")
+check(evaluate("document.querySelectorAll('.ensemble-candidates article').length === 2"), "two independent research candidates are preserved")
 check(evaluate("document.querySelector('.page-heading a[href$=\"/analysis\"]')?.textContent.includes('Back to analysis')"), "Research page links back to Script Analyst")
-check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].pipeline.researcher.status === 'completed'"), "research pipeline stage completes")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].pipeline.researcher.status === 'completed'"), "research pipeline stage completes")
 if expect_api_research:
-    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].research.researchId.startsWith('research_')"), "API Research result persists")
-    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].research.sources[0].domain.endsWith('example.test')"), "fixture Research sources persist")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].research.researchId.startsWith('research_')"), "API Research result persists")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].research.sources[0].domain.endsWith('example.test')"), "fixture Research sources persist")
 capture("research-1280")
 click(".page-heading a[href$='/analysis']")
 wait_for("document.querySelectorAll('.story-essential-grid article').length === 3", "Research can return to Script Analyst")
 check(evaluate("location.hash.endsWith('/analysis')"), "Back to analysis restores the previous interface")
-check(evaluate("Boolean(JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].research)"), "completed research remains saved after navigating back")
+check(evaluate("Boolean(JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].research)"), "completed research remains saved after navigating back")
 click("[data-action='research-topic']")
 wait_for("Boolean(document.querySelector('.research-verdict'))", "saved research reopens without starting over")
 for width, height, name in ((768, 1024, "tablet"), (390, 844, "mobile")):
@@ -339,16 +359,18 @@ check(evaluate("document.querySelector('.claim-lock')?.textContent.includes('res
 check(evaluate("document.querySelector('.claim-lock')?.textContent.includes('GOAT means the player whose arrival most changes')"), "Scriptwriter carries the recommended narrative into the draft")
 check(evaluate("document.querySelector('.editor-score strong')?.textContent === '60s'"), "Scriptwriter fills the complete 60-second target")
 check(evaluate("document.querySelectorAll('.section-facts').length >= 2"), "script sections expose their supporting Fact IDs")
+check(evaluate("document.querySelector('.script-ensemble')?.textContent.includes('How the writing models compared')"), "Deep writing comparison is available")
+check(evaluate("document.querySelectorAll('.script-ensemble .ensemble-candidates article').length === 2"), "two independent writing candidates are preserved")
 click("a[href$='/research']")
 wait_for("Boolean(document.querySelector('.research-verdict'))", "Scriptwriter can return to saved research")
 check(evaluate("location.hash.endsWith('/research')"), "Back to research restores the previous interface")
 click("[data-action='generate-script']")
 wait_for(f"document.querySelectorAll('[data-script-section]').length === {expected_script_sections}", "saved script reopens without regeneration")
 if expect_api_script:
-    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].generatedScript.scriptId.startsWith('script_')"), "real Scriptwriter draft persists")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].generatedScript.scriptId.startsWith('script_')"), "real Scriptwriter draft persists")
     click("[data-action='regenerate-script']")
     wait_for("document.querySelector('.editor-toolbar').textContent.includes('Draft 2')", "Scriptwriter revision creates version two")
-    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].generatedScript.supersedesScriptId.startsWith('script_')"), "revision lineage persists")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].generatedScript.supersedesScriptId.startsWith('script_')"), "revision lineage persists")
 capture("script-1280")
 set_value("#section-hook", "A single shipping lane can change the balance of an entire region.")
 click("#script-form button[type='submit']")
@@ -358,7 +380,7 @@ check(evaluate("location.hash.endsWith('/review')"), "workflow navigates to Orig
 capture("review-1280")
 check(evaluate("document.querySelectorAll('.comparison-item').length === 2"), "phrase comparison evidence renders")
 check(evaluate("document.body.textContent.includes('not a copyright or legal determination')"), "review includes non-legal disclaimer")
-check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].generatedScript.sections[0].text.includes('shipping lane')"), "script edits persist")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].generatedScript.sections[0].text.includes('shipping lane')"), "script edits persist")
 
 click("[data-action='send-back-script']")
 wait_for("Boolean(document.querySelector('#script-form'))", "review can return to the Scriptwriter")
@@ -377,8 +399,8 @@ click("[data-action='approve-production']")
 wait_for("document.querySelectorAll('.scene-row').length === 8", "storyboard generates eight scenes")
 check(evaluate("location.hash.endsWith('/production')"), "workflow navigates to Storyboard and Video Producer")
 if expect_api_storyboard:
-    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].storyboard[0].searchQuery.includes('licensed geopolitical')"), "real Storyboard metadata persists")
-    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].storyboard.at(-1).end === 60"), "real Storyboard timeline reaches the target duration")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].storyboard[0].searchQuery.includes('licensed geopolitical')"), "real Storyboard metadata persists")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].storyboard.at(-1).end === 60"), "real Storyboard timeline reaches the target duration")
 capture("storyboard-1280")
 check(evaluate("document.body.textContent.includes('Search query')"), "storyboard includes production metadata")
 set_value("[data-project-setting='voice']", "Min — Clear explainer")
@@ -386,7 +408,7 @@ click("[data-project-setting='music']")
 click("[data-action='render-video']")
 wait_for("Boolean(document.querySelector('.final-player'))", f"{'provider' if expect_api_video else 'mock'} video render reaches final result", timeout=8)
 if expect_api_video:
-    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].render.source === 'provider'"), "provider render result persists")
+    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].render.source === 'provider'"), "provider render result persists")
     check(evaluate("document.querySelectorAll('.delivery-actions a[href*=" + json.dumps("media.example.test") + "]').length === 2"), "provider delivery links are available")
     check(not evaluate("document.body.textContent.includes('no real video file was generated')"), "provider result is not labeled as a mock")
 else:
@@ -397,9 +419,9 @@ else:
 check(evaluate("document.querySelector('.delivery-panel').textContent.includes('Min — Clear explainer')"), "voice selection carries into the final package")
 check(evaluate("document.querySelector('.delivery-panel').textContent.includes('Off')"), "music setting carries into the final package")
 check(evaluate("document.querySelector('.pipeline-completed:last-child') !== null"), "producer pipeline stage completes")
-check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].status === 'completed'"), "project reaches completed status")
-check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].render.completed === true"), "final render state persists")
-check(evaluate("Object.values(JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].pipeline).every(step => step.status === 'completed')"), "every Phase 7 pipeline stage is complete")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].status === 'completed'"), "project reaches completed status")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].render.completed === true"), "final render state persists")
+check(evaluate("Object.values(JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].pipeline).every(step => step.status === 'completed')"), "every Phase 7 pipeline stage is complete")
 
 # Every completed stage can be revisited from the shared pipeline without losing work.
 check(evaluate("document.querySelectorAll('.agent-pipeline a.pipeline-link').length === 6"), "all completed pipeline stages are navigable")
@@ -413,7 +435,7 @@ click("[aria-label='Open Originality Reviewer']")
 wait_for("Boolean(document.querySelector('.review-hero'))", "pipeline moves naturally to Originality Reviewer")
 click("[aria-label='Open Video Producer']")
 wait_for("Boolean(document.querySelector('.final-player'))", "pipeline returns to completed Video Producer")
-check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v1')).projects[0].render.completed === true"), "stage navigation preserves completed work")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].render.completed === true"), "stage navigation preserves completed work")
 
 # Responsive and accessibility checks on the completed workflow.
 for width, height, name in ((1280, 900, "desktop"), (768, 1024, "tablet"), (390, 844, "mobile")):
@@ -427,7 +449,7 @@ for width, height, name in ((1280, 900, "desktop"), (768, 1024, "tablet"), (390,
 
 browser.command("Emulation.clearDeviceMetricsOverride")
 evaluate("location.hash = '#/dashboard'")
-wait_for("document.querySelectorAll('.project-row').length >= 2", "completed project returns to dashboard")
+wait_for("document.querySelectorAll('.project-row').length >= 1", "completed project returns to dashboard")
 browser.command("Emulation.setDeviceMetricsOverride", {
     "width": 390, "height": 844, "deviceScaleFactor": 1, "mobile": True,
 })

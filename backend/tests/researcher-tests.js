@@ -70,6 +70,53 @@ test("creates a provider-grounded Fact Pack", async () => {
   assert.deepEqual(result.facts[0].sourceIds, ["source_1"]); assert.equal(result.verdict.status, "partially_supported"); assert.equal(result.narrativeCase.mode, "reframe"); assert.deepEqual(result.narrativeCase.supportFactIds, ["fact_1", "fact_2", "fact_3"]); assert.equal(result.comparisons.length, 1); assert.deepEqual(result.storyFindings[0].factIds, ["fact_1"]); assert.equal(result.safety.providerVerifiedSources, true); assert.equal(provider.calls.length, 1);
 });
 
+test("deep research creates two independent candidates and a judged Fact Pack", async () => {
+  const primary = new FakeProvider();
+  const candidateA = new FakeProvider();
+  const candidateB = new FakeProvider();
+  const judge = new FakeProvider();
+  const researcher = new Researcher({ provider: primary, candidateAProvider: candidateA, candidateBProvider: candidateB, judgeProvider: judge });
+  const result = await researcher.research(validRequest({ analysisMode: "deep" }));
+  assert.equal(result.ensemble.mode, "deep");
+  assert.equal(result.ensemble.candidates.length, 2);
+  assert.equal(result.ensemble.judgment.winner, "hybrid");
+  assert.equal(result.ensemble.degraded, false);
+  assert.equal(primary.calls.length, 0);
+  assert.equal(candidateA.calls.length, 1);
+  assert.equal(candidateB.calls.length, 1);
+  assert.equal(judge.calls.length, 1);
+  assert.match(judge.calls[0].instructions, /final Research Judge/);
+});
+
+test("deep research keeps one validated candidate when the other stops", async () => {
+  const researcher = new Researcher({
+    provider: new FakeProvider(),
+    candidateAProvider: new FakeProvider(new Error("candidate stopped")),
+    candidateBProvider: new FakeProvider(),
+    judgeProvider: new FakeProvider(),
+  });
+  const result = await researcher.research(validRequest({ analysisMode: "deep" }));
+  assert.equal(result.ensemble.degraded, true);
+  assert.equal(result.ensemble.candidates.length, 1);
+  assert.equal(result.ensemble.judgment.winner, "candidate-b");
+});
+
+test("deep research keeps a candidate when the Research Judge stops", async () => {
+  const researcher = new Researcher({
+    provider: new FakeProvider(),
+    candidateAProvider: new FakeProvider(),
+    candidateBProvider: new FakeProvider(),
+    judgeProvider: new FakeProvider(new Error("judge stopped")),
+  });
+  const result = await researcher.research(validRequest({ analysisMode: "deep" }));
+  assert.equal(result.ensemble.degraded, true);
+  assert.equal(result.ensemble.judgment.winner, "candidate-a");
+});
+
+test("rejects an unsupported research analysis mode", async () => {
+  await assert.rejects(new Researcher({ provider: new FakeProvider() }).research(validRequest({ analysisMode: "maximum" })), (error) => error.code === "INVALID_RESEARCH_BRIEF" && error.details[0].field === "analysisMode");
+});
+
 test("rejects a narrative case that cites an unknown supporting fact", async () => {
   const result = providerResult(); const body = JSON.parse(result.text); body.narrativeCase.supportFactNumbers = [1, 8]; result.text = JSON.stringify(body);
   await assert.rejects(new Researcher({ provider: new FakeProvider(result) }).research(validRequest()), (error) => error.code === "INVALID_RESEARCH_RESPONSE" && error.details[0].reason === "unknown_fact");

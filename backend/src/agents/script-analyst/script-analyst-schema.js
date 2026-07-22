@@ -78,7 +78,7 @@ function validateAnalysisRequest(input) {
     projectId,
     targetTopic,
     targetDurationSeconds,
-    analysisLanguage: "English",
+    analysisLanguage: analysisLanguage || "English",
     transcript: {
       transcriptId,
       language: transcript.language || null,
@@ -90,11 +90,56 @@ function validateAnalysisRequest(input) {
   };
 }
 
+function validateSynthesisRequest(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new AppError(400, "INVALID_SYNTHESIS_REQUEST", "The synthesis request must be a JSON object.", false);
+  }
+  const projectId = typeof input.projectId === "string" ? input.projectId.trim() : "";
+  const targetTopic = typeof input.targetTopic === "string" ? input.targetTopic.replace(/\s+/g, " ").trim() : "";
+  const targetDurationSeconds = Number(input.targetDurationSeconds);
+  const analysisLanguage = input.analysisLanguage == null ? "English" : String(input.analysisLanguage).trim();
+  const analysisMode = input.analysisMode == null ? "standard" : String(input.analysisMode).trim().toLowerCase();
+  if (!projectId || projectId.length > 128) {
+    throw new AppError(400, "INVALID_SYNTHESIS_REQUEST", "projectId is required.", false, detail("projectId", "required"));
+  }
+  if (targetTopic.length < 3 || targetTopic.length > 200) {
+    throw new AppError(400, "INVALID_SYNTHESIS_REQUEST", "targetTopic is required.", false, detail("targetTopic", "required"));
+  }
+  if (!Number.isInteger(targetDurationSeconds) || targetDurationSeconds < MIN_TARGET_DURATION || targetDurationSeconds > MAX_TARGET_DURATION) {
+    throw new AppError(400, "INVALID_SYNTHESIS_REQUEST", `targetDurationSeconds must be an integer from ${MIN_TARGET_DURATION} to ${MAX_TARGET_DURATION}.`, false, detail("targetDurationSeconds", "unsupported"));
+  }
+  if (!validLanguage(analysisLanguage)) {
+    throw new AppError(400, "INVALID_SYNTHESIS_REQUEST", "The analysis language is invalid.", false, detail("analysisLanguage", "invalid"));
+  }
+  if (!["standard", "deep"].includes(analysisMode)) {
+    throw new AppError(400, "INVALID_SYNTHESIS_REQUEST", "analysisMode must be standard or deep.", false, detail("analysisMode", "invalid_enum"));
+  }
+  if (!Array.isArray(input.analyses) || input.analyses.length < 3 || input.analyses.length > 5) {
+    throw new AppError(400, "INVALID_SYNTHESIS_REQUEST", "Three to five reference analyses are required.", false, detail("analyses", "invalid_array"));
+  }
+  const analyses = input.analyses.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item) || !item.analysis || typeof item.analysis !== "object") {
+      throw new AppError(400, "INVALID_SYNTHESIS_REQUEST", "Every reference must include an analysis.", false, detail(`analyses.${index}.analysis`, "required"));
+    }
+    const analysisId = typeof item.analysis.analysisId === "string" ? item.analysis.analysisId.trim() : "";
+    if (!analysisId || !Array.isArray(item.analysis.structure) || !item.analysis.hookMechanics || !item.analysis.narrativeStyle) {
+      throw new AppError(400, "INVALID_SYNTHESIS_REQUEST", "A complete Script Analyst result is required for every reference.", false, detail(`analyses.${index}.analysis`, "invalid"));
+    }
+    return {
+      referenceId: String(item.referenceId || `reference-${index + 1}`).slice(0, 128),
+      title: String(item.title || `Reference ${index + 1}`).replace(/\s+/g, " ").trim().slice(0, 200),
+      analysis: item.analysis,
+    };
+  });
+  return { projectId, targetTopic, targetDurationSeconds, analysisLanguage, analysisMode, analyses };
+}
+
 module.exports = {
   MAX_TRANSCRIPT_CHARACTERS,
   MAX_TARGET_DURATION,
   MIN_TARGET_DURATION,
   MIN_TRANSCRIPT_WORDS,
   validateAnalysisRequest,
+  validateSynthesisRequest,
   validLanguage,
 };

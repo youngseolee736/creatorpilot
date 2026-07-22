@@ -106,10 +106,11 @@ const fixtureNarration = [
 const scriptProvider = {
   async complete(messages) {
     const payload = JSON.parse(messages[1].content.slice(messages[1].content.indexOf("{") ));
+    const input = payload.brief || payload;
     return JSON.stringify({
-      claim: payload.claimStrategy.requiredClaim,
-      title: payload.creativeBrief.topic,
-      sections: payload.sectionPlan.map((section, sectionIndex) => ({
+      claim: input.claimStrategy.requiredClaim,
+      title: input.creativeBrief.topic,
+      sections: input.sectionPlan.map((section, sectionIndex) => ({
         slot: section.slot,
         label: section.label,
         text: fixtureNarration[sectionIndex] || fixtureNarration[fixtureNarration.length - 1],

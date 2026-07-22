@@ -8,8 +8,11 @@ const DEFAULT_THRESHOLDS = Object.freeze({
 });
 const TOP_LEVEL_FIELDS = new Set([
   "projectId",
+  "reviewLanguage",
   "referenceTranscript",
   "referenceAnalysis",
+  "referenceTranscripts",
+  "referenceAnalyses",
   "script",
   "thresholds",
 ]);
@@ -131,10 +134,21 @@ function validateReviewRequest(request) {
   if (!plainObject(request)) invalid("request", "invalid_object", "The review request must be a JSON object.");
   const unexpected = Object.keys(request).find((field) => !TOP_LEVEL_FIELDS.has(field));
   if (unexpected) invalid(unexpected, "unexpected_field");
+  const referenceTranscripts = Array.isArray(request.referenceTranscripts)
+    ? request.referenceTranscripts.map(normalizeReferenceTranscript)
+    : [normalizeReferenceTranscript(request.referenceTranscript)];
+  const referenceAnalyses = Array.isArray(request.referenceAnalyses)
+    ? request.referenceAnalyses.map(normalizeReferenceAnalysis)
+    : [normalizeReferenceAnalysis(request.referenceAnalysis)];
+  if (referenceTranscripts.length < 1 || referenceTranscripts.length > 5) invalid("referenceTranscripts", "invalid_array");
+  if (referenceAnalyses.length < 1 || referenceAnalyses.length > 5) invalid("referenceAnalyses", "invalid_array");
   return {
     projectId: requiredString(request.projectId, "projectId", { max: 128 }),
-    referenceTranscript: normalizeReferenceTranscript(request.referenceTranscript),
-    referenceAnalysis: normalizeReferenceAnalysis(request.referenceAnalysis),
+    reviewLanguage: request.reviewLanguage == null ? "English" : requiredString(request.reviewLanguage, "reviewLanguage", { min: 2, max: 64 }),
+    referenceTranscript: referenceTranscripts[0],
+    referenceAnalysis: referenceAnalyses[0],
+    referenceTranscripts,
+    referenceAnalyses,
     script: normalizeScript(request.script),
     thresholds: normalizeThresholds(request.thresholds),
   };
