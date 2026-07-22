@@ -40,9 +40,41 @@ function normalizeFactPack(value) {
     if (ids.some((id) => !sourceIds.has(id))) invalid(`factPack.facts.${index}.sourceIds`, "unknown_source");
     if (!["high", "medium", "low"].includes(fact?.confidence)) invalid(`factPack.facts.${index}.confidence`, "invalid_enum");
     if (fact.usableInScript !== true) invalid(`factPack.facts.${index}.usableInScript`, "must_be_true");
-    return { factId: requiredString(fact.factId, `factPack.facts.${index}.factId`, { max: 100 }), claim: requiredString(fact.claim, `factPack.facts.${index}.claim`, { max: 500 }), explanation: requiredString(fact.explanation, `factPack.facts.${index}.explanation`, { max: 900 }), confidence: fact.confidence, sourceIds: ids, usableInScript: true };
+    const narrativeRole = fact.narrativeRole || "evidence";
+    if (!["opening", "context", "build", "reveal", "payoff", "counterpoint", "evidence"].includes(narrativeRole)) invalid(`factPack.facts.${index}.narrativeRole`, "invalid_enum");
+    return { factId: requiredString(fact.factId, `factPack.facts.${index}.factId`, { max: 100 }), narrativeRole, claim: requiredString(fact.claim, `factPack.facts.${index}.claim`, { max: 500 }), explanation: requiredString(fact.explanation, `factPack.facts.${index}.explanation`, { max: 900 }), confidence: fact.confidence, sourceIds: ids, usableInScript: true };
   });
-  return { researchId: requiredString(value.researchId, "factPack.researchId", { max: 160 }), summary: requiredString(value.summary, "factPack.summary", { max: 800 }), facts, sources, openQuestions: stringArray(value.openQuestions || [], "factPack.openQuestions", { maxItems: 5, maxLength: 400 }) };
+  const factIds = new Set(facts.map((fact) => fact.factId));
+  const storyFindings = Array.isArray(value.storyFindings) ? value.storyFindings.map((finding, index) => {
+    const role = requiredString(finding?.role, `factPack.storyFindings.${index}.role`, { max: 40 });
+    if (!["opening", "context", "build", "reveal", "payoff"].includes(role)) invalid(`factPack.storyFindings.${index}.role`, "invalid_enum");
+    const ids = stringArray(finding?.factIds, `factPack.storyFindings.${index}.factIds`, { minItems: 1, maxItems: 3, maxLength: 100 });
+    if (ids.some((id) => !factIds.has(id))) invalid(`factPack.storyFindings.${index}.factIds`, "unknown_fact");
+    return { role, guidance: requiredString(finding.guidance, `factPack.storyFindings.${index}.guidance`, { max: 400 }), factIds: ids };
+  }) : [];
+  const summary = requiredString(value.summary, "factPack.summary", { max: 800 });
+  const verdict = plainObject(value.verdict)
+    ? {
+      status: requiredString(value.verdict.status, "factPack.verdict.status", { max: 40 }),
+      headline: requiredString(value.verdict.headline, "factPack.verdict.headline", { max: 300 }),
+      explanation: requiredString(value.verdict.explanation, "factPack.verdict.explanation", { max: 600 }),
+    }
+    : { status: "insufficient_evidence", headline: summary, explanation: "No structured verdict was supplied." };
+  if (!["supported", "partially_supported", "not_supported", "insufficient_evidence"].includes(verdict.status)) invalid("factPack.verdict.status", "invalid_enum");
+  const narrativeCase = plainObject(value.narrativeCase)
+    ? {
+      mode: requiredString(value.narrativeCase.mode, "factPack.narrativeCase.mode", { max: 20 }),
+      recommendedFrame: requiredString(value.narrativeCase.recommendedFrame, "factPack.narrativeCase.recommendedFrame", { max: 240 }),
+      definition: requiredString(value.narrativeCase.definition, "factPack.narrativeCase.definition", { max: 300 }),
+      thesis: requiredString(value.narrativeCase.thesis, "factPack.narrativeCase.thesis", { max: 400 }),
+      whyItProvesClaim: requiredString(value.narrativeCase.whyItProvesClaim, "factPack.narrativeCase.whyItProvesClaim", { max: 600 }),
+      concession: requiredString(value.narrativeCase.concession, "factPack.narrativeCase.concession", { max: 400 }),
+      supportFactIds: stringArray(value.narrativeCase.supportFactIds, "factPack.narrativeCase.supportFactIds", { minItems: 2, maxItems: 4, maxLength: 100 }),
+    }
+    : { mode: verdict.status === "supported" ? "direct" : "unavailable", recommendedFrame: verdict.headline, definition: "Use the conventional meaning of the claim.", thesis: summary, whyItProvesClaim: verdict.explanation, concession: verdict.explanation, supportFactIds: facts.slice(0, 2).map((fact) => fact.factId) };
+  if (!["direct", "reframe", "unavailable"].includes(narrativeCase.mode)) invalid("factPack.narrativeCase.mode", "invalid_enum");
+  if (narrativeCase.supportFactIds.some((id) => !factIds.has(id))) invalid("factPack.narrativeCase.supportFactIds", "unknown_fact");
+  return { researchId: requiredString(value.researchId, "factPack.researchId", { max: 160 }), summary, verdict, narrativeCase, criteria: stringArray(value.criteria || [], "factPack.criteria", { maxItems: 5, maxLength: 120 }), facts, sources, storyFindings, openQuestions: stringArray(value.openQuestions || [], "factPack.openQuestions", { maxItems: 5, maxLength: 400 }) };
 }
 
 function normalizeCurrentScript(value) {

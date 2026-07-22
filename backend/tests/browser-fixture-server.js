@@ -11,7 +11,7 @@ const transcriptText = "The reference begins with a surprising question, introdu
 const provider = {
   async complete() {
     return JSON.stringify({
-      summary: "A long-form news explainer that opens with an urgent escalation claim, includes an early engagement prompt, presents a sequence of concrete incidents and a surprising strategic revelation, then analyzes cascading economic and military implications before closing with uncertain multi-front stakes.",
+      summary: "A growing crisis builds through evidence until one reveal changes its meaning and leaves the outcome uncertain.",
       hookType: "Urgent escalation statement paired with a surprising operational revelation",
       hookDuration: 4,
       hookPurpose: "Grab immediate attention by conveying that a local conflict is intensifying and hinting at a consequential development that raises stakes for global stakeholders.",
@@ -45,6 +45,11 @@ const provider = {
         pattern: "Problem → context → evidence → reveal → consequences",
         explanation: "The video waits until the evidence is clear before explaining the bigger meaning.",
         sequence: ["Show the problem", "Explain the situation", "Add evidence", "Reveal what changed", "Show why it matters"],
+      },
+      appliedExamples: {
+        opening: "Messi is the MLS benchmark—but what if Son Heung-min is already making the stronger case?",
+        build: "Test Son's case through impact, consistency, and how each player changes his team without assuming the answer.",
+        payoff: "Reveal which standard makes Son's case strongest, while acknowledging where Messi still leads.",
       },
       retentionMap: [
         { type: "Unanswered question", start: 0, end: 4, purpose: "Make the viewer wait to learn which event changes the story.", evidence: "The opening promises a bigger development without explaining it." },
@@ -91,22 +96,24 @@ const transcriptService = {
 };
 
 const fixtureNarration = [
-  "One narrow corridor can influence decisions made across an entire ocean, because the question is larger than any single border or headline.",
-  "Taiwan sits inside a network of shipping routes, advanced manufacturing, regional partnerships, and security commitments that reaches far beyond the island itself.",
-  "Walking away could appear to reduce one immediate risk, yet it would also force every nearby partner to reconsider which long-term promises remain dependable.",
-  "That uncertainty would travel through supply chains and diplomatic relationships together, making future crises harder to contain before they become wider confrontations.",
-  "The strongest policy is therefore not a dramatic gesture but steady coordination: clearer expectations, resilient trade, and choices that leave room for peaceful outcomes.",
-  "The map looks narrow, but the consequences are global. Follow for more concise explanations of the systems shaping tomorrow's most important decisions.",
+  "Calling Son Heung-min the MLS GOAT sounds ridiculous if GOAT means the biggest statistical total. But that is only one definition of greatness.",
+  "For this story, GOAT means the player whose arrival most changes what a team and an entire league believe is possible.",
+  "That is where Son's case begins. His impact matters, but so does the new attention, expectation, and competitive identity created around him.",
+  "Messi still owns the stronger résumé and leads creative measures. That concession is not the ending; it clarifies the argument we are actually making.",
+  "Statistics measure what happened on the pitch. Transformative greatness also asks whose presence changes the scale and raises the standard around everyone else.",
+  "So if GOAT means the greatest career résumé, choose Messi. If it means the player who most transforms MLS's next chapter, Son has the case—and that is why he is my MLS GOAT right now.",
 ];
 const scriptProvider = {
   async complete(messages) {
     const payload = JSON.parse(messages[1].content.slice(messages[1].content.indexOf("{") ));
     return JSON.stringify({
+      claim: payload.claimStrategy.requiredClaim,
       title: payload.creativeBrief.topic,
       sections: payload.sectionPlan.map((section, sectionIndex) => ({
         slot: section.slot,
         label: section.label,
         text: fixtureNarration[sectionIndex] || fixtureNarration[fixtureNarration.length - 1],
+        factIds: [`fact_${(sectionIndex % 3) + 1}`],
       })),
     });
   },
@@ -116,13 +123,28 @@ const researchProvider = {
   async research() {
     return {
       text: JSON.stringify({
-        summary: "A compact source-grounded brief for the selected angle and audience.",
+        summary: "Son's case is strongest on selected impact measures, while Messi remains stronger on important creative measures.",
+        verdict: { status: "partially_supported", headline: "Son has a credible case, but not an uncontested one.", explanation: "The conclusion changes depending on whether the comparison prioritizes output, efficiency, availability, or creation." },
+        narrativeCase: { mode: "reframe", recommendedFrame: "GOAT means the player whose arrival most changes what the league can become.", definition: "In this story, GOAT measures transformative league impact, not only the largest season total.", thesis: "Son can be called the MLS GOAT because his case rests on changing the league's reach, competitive identity, and expectations at once.", whyItProvesClaim: "This lens uses measurable impact and sourced context while making the evaluative definition explicit.", concession: "Messi still owns the stronger conventional statistical and career case.", supportFactNumbers: [1, 2, 3] },
+        criteria: ["Goal contribution", "Per-90 efficiency", "Team influence"],
+        comparisonSet: ["Son Heung-min", "Lionel Messi", "MLS attacking leaders"],
+        comparisons: [
+          { metric: "Non-penalty impact", subject: "Son Heung-min", subjectValue: "Strong", benchmark: "Lionel Messi", benchmarkValue: "Strong", interpretation: "Separating penalties makes the scoring comparison more informative.", sourceUrls: ["https://source1.example.test/report"] },
+          { metric: "Chance creation", subject: "Son Heung-min", subjectValue: "Competitive", benchmark: "Lionel Messi", benchmarkValue: "Leads", interpretation: "Messi's creative output is the strongest counterweight to the premise.", sourceUrls: ["https://source2.example.test/report"] },
+        ],
         facts: [1, 2, 3].map((number) => ({
+          narrativeRole: ["opening", "build", "payoff"][number - 1],
           claim: `Fixture claim ${number} grounded in a provider-returned source.`,
           explanation: `Fixture explanation ${number} is suitable for the approved short-video angle.`,
           confidence: number === 2 ? "medium" : "high",
           sourceUrls: [`https://source${number}.example.test/report`],
         })),
+        counterpoint: { claim: "Messi remains the stronger creator on key measures.", explanation: "The script should acknowledge the category where the rival leads.", sourceUrls: ["https://source2.example.test/report"] },
+        storyFindings: [
+          { role: "opening", guidance: "Challenge the expected ranking with the strongest fair comparison.", factNumbers: [1] },
+          { role: "build", guidance: "Compare output, efficiency, and role context.", factNumbers: [1, 2] },
+          { role: "payoff", guidance: "Name the exact criteria that support the qualified verdict.", factNumbers: [3] },
+        ],
         openQuestions: ["Recheck time-sensitive figures immediately before publication."],
       }),
       sources: [1, 2, 3].map((number) => ({ title: `Fixture source ${number}`, url: `https://source${number}.example.test/report` })),
@@ -131,7 +153,11 @@ const researchProvider = {
 };
 
 const reviewerProvider = {
-  async complete() {
+  async complete(messages) {
+    const payload = JSON.parse(messages[1].content.slice(messages[1].content.indexOf("{")));
+    const input = payload.originalReviewInput || payload;
+    const firstText = input.script.sections[0].text;
+    const finalText = input.script.sections[input.script.sections.length - 1].text;
     return JSON.stringify({
       originalityEstimate: 92,
       structureSimilarity: {
@@ -142,12 +168,12 @@ const reviewerProvider = {
       summary: "The draft keeps the reference's pacing mechanics while using distinct language and subject-specific expression.",
       overlaps: [{
         reference: "raises practical stakes",
-        generated: "making future crises harder to contain",
+        generated: firstText.slice(0, 160),
         risk: "Low",
         note: "Both escalate consequences, but the wording, topic, and narrative placement are distinct.",
       }, {
         reference: "resolves the opening idea near the ending",
-        generated: "The map looks narrow, but the consequences are global",
+        generated: finalText.slice(0, 160),
         risk: "Low",
         note: "Both resolve the opening near the close, while the language and conclusion remain topic-specific.",
       }],

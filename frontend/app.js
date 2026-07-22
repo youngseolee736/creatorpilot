@@ -108,7 +108,7 @@ async function ensureAnalysis(project) {
           pipeline: updatePipeline(current, "transcript", "completed", `${transcript.wordCount} words extracted`),
         });
       }
-      if (!current.analysis) {
+      if (!hasStoryLogic(current.analysis)) {
         current = store.updateProject(project.id, {
           pipeline: updatePipeline(current, "analyst", "in_progress", "Mapping hook, pacing, and structure"),
         });
@@ -126,6 +126,20 @@ async function ensureAnalysis(project) {
       failProject(current, stepId, error);
     }
   });
+}
+
+function hasStoryLogic(analysis) {
+  return Boolean(
+    analysis
+    && analysis.hookMechanics
+    && Array.isArray(analysis.narrativeStyle?.progression)
+    && Array.isArray(analysis.informationFlow?.sequence)
+    && analysis.appliedExamples?.opening
+    && analysis.appliedExamples?.build
+    && analysis.appliedExamples?.payoff
+    && Array.isArray(analysis.retentionMap)
+    && Array.isArray(analysis.reusablePatterns),
+  );
 }
 
 async function ensureScript(project, { force = false } = {}) {
@@ -156,27 +170,40 @@ async function ensureScript(project, { force = false } = {}) {
 async function ensureResearch(project) {
   await runTask(`research:${project.id}`, async () => {
     let current = store.getProject(project.id);
-    if (current.research) return;
+    if (hasResearchStrategy(current.research)) return;
     try {
       const referenceBlueprint = current.referenceBlueprint || referenceBlueprintFromAnalysis(current.analysis);
       current = store.updateProject(project.id, {
         error: null,
+        research: null,
         status: "researching",
         referenceBlueprint,
-        pipeline: updatePipeline(current, "researcher", "in_progress", "Checking current sources for your angle"),
+        pipeline: updatePipeline(current, "researcher", "in_progress", "Testing the claim with current evidence"),
       });
       render({ preserveFocus: true });
       const research = await researchTopic(current);
       current = store.updateProject(project.id, {
         research,
         status: "research_ready",
-        pipeline: updatePipeline(current, "researcher", "completed", `${research.facts.length} sourced claims ready`),
+        pipeline: updatePipeline(current, "researcher", "completed", `${research.facts.length} story-ready findings`),
       });
       render({ preserveFocus: true });
     } catch (error) {
       failProject(current, "researcher", error);
     }
   });
+}
+
+function hasResearchStrategy(research) {
+  return Boolean(
+    research
+    && research.verdict?.status
+    && Array.isArray(research.criteria)
+    && Array.isArray(research.comparisonSet)
+    && Array.isArray(research.comparisons)
+    && research.counterpoint?.claim
+    && Array.isArray(research.storyFindings),
+  );
 }
 
 async function ensureScriptRevision(project, revisionInstructions) {
@@ -287,7 +314,7 @@ async function startRender(project) {
 
 function ensureRouteData(route, project) {
   if (!project || project.error) return;
-  if (route.name === "analysis" && !project.analysis) ensureAnalysis(project);
+  if (route.name === "analysis" && !hasStoryLogic(project.analysis)) ensureAnalysis(project);
   if (route.name === "research" && !project.research) ensureResearch(project);
   if (route.name === "script" && !project.research) navigate(routeFor("research", project.id));
   else if (route.name === "script" && !project.generatedScript) ensureScript(project);
@@ -457,7 +484,12 @@ app.addEventListener("click", async (event) => {
     URL.revokeObjectURL(url);
   }
   if (action === "retry-analysis") {
-    store.updateProject(project.id, { error: null, pipeline: updatePipeline(project, project.transcript ? "analyst" : "transcript", "waiting", "Retry queued") });
+    store.updateProject(project.id, {
+      error: null,
+      analysis: null,
+      referenceBlueprint: null,
+      pipeline: updatePipeline(project, project.transcript ? "analyst" : "transcript", "waiting", "Retry queued"),
+    });
     render({ preserveFocus: true });
     ensureAnalysis(store.getProject(project.id));
   }

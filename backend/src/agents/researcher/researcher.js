@@ -12,7 +12,7 @@ class Researcher {
       apiBaseUrl: config.apiBaseUrl,
       apiKey: config.apiKey,
       model: config.model,
-      timeoutMs: hasScopedTimeout ? config.timeoutMs : Math.max(Number(config.timeoutMs) || 0, 120000),
+      timeoutMs: hasScopedTimeout ? config.timeoutMs : Math.max(Number(config.timeoutMs) || 0, 300000),
       ...(options.providerOptions || {}),
     });
     this.completed = new Map();

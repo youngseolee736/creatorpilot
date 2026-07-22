@@ -19,7 +19,23 @@ function validRequest(overrides = {}) {
 
 function providerResult(overrides = {}) {
   return {
-    text: JSON.stringify({ summary: "Libraries support several measurable community functions.", facts: [1, 2, 3].map((number) => ({ claim: `Supported claim ${number}`, explanation: `A concise sourced explanation ${number}.`, confidence: number === 3 ? "medium" : "high", sourceUrls: [`https://source${number}.example/report`] })), openQuestions: ["Local outcomes vary by program design."], ...(overrides.body || {}) }),
+    text: JSON.stringify({
+      summary: "Libraries support several measurable community functions, though local results vary by program design.",
+      verdict: { status: "partially_supported", headline: "Libraries function as practical civic infrastructure.", explanation: "The evidence supports several community benefits but does not show identical outcomes in every location." },
+      narrativeCase: { mode: "reframe", recommendedFrame: "Judge libraries by the opportunities they make reachable.", definition: "Civic infrastructure means a shared place that repeatedly connects residents to practical services and opportunity.", thesis: "Libraries strengthen neighborhoods because they make several forms of opportunity locally reachable in one trusted place.", whyItProvesClaim: "The combined reach of services, access, and community use supports the broader claim even when outcomes vary by location.", concession: "No single program produces identical outcomes everywhere.", supportFactNumbers: [1, 2, 3] },
+      criteria: ["Service reach", "Community outcomes", "Cost efficiency"],
+      comparisonSet: ["Public libraries", "Comparable local services"],
+      comparisons: [{ metric: "Service reach", subject: "Public libraries", subjectValue: "Broad local access", benchmark: "Comparable services", benchmarkValue: "Program-dependent access", interpretation: "Libraries combine several services in one public location.", sourceUrls: ["https://source1.example/report"] }],
+      facts: [1, 2, 3].map((number) => ({ narrativeRole: ["opening", "build", "payoff"][number - 1], claim: `Supported claim ${number}`, explanation: `A concise sourced explanation ${number}.`, confidence: number === 3 ? "medium" : "high", sourceUrls: [`https://source${number}.example/report`] })),
+      counterpoint: { claim: "Local outcomes are not uniform.", explanation: "Program design and community conditions affect measured results.", sourceUrls: ["https://source3.example/report"] },
+      storyFindings: [
+        { role: "opening", guidance: "Challenge the idea that libraries only lend books.", factNumbers: [1] },
+        { role: "build", guidance: "Compare several measurable community services.", factNumbers: [1, 2] },
+        { role: "payoff", guidance: "Resolve with the strongest supported civic outcome.", factNumbers: [3] },
+      ],
+      openQuestions: ["Local outcomes vary by program design."],
+      ...(overrides.body || {}),
+    }),
     sources: [1, 2, 3].map((number) => ({ title: `Primary source ${number}`, url: `https://source${number}.example/report` })),
     ...overrides,
   };
@@ -29,6 +45,16 @@ class FakeProvider {
   constructor(result = providerResult()) { this.result = result; this.calls = []; }
   async research(input) { this.calls.push(input); if (this.result instanceof Error) throw this.result; return this.result; }
 }
+
+test("gives web research a five-minute default deadline", () => {
+  const researcher = new Researcher({ environment: { LLM_API_BASE_URL: "https://api.openai.com/v1", LLM_API_KEY: "test-key", LLM_MODEL: "test-model", LLM_TIMEOUT_MS: "50000" } });
+  assert.equal(researcher.provider.timeoutMs, 300000);
+});
+
+test("honors an explicit Research Agent deadline", () => {
+  const researcher = new Researcher({ environment: { LLM_API_BASE_URL: "https://api.openai.com/v1", LLM_API_KEY: "test-key", LLM_MODEL: "test-model", RESEARCH_LLM_TIMEOUT_MS: "240000" } });
+  assert.equal(researcher.provider.timeoutMs, 240000);
+});
 
 async function request(app, path, body) {
   const server = app.listen(0, "127.0.0.1"); await new Promise((resolve) => server.once("listening", resolve));
@@ -41,12 +67,22 @@ test("creates a provider-grounded Fact Pack", async () => {
   const provider = new FakeProvider(); const researcher = new Researcher({ provider });
   const result = await researcher.research(validRequest());
   assert.match(result.researchId, /^research_/); assert.equal(result.facts.length, 3); assert.equal(result.sources.length, 3);
-  assert.deepEqual(result.facts[0].sourceIds, ["source_1"]); assert.equal(result.safety.providerVerifiedSources, true); assert.equal(provider.calls.length, 1);
+  assert.deepEqual(result.facts[0].sourceIds, ["source_1"]); assert.equal(result.verdict.status, "partially_supported"); assert.equal(result.narrativeCase.mode, "reframe"); assert.deepEqual(result.narrativeCase.supportFactIds, ["fact_1", "fact_2", "fact_3"]); assert.equal(result.comparisons.length, 1); assert.deepEqual(result.storyFindings[0].factIds, ["fact_1"]); assert.equal(result.safety.providerVerifiedSources, true); assert.equal(provider.calls.length, 1);
+});
+
+test("rejects a narrative case that cites an unknown supporting fact", async () => {
+  const result = providerResult(); const body = JSON.parse(result.text); body.narrativeCase.supportFactNumbers = [1, 8]; result.text = JSON.stringify(body);
+  await assert.rejects(new Researcher({ provider: new FakeProvider(result) }).research(validRequest()), (error) => error.code === "INVALID_RESEARCH_RESPONSE" && error.details[0].reason === "unknown_fact");
 });
 
 test("rejects a fact whose URL was not returned by the provider", async () => {
   const result = providerResult(); const body = JSON.parse(result.text); body.facts[0].sourceUrls = ["https://invented.example/report"]; result.text = JSON.stringify(body);
   await assert.rejects(new Researcher({ provider: new FakeProvider(result) }).research(validRequest()), (error) => error.code === "INVALID_RESEARCH_RESPONSE" && error.details[0].reason === "not_in_provider_sources");
+});
+
+test("rejects a story finding that references an unknown fact", async () => {
+  const result = providerResult(); const body = JSON.parse(result.text); body.storyFindings[0].factNumbers = [8]; result.text = JSON.stringify(body);
+  await assert.rejects(new Researcher({ provider: new FakeProvider(result) }).research(validRequest()), (error) => error.code === "INVALID_RESEARCH_RESPONSE" && error.details[0].reason === "unknown_fact");
 });
 
 test("rejects raw transcript content at the Research Agent boundary", async () => {
@@ -74,4 +110,3 @@ test("collects both consulted and cited HTTPS sources", () => {
 
 let failures = 0;
 (async () => { for (const { name, callback } of tests) { try { await callback(); console.log(`✓ ${name}`); } catch (error) { failures += 1; console.error(`✗ ${name}`); console.error(error); } } console.log(`\n${tests.length - failures}/${tests.length} researcher tests passed`); if (failures) process.exitCode = 1; })();
-

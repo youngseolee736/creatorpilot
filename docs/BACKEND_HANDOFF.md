@@ -61,8 +61,8 @@ remain separate upstream responsibilities.
 |---|---|---|---|---|---|---|---|
 | `extractTranscript(project)` | `frontend/mock-services.mjs` | `POST /api/transcripts/extract` | `app.js#ensureAnalysis`, `pages/analysis.mjs`, shared pipeline | Extracting reference transcript | Inline agent error with Retry; distinguish invalid/private/no transcript from transient provider failure | No | Cache by canonical video ID + caption language; respect transcript retention policy |
 | `analyzeReference(project)` | same | `POST /api/analysis/reference` | `app.js#ensureAnalysis`, `pages/analysis.mjs` | Mapping hook, pacing, and structure | Retry for transient model errors; invalid/short transcript requires new source | No | Cache by transcript content hash + analyzer version |
-| `researchTopic(project)` | same | `POST /api/research/topic` | `app.js#ensureResearch`, `pages/research.mjs` | Checking current sources for the tailored angle | Retry transient web-search errors; never promote uncited claims | No | Cache by exact brief + blueprint within the running backend |
-| `generateScript(project)` | same | `POST /api/scripts/generate` | `app.js#ensureScript`, `pages/script-editor.mjs` | Drafting original narration / Writing a new version | Retry without duplicate versions; show unsupported brief/language separately | No | Do not shared-cache creative output; store immutable result per project/version |
+| `researchTopic(project)` | same | `POST /api/research/topic` | `app.js#ensureResearch`, `pages/research.mjs` | Testing the claim against current sources and fair comparisons | Retry transient web-search errors; never promote uncited facts, comparisons, or counterpoints | No | Cache by exact brief + blueprint within the running backend |
+| `generateScript(project)` | same | `POST /api/scripts/generate` | `app.js#ensureScript`, `pages/script-editor.mjs` | Turning verified findings into a claim-led narration / Writing a new version | Retry without duplicate versions; reject claim drift and unknown Fact IDs | No | Do not shared-cache creative output; store immutable result per project/version |
 | `reviewOriginality(project)` | same | `POST /api/scripts/review` | `app.js#ensureReview`, `pages/review.mjs` | Comparing language and story structure | Retry; never convert an unavailable review into a pass | No | Cache by reference hash + exact script hash + reviewer version |
 | `generateStoryboard(project)` | same | `POST /api/storyboards/generate` | `app.js#ensureStoryboard`, `pages/production.mjs` | Planning scenes and visual evidence | Retry; reject non-passed or stale review | No | Store by approved script/review ID; invalidate when script changes |
 | `renderVideo(project, onProgress)` | same | `POST /api/videos/render`, then `GET /api/videos/:renderId/status` | `app.js#startRender`, `pages/production.mjs` | Preparing, staged progress, final result | Retry start/status separately; preserve `renderId`; terminal provider failure must stop polling | Yes, 1.5 s default | Never HTTP-cache live status; persist final render metadata and use signed media URLs |
@@ -90,8 +90,13 @@ The UI stores it as `project.transcript`, replaces `project.referenceTitle`, and
 ### `analyzeReference(project)`
 
 The mock accepts the project only to create a stable mock ID. API mode sends
-`projectId`, the stored normalized transcript, `targetDurationSeconds`, and
-`analysisLanguage`.
+`projectId`, `targetTopic`, the stored normalized transcript,
+`targetDurationSeconds`, and `analysisLanguage`.
+
+The analysis workspace always returns English. Its leading `summary` is one
+sentence with at most 18 words so the UI can present it as a scannable story
+statement. Detailed timing remains available to downstream agents but is not
+shown as a user-facing timeline.
 
 Current response:
 
@@ -112,6 +117,11 @@ Current response:
   "hookMechanics": { "trigger": "Expectation reversal", "curiosityGap": "The alternative is unexplained.", "promisedPayoff": "Reveal the mechanism and larger implication.", "deliveryPattern": "Challenge, delay, reveal, resolve.", "evidenceStart": 0, "evidenceEnd": 5, "evidence": "The expected solution is rejected before context is supplied." },
   "narrativeStyle": { "primaryMode": "Reframe-driven explainer", "narrativeEngine": "A small mechanism expands into system-level stakes.", "progression": ["Assumption", "Alternative", "Mechanism", "Stakes", "Payoff"] },
   "informationFlow": { "pattern": "Assumption → mechanism → stakes → payoff", "explanation": "The mechanism is understood before the stakes expand.", "sequence": ["Assumption", "Mechanism", "Stakes", "Payoff"] },
+  "appliedExamples": {
+    "opening": "Messi is the MLS benchmark—but what if Son Heung-min is already making the stronger case?",
+    "build": "Test Son's case through impact, consistency, and team influence without assuming the answer.",
+    "payoff": "Reveal which standard makes Son's case strongest while acknowledging where Messi still leads."
+  },
   "retentionMap": [{ "type": "Open loop", "start": 0, "end": 5, "purpose": "Create an unresolved question.", "evidence": "The answer is delayed." }],
   "structure": [
     { "label": "Hook", "start": 0, "end": 5, "note": "Contradicts the expected solution" },

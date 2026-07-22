@@ -73,13 +73,13 @@ Errors: `400 INVALID_YOUTUBE_URL`; `404 VIDEO_NOT_FOUND` or `TRANSCRIPT_UNAVAILA
 
 ## `POST /api/analysis/reference`
 
-Purpose: derive timestamp-grounded Narrative DNA—hook mechanics, narrative style,
-information flow, retention devices, intended emotional movement, viewer journey,
-and structural patterns—without reproducing source wording. Responsible agent:
-Script Analyst Agent. Consumed by: Reference Analysis screen and the compact
-reference blueprint passed to later agents.
+Purpose: derive the reference's storytelling logic and demonstrate its Opening,
+Build, and Payoff with the customer's new topic, without reproducing source
+wording or inventing research. Responsible agent: Script Analyst Agent. Consumed
+by: Reference Analysis screen and the compact reference blueprint passed to
+later agents.
 
-Required: `projectId`, `transcript`, `targetDurationSeconds`. Optional:
+Required: `projectId`, `targetTopic`, `transcript`, `targetDurationSeconds`. Optional:
 `analysisLanguage` is accepted for backward compatibility, but analysis prose is
 always normalized to English. The project's language controls the later script,
 not the analyst workspace. `targetDurationSeconds` is an integer from 15 through 180.
@@ -93,6 +93,7 @@ Request:
 ```json
 {
   "projectId": "project_01JZ8P",
+  "targetTopic": "Why Son Heung-min is outperforming Messi in MLS",
   "transcript": {
     "transcriptId": "tr_01JZ8Q",
     "source": "youtube_captions",
@@ -128,6 +129,11 @@ Success (`200`):
     "estimatedOriginalDuration": 58,
     "hookMechanics": { "trigger": "Expectation reversal", "curiosityGap": "The obvious answer is challenged before the alternative is explained.", "promisedPayoff": "Reveal the overlooked mechanism and its larger implication.", "deliveryPattern": "Challenge, delay, progressively reveal, then resolve.", "evidenceStart": 0, "evidenceEnd": 5, "evidence": "The opening rejects the expected solution before giving context." },
     "narrativeStyle": { "primaryMode": "Reframe-driven explainer", "narrativeEngine": "A small mechanism expands into a larger possibility while constraints preserve uncertainty.", "progression": ["Expected answer", "Hidden alternative", "Mechanism", "Scale", "Tension", "Payoff"] },
+    "appliedExamples": {
+      "opening": "Messi is the MLS benchmark—but what if Son Heung-min is already making the stronger case?",
+      "build": "Test Son's case through impact, consistency, and team influence without assuming the answer.",
+      "payoff": "Reveal which standard makes Son's case strongest while acknowledging where Messi still leads."
+    },
     "informationFlow": { "pattern": "Assumption → alternative → mechanism → scale → objections → implication", "explanation": "The broad stakes arrive only after the mechanism is understandable.", "sequence": ["Assumption", "Alternative", "Explanation", "Scale", "Constraints", "Implication"] },
     "retentionMap": [{ "type": "Open loop", "start": 0, "end": 5, "purpose": "Create a question the ending must resolve.", "evidence": "The alternative is introduced without its full explanation." }],
     "structure": [
@@ -156,14 +162,14 @@ TRANSCRIPT_NOT_ANALYZABLE`; `429 LLM_RATE_LIMITED`; `500 LLM_NOT_CONFIGURED` or
 ## `POST /api/research/topic`
 
 Purpose: turn the user's tailored creative brief and compact reference blueprint
-into a source-grounded Fact Pack before writing. Responsible agent: Research
-Agent. Consumed by: Research review screen and Scriptwriter.
+into a source-grounded comparison and story plan before writing. Responsible
+agent: Research Agent. Consumed by: Research review screen and Scriptwriter.
 
 Required: `projectId`, `creativeBrief`, and `referenceBlueprint`. Raw transcript
 fields are prohibited. The Research Agent uses the OpenAI Responses API
-`web_search` tool. Every fact must cite at least one HTTPS URL that also appears
-in the provider's returned citation/source metadata; unmatched URLs reject the
-entire result.
+`web_search` tool. Every fact, comparison, and counterpoint must cite at least
+one HTTPS URL that also appears in the provider's returned citation/source
+metadata; unmatched URLs reject the entire result.
 
 Request:
 
@@ -199,8 +205,14 @@ Request:
 }
 ```
 
-Success (`201`) includes `researchId`, `summary`, three through eight `facts`,
-normalized `sources`, optional `openQuestions`, `searchedAt`, and
+Success (`201`) includes `researchId`, `summary`, a literal-evidence `verdict`,
+and a `narrativeCase` containing the strongest honest route for proving the
+requested claim. `narrativeCase` records whether the route is direct, a transparent
+reframe, or unavailable; it also supplies the definition, thesis, concession,
+and at least two supporting Fact IDs. The response also includes explicit
+`criteria`, `comparisonSet`, optional like-for-like `comparisons`, three through
+eight role-tagged `facts`, a sourced `counterpoint`, `storyFindings` linked to
+fact IDs, normalized `sources`, optional `openQuestions`, `searchedAt`, and
 `safety.providerVerifiedSources=true`. A citation is evidence of provenance, not
 a factual guarantee.
 
@@ -215,9 +227,12 @@ compact reference mechanics, and approved Fact Pack. Responsible agent:
 Scriptwriter Agent. Consumed by: Script Editor screen.
 
 Implemented in Phase 3. The endpoint rejects raw transcript fields and allowlists
-the abstract analysis before building the prompt. The model supplies only title
-and narration text; the backend controls IDs, versions, ranges, and speaking-time
-estimates. Identical in-flight requests are coalesced and successful identical
+the abstract analysis before building the prompt. The model supplies the exact
+required claim, title, narration, and Fact Pack IDs used per section. The backend
+controls claim strategy, IDs, versions, ranges, and speaking-time estimates, and
+requires every narrative-case fact, at least two known facts, claim language in
+the narration, and a speaking estimate within two seconds of the requested
+duration. Identical in-flight requests are coalesced and successful identical
 requests reuse the same result within the running process. Persistence across a
 server restart is not yet available.
 
@@ -225,7 +240,7 @@ Required: `projectId`, `creativeBrief`, `referenceBlueprint`, `factPack`,
 `targetLanguage`, and `targetDurationSeconds`. Optional:
 `revisionInstructions` (empty for first draft). The raw transcript and the old
 top-level `topic`, `audience`, and `referenceAnalysis` shape are rejected.
-Loading UI: “Drafting original narration.” Retry: user-triggered; an idempotent
+Loading UI: “Turning verified findings into a claim-led narration.” Retry: user-triggered; an idempotent
 retry must not create duplicate versions.
 
 Request:
@@ -262,12 +277,15 @@ Success (`201`):
   "requestId": "req_script_01",
   "data": {
     "scriptId": "sc_01JZ8S",
+    "claim": "Why the United States cannot abandon Taiwan",
+    "claimStrategy": { "mode": "qualify", "researchStatus": "partially_supported", "explanation": "The script argues the strongest defensible version and addresses the main counterpoint." },
+    "usedFactIds": ["fact_1", "fact_2"],
     "title": "Why the United States cannot abandon Taiwan",
     "version": 1,
     "estimatedSeconds": 59,
     "sections": [
-      { "id": "hook", "label": "Hook", "range": "0–5s", "text": "The most important line on a map may be the one ships cannot cross." },
-      { "id": "context", "label": "Context", "range": "5–15s", "text": "This story is about the system hidden underneath one headline." }
+      { "id": "hook", "label": "Hook", "range": "0–5s", "text": "Why can the United States not abandon Taiwan? The answer begins beyond the island.", "factIds": ["fact_1"] },
+      { "id": "context", "label": "Context", "range": "5–15s", "text": "This story is about the system hidden underneath one headline.", "factIds": ["fact_2"] }
     ]
   }
 }

@@ -70,6 +70,13 @@ mocked.
   ranges, and speaking-time estimates.
 - Connected “New version” to the revision endpoint while preserving local edits
   and reviewer guidance.
+- Locked every draft to the user's exact claim and required at least two known
+  research facts, with per-section Fact IDs exposed in the editor.
+- Added verdict-aware writing modes plus a Claim Lock panel and backward
+  navigation to the saved Research Agent result.
+- Uses the Research Agent's recommended narrative case to keep advocating the
+  user's claim without fabricating facts, and enforces a ±2-second full-duration
+  speaking target (145–155 words for a 60-second English script).
 
 ### Files and evidence
 
@@ -85,11 +92,11 @@ mocked.
 
 ### Validation
 
-- Backend: 24 transcript, 27 analysis, and 16 Scriptwriter tests passed.
-- Frontend: syntax checks and 15 service/core tests passed.
+- Backend: the complete 131-test suite passed, including 18 Scriptwriter tests.
+- Frontend: syntax checks and 30 service/core/UI tests passed.
 - Dependency audit: 0 vulnerabilities across 76 packages.
-- Browser: API transcript, analysis, initial script, and revision lineage passed;
-  the remaining mock workflow also completed.
+- Browser: the complete API-backed fixture workflow passed, including claim
+  lock, Fact ID visibility, Research navigation, revision lineage, and clean runtime.
 - Browser viewports: 1280×900, 768×1024, and 390×844 had no horizontal
   overflow. Visible controls had accessible names, keyboard focus was visible,
   route focus was correct, and the browser console/runtime were clean.
@@ -112,6 +119,6 @@ mocked.
   and browser boundary.
 - Idempotency and completed-result caching last only for the running backend
   process; durable version conflict handling requires future persistence work.
-- The Scriptwriter has no research/fact-checking source and cannot guarantee
-  factual accuracy or originality. The real Originality Reviewer remains future
-  work.
+- The Scriptwriter is grounded only in the approved Fact Pack. It does not
+  independently research missing evidence and cannot guarantee factual or legal
+  accuracy beyond that input.

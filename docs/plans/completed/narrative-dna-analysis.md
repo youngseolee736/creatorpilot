@@ -52,8 +52,8 @@ interaction patterns.
 
 ## Validation and self-review
 
-- `npm test`: 124 backend and agent tests passed.
-- `node frontend/tests/creatorpilot.test.mjs`: 28 frontend tests passed.
+- `npm test`: 126 backend and agent tests passed.
+- `node frontend/tests/creatorpilot.test.mjs`: 29 frontend tests passed.
 - Full API-backed browser workflow passed with the fixture backend.
 - Browser inspection covered 1280×900, 768×1024, and 390×844.
 - Narrative DNA and final-result screens had no horizontal overflow.
@@ -78,12 +78,28 @@ counts, removed duplicate summary panels, and placed timing evidence behind a
 native collapsed disclosure. The final script still follows the creator's
 selected target language.
 
-A second follow-up replaced the technical Narrative DNA presentation with five
-plain storytelling questions: opening, story movement, information reveal,
-continued interest, and payoff. User-facing timelines, emotional-arc charts,
-retention terminology, confidence labels, and category-heavy summaries were
-removed. Timing remains internal validation data only, while the page ends with
-a short reusable Story Blueprint.
+A second follow-up removed the technical Narrative DNA presentation. The final
+screen now exposes only a one-sentence story summary, a five-step flow, three
+story decisions (Opening, Build, Payoff), and two or three reusable instructions.
+User-facing timelines, emotional-arc charts, retention terminology, confidence
+labels, and category-heavy summaries were removed. Timing remains internal
+validation data only.
+
+The final readability pass used Subscribr's progressive-disclosure pattern as a
+reference without reproducing its interface. It enforces an 18-word maximum for
+the leading story sentence, reduces its display size, keeps secondary evidence
+collapsed, and removes the duplicate sticky action bar that obscured the story
+cards. The single next-step action remains in the page header.
+
+A topic-application pass adds one concrete example beneath each story decision.
+The examples use the customer's current topic for Opening, Build, and Payoff,
+while explicitly avoiding invented facts before the Research Agent runs. The
+three decisions stack vertically so the applied examples remain readable at
+desktop and mobile widths.
+
+The retry path now clears incomplete cached analysis data before requesting a
+fresh result. The analysis renderer also treats every list as untrusted stored
+data, so a partial or legacy result cannot crash the page while migration runs.
 
 The final screen remains visually distant from all documented references: it
 uses CreatorPilot's existing editorial typography, neutral work surface, and

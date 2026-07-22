@@ -119,34 +119,76 @@ function requestFingerprint(input, mode) {
   return crypto.createHash("sha256").update(JSON.stringify({ mode, input })).digest("hex");
 }
 
+const CLAIM_STOP_WORDS = new Set(["why", "how", "what", "when", "where", "who", "is", "are", "the", "a", "an", "to", "than", "in", "on", "of", "and", "or", "for", "with"]);
+
+function meaningfulClaimWords(value) {
+  return [...new Set((String(value).toLowerCase().match(/[\p{L}\p{N}']+/gu) || [])
+    .filter((word) => word.length >= 3 && !CLAIM_STOP_WORDS.has(word)))];
+}
+
+function claimStrategy(input) {
+  const status = input.factPack.verdict.status;
+  const narrativeCase = input.factPack.narrativeCase;
+  const mode = narrativeCase.mode === "direct" ? "direct_case" : narrativeCase.mode === "reframe" ? "reframed_case" : "evidence_boundary";
+  return {
+    mode,
+    researchStatus: status,
+    frame: narrativeCase.recommendedFrame,
+    explanation: mode === "direct_case"
+      ? "The script proves the claim with direct evidence."
+      : mode === "reframed_case"
+        ? "The script proves the claim through the strongest transparent narrative lens."
+        : "The script marks the evidence boundary because no honest supporting route was found.",
+  };
+}
+
 function normalizeScript(raw, input, plan, mode, fingerprint) {
   const keys = Object.keys(raw);
-  if (keys.some((key) => !["title", "sections"].includes(key))) throw invalid("response", "unexpected_field");
+  if (keys.some((key) => !["claim", "title", "sections"].includes(key))) throw invalid("response", "unexpected_field");
+  const claim = stringField(raw.claim, "claim", 500);
+  if (claim !== input.creativeBrief.topic) throw invalid("claim", "must_match_required_claim");
   const title = stringField(raw.title, "title", 180);
   if (!Array.isArray(raw.sections) || raw.sections.length !== plan.length) throw invalid("sections", "must_match_section_plan");
 
   let fullText = "";
+  const knownFactIds = new Set(input.factPack.facts.map((fact) => fact.factId));
+  const usedFactIds = new Set();
   const sections = raw.sections.map((section, index) => {
     if (!section || typeof section !== "object" || Array.isArray(section)) throw invalid(`sections.${index}`, "invalid_object");
-    if (Object.keys(section).some((key) => !["slot", "label", "text"].includes(key))) {
+    if (Object.keys(section).some((key) => !["slot", "label", "text", "factIds"].includes(key))) {
       throw invalid(`sections.${index}`, "unexpected_field");
     }
     const slot = stringField(section.slot, `sections.${index}.slot`, 100);
     if (slot !== plan[index].slot) throw invalid(`sections.${index}.slot`, "must_match_section_plan");
     stringField(section.label, `sections.${index}.label`, 80);
     const text = stringField(section.text, `sections.${index}.text`, 6000);
+    if (!Array.isArray(section.factIds) || section.factIds.length > 3) throw invalid(`sections.${index}.factIds`, "invalid_array");
+    const factIds = section.factIds.map((factId, factIndex) => stringField(factId, `sections.${index}.factIds.${factIndex}`, 100));
+    if (new Set(factIds).size !== factIds.length) throw invalid(`sections.${index}.factIds`, "duplicate_fact_id");
+    if (factIds.some((factId) => !knownFactIds.has(factId))) throw invalid(`sections.${index}.factIds`, "unknown_fact");
+    factIds.forEach((factId) => usedFactIds.add(factId));
     fullText += `${fullText ? " " : ""}${text}`;
     return {
       id: plan[index].slot,
       label: plan[index].label,
       range: `${plan[index].start}–${plan[index].end}s`,
       text,
+      factIds,
     };
   });
   if (fullText.length > 30000) throw invalid("sections", "script_too_large");
+  if (usedFactIds.size < 2) throw invalid("sections", "insufficient_fact_use");
+  if (input.factPack.narrativeCase.supportFactIds.some((factId) => !usedFactIds.has(factId))) throw invalid("sections", "missing_narrative_case_fact");
+
+  const expectedWords = meaningfulClaimWords(claim);
+  const narrationWords = new Set((fullText.toLowerCase().match(/[\p{L}\p{N}']+/gu) || []));
+  const requiredCoverage = Math.min(2, expectedWords.length);
+  if (expectedWords.filter((word) => narrationWords.has(word)).length < requiredCoverage) {
+    throw invalid("sections", "claim_not_expressed");
+  }
 
   const estimatedSeconds = Math.max(1, Math.round(estimateSpeechSeconds(fullText, input.targetLanguage)));
-  const tolerance = Math.max(4, Math.round(input.targetDurationSeconds * 0.2));
+  const tolerance = Math.max(2, Math.round(input.targetDurationSeconds * 0.03));
   if (Math.abs(estimatedSeconds - input.targetDurationSeconds) > tolerance) {
     throw invalid("estimatedSeconds", estimatedSeconds < input.targetDurationSeconds ? "script_too_short" : "script_too_long");
   }
@@ -154,6 +196,9 @@ function normalizeScript(raw, input, plan, mode, fingerprint) {
   return {
     scriptId: `script_${fingerprint.slice(0, 20)}`,
     ...(mode === "revision" ? { supersedesScriptId: input.currentScript.scriptId } : {}),
+    claim,
+    claimStrategy: claimStrategy(input),
+    usedFactIds: [...usedFactIds],
     title,
     version: mode === "revision" ? input.currentScript.version + 1 : 1,
     estimatedSeconds,

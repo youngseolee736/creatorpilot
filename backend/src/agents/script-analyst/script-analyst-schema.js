@@ -26,6 +26,11 @@ function validateAnalysisRequest(input) {
     throw new AppError(400, "INVALID_ANALYSIS_REQUEST", "projectId is required.", false, detail("projectId", "required"));
   }
 
+  const targetTopic = typeof input.targetTopic === "string" ? input.targetTopic.replace(/\s+/g, " ").trim() : "";
+  if (targetTopic.length < 3 || targetTopic.length > 200) {
+    throw new AppError(400, "INVALID_ANALYSIS_REQUEST", "targetTopic is required.", false, detail("targetTopic", "required"));
+  }
+
   const transcript = input.transcript;
   if (!transcript || typeof transcript !== "object" || Array.isArray(transcript)) {
     throw new AppError(400, "INVALID_ANALYSIS_REQUEST", "A normalized transcript is required.", false, detail("transcript", "required"));
@@ -71,6 +76,7 @@ function validateAnalysisRequest(input) {
 
   return {
     projectId,
+    targetTopic,
     targetDurationSeconds,
     analysisLanguage: "English",
     transcript: {

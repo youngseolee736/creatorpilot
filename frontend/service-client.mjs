@@ -80,6 +80,7 @@ function makeApiServices(config, fetchImpl) {
     analyzeReference(project) {
       return post("/api/analysis/reference", {
         projectId: project.id,
+        targetTopic: project.topic,
         transcript: project.transcript,
         targetDurationSeconds: project.duration,
         analysisLanguage: "English",

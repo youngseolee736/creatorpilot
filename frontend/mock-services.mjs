@@ -36,6 +36,7 @@ export async function extractTranscript(project) {
 export async function analyzeReference(project = {}) {
   await wait(520);
   maybeFail("analyzeReference");
+  const topic = project.topic || "your topic";
   return {
     analysisId: `analysis_${project.id || "mock"}`,
     summary: "A concise explainer that opens with a reframe, develops the mechanism, and resolves with future stakes.",
@@ -73,6 +74,11 @@ export async function analyzeReference(project = {}) {
       explanation: "The explanation delays broad stakes until the viewer understands one concrete mechanism.",
       sequence: ["Familiar assumption", "Contrasting possibility", "How it works", "Why it scales", "What could fail", "Why it matters"],
     },
+    appliedExamples: {
+      opening: `Challenge the obvious answer behind “${topic}” and promise to test it.`,
+      build: `Examine “${topic}” through increasingly consequential evidence without revealing the answer too early.`,
+      payoff: `Return to “${topic}” and explain which evidence ultimately changes the answer.`,
+    },
     retentionMap: [
       { type: "Expectation reversal", start: 0, end: 5, purpose: "Interrupt the default answer and create a knowledge gap.", evidence: "The opening replaces the familiar solution with an unexplained alternative." },
       { type: "Progressive reveal", start: 14, end: 39, purpose: "Increase the significance of the idea in two stages.", evidence: "A specific mechanism is explained before its system-level implication." },
@@ -106,16 +112,29 @@ export async function researchTopic(project = {}) {
   maybeFail("researchTopic");
   return {
     researchId: `research_mock_${project.id}`,
-    summary: `A compact evidence pack tailored to ${project.creativeBrief?.targetAudience || "the selected audience"} and the angle “${project.creativeBrief?.angle || project.topic}.”`,
+    summary: `The available evidence supports parts of “${project.topic},” but the strongest conclusion depends on the comparison criteria.`,
+    verdict: { status: "partially_supported", headline: "The claim is strongest when impact and efficiency are evaluated together.", explanation: "Some measures support the premise while other measures favor established league leaders." },
+    narrativeCase: { mode: "reframe", recommendedFrame: "Define greatness by transformative impact, not one statistical leaderboard.", definition: "Greatest means the player whose performance, role, and presence most change the team and the league around him.", thesis: `${project.topic} is defensible when greatness is measured by transformative impact rather than one raw total.`, whyItProvesClaim: "This transparent lens combines the strongest sourced performance evidence with broader team and league influence.", concession: "The named rival still leads important conventional measures.", supportFactIds: ["fact_1", "fact_2", "fact_3"] },
+    criteria: ["Total production", "Per-90 efficiency", "Team impact"],
+    comparisonSet: ["Primary subject", "Named rival", "League leaders"],
+    comparisons: [
+      { metric: "Per-90 contribution", subject: "Primary subject", subjectValue: "Competitive", benchmark: "Named rival", benchmarkValue: "Competitive", interpretation: "Rate statistics make unequal playing time easier to compare.", sourceIds: ["source_1"], sourceUrls: ["https://www.mlssoccer.com/stats/players/" ] },
+    ],
     facts: [
-      { factId: "fact_1", claim: "The topic affects systems beyond the most visible headline.", explanation: "The strongest framing connects the immediate event to infrastructure, institutions, and downstream consequences.", confidence: "high", sourceIds: ["source_1"], sourceUrls: ["https://www.oecd.org/"], usableInScript: true },
-      { factId: "fact_2", claim: "Audience understanding improves when the mechanism is explained before the stakes.", explanation: "The narration should establish how the system works, then show what changes if one part fails.", confidence: "medium", sourceIds: ["source_2"], sourceUrls: ["https://ourworldindata.org/"], usableInScript: true },
-      { factId: "fact_3", claim: "Recent primary sources should anchor any precise or time-sensitive claim.", explanation: "Dates, quantities, and policy positions can change, so the final editor should open the linked source before publishing.", confidence: "high", sourceIds: ["source_3"], sourceUrls: ["https://www.un.org/en/"], usableInScript: true },
+      { factId: "fact_1", narrativeRole: "opening", claim: "The headline comparison changes when totals are separated from per-90 production.", explanation: "This creates a fairer opening question when players have different minutes.", confidence: "high", sourceIds: ["source_1"], sourceUrls: ["https://www.mlssoccer.com/stats/players/"], usableInScript: true },
+      { factId: "fact_2", narrativeRole: "build", claim: "Role and penalty responsibility can materially change an attacking comparison.", explanation: "The build should distinguish raw output from how that output was produced.", confidence: "medium", sourceIds: ["source_2"], sourceUrls: ["https://fbref.com/en/comps/22/Major-League-Soccer-Stats"], usableInScript: true },
+      { factId: "fact_3", narrativeRole: "payoff", claim: "A qualified verdict is more defensible than one universal player ranking.", explanation: "The ending should name the criteria on which the subject leads and where the rival remains stronger.", confidence: "high", sourceIds: ["source_3"], sourceUrls: ["https://www.mlssoccer.com/"], usableInScript: true },
+    ],
+    counterpoint: { claim: "The named rival may still lead important creative measures.", explanation: "A fair conclusion must show where the premise becomes weaker.", sourceIds: ["source_2"], sourceUrls: ["https://fbref.com/en/comps/22/Major-League-Soccer-Stats"] },
+    storyFindings: [
+      { role: "opening", guidance: "Open with the statistic that most clearly challenges the expected ranking.", factIds: ["fact_1"] },
+      { role: "build", guidance: "Compare totals, rate statistics, and role context before naming a leader.", factIds: ["fact_1", "fact_2"] },
+      { role: "payoff", guidance: "Resolve with the precise criteria the evidence actually supports.", factIds: ["fact_3"] },
     ],
     sources: [
-      { sourceId: "source_1", title: "OECD", url: "https://www.oecd.org/", domain: "oecd.org" },
-      { sourceId: "source_2", title: "Our World in Data", url: "https://ourworldindata.org/", domain: "ourworldindata.org" },
-      { sourceId: "source_3", title: "United Nations", url: "https://www.un.org/en/", domain: "un.org" },
+      { sourceId: "source_1", title: "MLS player statistics", url: "https://www.mlssoccer.com/stats/players/", domain: "mlssoccer.com" },
+      { sourceId: "source_2", title: "Major League Soccer statistics", url: "https://fbref.com/en/comps/22/Major-League-Soccer-Stats", domain: "fbref.com" },
+      { sourceId: "source_3", title: "Major League Soccer", url: "https://www.mlssoccer.com/", domain: "mlssoccer.com" },
     ],
     openQuestions: ["Which time-sensitive figures should be rechecked immediately before publication?"],
     searchedAt: new Date().toISOString(),
@@ -126,19 +145,24 @@ export async function researchTopic(project = {}) {
 export async function generateScript(project) {
   await wait(560);
   maybeFail("generateScript");
+  const caseMode = project.research?.narrativeCase?.mode || "reframe";
+  const mode = caseMode === "direct" ? "direct_case" : caseMode === "reframe" ? "reframed_case" : "evidence_boundary";
   return {
     scriptId: `script_mock_${project.id}_${(project.generatedScript?.version || 0) + 1}`,
+    claim: project.topic,
+    claimStrategy: { mode, researchStatus: project.research?.verdict?.status || "partially_supported", frame: project.research?.narrativeCase?.recommendedFrame, explanation: mode === "direct_case" ? "The script proves the claim with direct evidence." : mode === "evidence_boundary" ? "No honest supporting route was found." : "The script proves the claim through the strongest transparent narrative lens." },
+    usedFactIds: ["fact_1", "fact_2", "fact_3"],
     title: project.topic,
     version: (project.generatedScript?.version || 0) + 1,
-    estimatedSeconds: 59,
+    estimatedSeconds: 60,
     sections: [
-      { id: "hook", label: "Hook", range: "0–5s", text: "The most important line on a map may be the one ships cannot cross." },
-      { id: "context", label: "Context", range: "5–15s", text: `That is why ${project.topic.toLowerCase()} is less about one headline and more about the system hidden underneath it.` },
-      { id: "argument-1", label: "Main argument 1", range: "15–27s", text: "Trade routes, advanced manufacturing, and regional security all converge in the same narrow corridor." },
-      { id: "argument-2", label: "Main argument 2", range: "27–40s", text: "If that corridor becomes unreliable, the shock does not stay local. It reaches factories, prices, and alliances around the world." },
-      { id: "argument-3", label: "Main argument 3", range: "40–51s", text: "Support is therefore not only a promise to one partner. It is a signal that long-term agreements still mean something." },
-      { id: "conclusion", label: "Conclusion", range: "51–57s", text: "Walking away might look simpler today, but it would make every future crisis harder." },
-      { id: "cta", label: "CTA", range: "57–60s", text: "Follow for one-minute explanations of the forces shaping tomorrow." },
+      { id: "hook", label: "Hook", range: "0–5s", text: `${project.topic} sounds surprising—until we define what “best” actually means.`, factIds: ["fact_1"] },
+      { id: "context", label: "Context", range: "5–15s", text: "The fair comparison uses current impact, efficiency, availability, and team role instead of fame alone.", factIds: ["fact_1"] },
+      { id: "argument-1", label: "Main argument 1", range: "15–27s", text: "The strongest evidence supports the claim on the measures that connect most directly to match-winning impact.", factIds: ["fact_2"] },
+      { id: "argument-2", label: "Main argument 2", range: "27–40s", text: "The rival still leads an important category, and acknowledging that counterpoint makes the comparison more credible.", factIds: ["fact_3"] },
+      { id: "argument-3", label: "Main argument 3", range: "40–51s", text: "But one leading category does not settle the whole question when the chosen criteria measure a broader contribution.", factIds: ["fact_2"] },
+      { id: "conclusion", label: "Conclusion", range: "51–57s", text: `Under those explicit criteria, the evidence makes ${project.topic.toLowerCase()} a defensible conclusion.`, factIds: ["fact_3"] },
+      { id: "cta", label: "CTA", range: "57–60s", text: "Now decide which measure of best matters most to you.", factIds: [] },
     ],
   };
 }

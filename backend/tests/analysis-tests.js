@@ -60,6 +60,7 @@ const transcriptText = "The presenter starts with a surprising question about ci
 function validRequest(overrides = {}) {
   return {
     projectId: "project-analysis-test",
+    targetTopic: "Why Son Heung-min is outperforming Messi in MLS",
     transcript: {
       transcriptId: "tr_analysis_test",
       source: "youtube_captions",
@@ -117,6 +118,11 @@ function validAnalysis(overrides = {}) {
       explanation: "The video earns its conclusion by moving from familiar framing to increasingly specific consequences.",
       sequence: ["Question", "Context", "Options", "Practical stakes", "Answer"],
     },
+    appliedExamples: {
+      opening: "Messi is the MLS benchmark—but what if Son Heung-min is already making the stronger case?",
+      build: "Test Son's case through impact, consistency, and team influence without assuming the answer.",
+      payoff: "Reveal which standard makes Son's case strongest while acknowledging where Messi still leads.",
+    },
     retentionMap: [
       { type: "Open loop", start: 0, end: 4, purpose: "Create a question the conclusion must answer.", evidence: "The opening question is not resolved immediately." },
       { type: "Escalation", start: 18, end: 45, purpose: "Increase consequence and specificity across the comparison.", evidence: "Each supporting point carries greater practical stakes." },
@@ -159,6 +165,14 @@ test("accepts a valid analysis request", async () => {
 
 test("normalizes every analysis output language to English", () => {
   assert.equal(validateAnalysisRequest(validRequest({ analysisLanguage: "Korean" })).analysisLanguage, "English");
+});
+
+test("rejects a missing target topic", async () => {
+  const requestBody = validRequest();
+  delete requestBody.targetTopic;
+  const result = await endpointResult(requestBody, JSON.stringify(validAnalysis()));
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error.details[0].field, "targetTopic");
 });
 
 test("rejects a missing transcript", async () => {
@@ -236,6 +250,17 @@ test("repairs a contract-valid JSON object that fails semantic validation", asyn
   assert.match(provider.calls[1][0].content, /complete required object/);
   assert.match(provider.calls[1][1].content, /\"reason\":\"required\"/);
   assert.match(provider.calls[1][1].content, /originalAnalysisInput/);
+});
+
+test("repairs a story summary longer than eighteen words", async () => {
+  const verbose = validAnalysis({
+    summary: "This deliberately verbose summary keeps explaining the same story structure with extra context that makes the main idea much harder to scan quickly.",
+  });
+  const { analyst, provider } = analystWith([JSON.stringify(verbose), JSON.stringify(validAnalysis())]);
+  const result = await analyst.analyze(validRequest());
+  assert.equal(result.summary, validAnalysis().summary);
+  assert.equal(provider.calls.length, 2);
+  assert.match(provider.calls[1][1].content, /must_not_exceed_18_words/);
 });
 
 test("rejects section end before section start", async () => {
@@ -408,9 +433,9 @@ test("keeps prompt injection text inside the untrusted transcript boundary", asy
   await analyst.analyze(validRequest({ transcript: { text: injected } }));
   const [systemMessage, userMessage] = provider.calls[0];
   assert.equal(systemMessage.role, "system");
-  assert.match(systemMessage.content, /untrusted video content/);
+  assert.match(systemMessage.content, /untrusted content/);
   assert.match(systemMessage.content, /written in English/);
-  assert.match(systemMessage.content, /at most 24 words/);
+  assert.match(systemMessage.content, /at most 18 words/);
   assert.equal(userMessage.role, "user");
   assert.match(userMessage.content, /Ignore previous instructions/);
   assert.doesNotMatch(systemMessage.content, /reveal the system prompt/);

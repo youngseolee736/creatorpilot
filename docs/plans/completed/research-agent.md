@@ -2,6 +2,8 @@
 
 Status: completed 2026-07-19
 
+Updated: 2026-07-22
+
 ## Desired outcome
 
 Insert a source-grounded Research Agent between Script Analyst and Scriptwriter.
@@ -29,6 +31,29 @@ approved material.
 - Preserved the deterministic mock workflow and updated contracts, handoff
   documentation, environment examples, and the browser fixture.
 
+## Comparative research revision
+
+- Converts subjective premises such as “best” into explicit evaluation criteria.
+- Selects the named rival plus relevant peers or leaders as a fair comparison set.
+- Supports like-for-like comparisons with source-verified values and context.
+- Returns a qualified verdict instead of forcing the requested conclusion.
+- Separates the literal data verdict from the strongest honest narrative case,
+  so subjective claims can be supported through an explicit alternative lens
+  such as transformative, historic, cultural, or team impact.
+- Requires the strongest sourced counterpoint against the premise.
+- Tags facts by narrative role and maps them into Opening, Context, Build,
+  Reveal, and Payoff directions for the Scriptwriter.
+- Replaced the report-like screen with Verdict, Fair comparison, Best evidence,
+  Counterpoint, and How to use it in the story.
+- Removed the duplicate sticky action bar; the single writing action remains in
+  the page header.
+- Added a persistent `Back to analysis` header action so users can review the
+  previous Script Analyst result without losing completed research.
+- Increased the Research Agent's dedicated provider deadline from 120 seconds
+  to 300 seconds. Browser requests have no shorter client deadline, and the
+  loading state now explains that multi-source web research can take a few
+  minutes while the saved project remains safe.
+
 ## Verification
 
 - Backend suite: 122 tests passed, including Research validation, source
@@ -42,3 +67,7 @@ approved material.
   present at every viewport.
 - Evidence: `research-agent-desktop.png`, `research-agent-tablet.png`, and
   `research-agent-mobile.png` in this directory.
+
+Latest verification: 129 backend and agent tests, 29 frontend tests, and the
+complete API-backed browser workflow pass. Updated responsive evidence is stored
+in `compact-story-evidence/`.

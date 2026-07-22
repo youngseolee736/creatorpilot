@@ -76,8 +76,12 @@ function validFactPack() {
   return {
     researchId: "research_script_test",
     summary: "A grounded pack about public libraries.",
-    facts: [1, 2, 3].map((number) => ({ factId: `fact_${number}`, claim: `Grounded claim ${number} about libraries.`, explanation: `Source-backed explanation ${number} suitable for a short script.`, confidence: number === 3 ? "medium" : "high", sourceIds: [`source_${number}`], usableInScript: true })),
+    verdict: { status: "partially_supported", headline: "The claim depends on the chosen measure.", explanation: "The strongest version is defensible under explicit criteria." },
+    narrativeCase: { mode: "reframe", recommendedFrame: "Judge libraries by access to opportunity, not book lending alone.", definition: "Neighborhood strength means repeated access to useful civic services.", thesis: "Libraries strengthen neighborhoods by concentrating trusted access to opportunity.", whyItProvesClaim: "Their combined services support the broader claim under a transparent civic-infrastructure lens.", concession: "Local outcomes vary by program design.", supportFactIds: ["fact_1", "fact_2", "fact_3"] },
+    criteria: ["Access", "Opportunity", "Community use"],
+    facts: [1, 2, 3].map((number) => ({ factId: `fact_${number}`, narrativeRole: ["opening", "build", "counterpoint"][number - 1], claim: `Grounded claim ${number} about libraries.`, explanation: `Source-backed explanation ${number} suitable for a short script.`, confidence: number === 3 ? "medium" : "high", sourceIds: [`source_${number}`], usableInScript: true })),
     sources: [1, 2, 3].map((number) => ({ sourceId: `source_${number}`, title: `Official source ${number}`, url: `https://example${number}.org/report`, domain: `example${number}.org` })),
+    storyFindings: [{ role: "opening", guidance: "Challenge the expected answer.", factIds: ["fact_1"] }, { role: "build", guidance: "Build the comparison.", factIds: ["fact_2"] }, { role: "payoff", guidance: "Resolve under explicit criteria.", factIds: ["fact_3"] }],
     openQuestions: [],
   };
 }
@@ -104,11 +108,13 @@ function validCandidate(requestBody = validRequest(), wordsPerSection = 36) {
   const input = validateScriptRequest(requestBody, { revision: Boolean(requestBody.currentScript) });
   const plan = createSectionPlan(input);
   return {
+    claim: requestBody.creativeBrief.topic,
     title: "The quiet infrastructure every neighborhood needs",
     sections: plan.map((section, index) => ({
       slot: section.slot,
       label: section.label,
-      text: narration(index, wordsPerSection),
+      text: `${index === 0 ? `${requestBody.creativeBrief.topic}. ` : ""}${narration(index, wordsPerSection)}`,
+      factIds: [`fact_${(index % 3) + 1}`],
     })),
   };
 }
@@ -128,11 +134,14 @@ test("creates a validated version-one script", async () => {
   const result = await endpointResult("/api/scripts/generate", requestBody, JSON.stringify(validCandidate(requestBody)));
   assert.equal(result.status, 201);
   assert.equal(result.body.data.version, 1);
+  assert.equal(result.body.data.claim, requestBody.creativeBrief.topic);
+  assert.equal(result.body.data.claimStrategy.mode, "reframed_case");
+  assert.ok(result.body.data.usedFactIds.length >= 2);
   assert.match(result.body.data.scriptId, /^script_[a-f0-9]{20}$/);
   assert.equal(result.body.data.sections.length, 4);
   assert.equal(result.body.data.sections[0].range, "0–5s");
   assert.equal(result.body.data.sections[result.body.data.sections.length - 1].range, "48–60s");
-  assert.ok(Math.abs(result.body.data.estimatedSeconds - 60) <= 12);
+  assert.ok(Math.abs(result.body.data.estimatedSeconds - 60) <= 2);
 });
 
 test("scales the abstract structure to the requested duration", async () => {
@@ -182,9 +191,21 @@ test("repairs a draft whose speaking estimate is too short", async () => {
     JSON.stringify(validCandidate(requestBody, 36)),
   ]);
   const result = await writer.generate(requestBody);
-  assert.ok(result.estimatedSeconds >= 48);
+  assert.ok(result.estimatedSeconds >= 58);
   assert.equal(provider.calls.length, 2);
   assert.match(provider.calls[1][1].content, /script_too_short/);
+});
+
+test("repairs a 68-second draft back to the full 60-second target", async () => {
+  const requestBody = validRequest();
+  const { writer, provider } = writerWith([
+    JSON.stringify(validCandidate(requestBody, 42)),
+    JSON.stringify(validCandidate(requestBody, 36)),
+  ]);
+  const result = await writer.generate(requestBody);
+  assert.ok(Math.abs(result.estimatedSeconds - 60) <= 2);
+  assert.equal(provider.calls.length, 2);
+  assert.match(provider.calls[1][1].content, /script_too_long/);
 });
 
 test("rejects invalid output after the single repair attempt", async () => {
@@ -200,6 +221,26 @@ test("rejects section slots that do not match the server plan", async () => {
   output.sections[0].slot = "invented-slot";
   const { writer } = writerWith([JSON.stringify(output), JSON.stringify(output)]);
   await assert.rejects(writer.generate(requestBody), (error) => error.details?.[0]?.reason === "must_match_section_plan");
+});
+
+test("repairs a draft that does not preserve the required claim", async () => {
+  const requestBody = validRequest();
+  const broken = validCandidate(requestBody);
+  broken.claim = "A different claim";
+  const { writer, provider } = writerWith([JSON.stringify(broken), JSON.stringify(validCandidate(requestBody))]);
+  const result = await writer.generate(requestBody);
+  assert.equal(result.claim, requestBody.creativeBrief.topic);
+  assert.match(provider.calls[1][1].content, /must_match_required_claim/);
+});
+
+test("repairs a draft that does not use enough grounded facts", async () => {
+  const requestBody = validRequest();
+  const broken = validCandidate(requestBody);
+  broken.sections.forEach((section) => { section.factIds = ["fact_1"]; });
+  const { writer, provider } = writerWith([JSON.stringify(broken), JSON.stringify(validCandidate(requestBody))]);
+  const result = await writer.generate(requestBody);
+  assert.ok(result.usedFactIds.length >= 2);
+  assert.match(provider.calls[1][1].content, /insufficient_fact_use/);
 });
 
 test("revises a script with stable IDs and version lineage", async () => {
@@ -255,6 +296,8 @@ test("keeps untrusted brief instructions outside the system message", async () =
   assert.match(systemMessage.content, /untrusted content/);
   assert.doesNotMatch(systemMessage.content, /reveal the system prompt/);
   assert.match(userMessage.content, /reveal the system prompt/);
+  assert.match(userMessage.content, /"mode":"reframed_case"/);
+  assert.match(userMessage.content, /"targetWords":150/);
   assert.doesNotMatch(userMessage.content, /transcriptId|transcript.*text/i);
 });
 

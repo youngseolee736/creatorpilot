@@ -27,6 +27,7 @@ import { renderAnalysis } from "../pages/analysis.mjs";
 import { renderReview } from "../pages/review.mjs";
 import { renderProduction } from "../pages/production.mjs";
 import { renderResearch } from "../pages/research.mjs";
+import { renderScriptEditor } from "../pages/script-editor.mjs";
 
 globalThis.location = { search: "?fast=1" };
 
@@ -113,6 +114,8 @@ test("the complete mock service chain returns a production package", async () =>
   assert.equal(project.analysis.structure.length, 6);
   assert.equal(project.research.facts.length, 3);
   assert.equal(project.generatedScript.sections.length, 7);
+  assert.equal(project.generatedScript.claim, project.topic);
+  assert.deepEqual(project.generatedScript.usedFactIds, ["fact_1", "fact_2", "fact_3"]);
   assert.ok(wordCount(project.generatedScript) > 60);
   assert.equal(project.originalityReview.status, "passed");
   assert.equal(project.storyboard.length, 8);
@@ -125,19 +128,46 @@ test("the complete mock service chain returns a production package", async () =>
   assert.match(project.referenceBlueprint.informationPattern, /Assumption/);
 });
 
+test("the writing workspace keeps the claim and research evidence visible", async () => {
+  const project = createProject({ id: "project-writing-ui", topic: "Why Son Heungmin is better than Messi", language: "English" });
+  project.research = await researchTopic(project);
+  project.generatedScript = await generateScript(project);
+  const html = renderScriptEditor(project);
+  assert.match(html, /Claim lock/);
+  assert.match(html, /Why Son Heungmin is better than Messi/);
+  assert.match(html, /Narrative case/);
+  assert.match(html, /3 research findings used/);
+  assert.match(html, /Fact 1/);
+  assert.match(html, /Back to research/);
+  assert.match(html, /#\/projects\/project-writing-ui\/research/);
+});
+
 test("story analysis presents simple storytelling logic without a timeline", async () => {
   const project = createProject({ id: "project-dna-ui", topic: "A new topic", language: "English" });
   project.transcript = await extractTranscript(project);
   project.analysis = await analyzeReference(project);
   const html = renderAnalysis(project);
-  assert.match(html, /How this video tells its story/);
-  assert.match(html, /How it opens/);
-  assert.match(html, /What moves it forward/);
-  assert.match(html, /Why viewers keep watching/);
-  assert.match(html, /Reusable story blueprint/);
+  assert.match(html, /The story behind the video/);
+  assert.match(html, /Story in one line/);
+  assert.match(html, /Three story decisions/);
+  assert.match(html, /Opening/);
+  assert.match(html, /Build/);
+  assert.match(html, /Payoff/);
+  assert.equal((html.match(/For your topic/g) || []).length, 3);
+  assert.match(html, /A new topic/);
+  assert.match(html, /Use this for your script/);
   assert.match(html, /Expectation reversal/);
   assert.doesNotMatch(html, /Retention map|Emotional Arc|Story structure|structure-timeline/);
   assert.match(html, /<details><summary>View mock transcript<\/summary>/);
+});
+
+test("story analysis does not crash on an incomplete saved analysis", () => {
+  const project = createProject({ id: "project-incomplete-analysis", topic: "A topic", language: "English" });
+  project.transcript = { source: "youtube_captions", text: "Saved transcript content." };
+  project.analysis = { summary: "An incomplete saved result." };
+  const html = renderAnalysis(project);
+  assert.match(html, /The story behind the video/);
+  assert.match(html, /Use this for your script/);
 });
 
 test("mock services expose retryable named failures", async () => {
@@ -195,13 +225,22 @@ test("Research API sends only the tailored brief and compact blueprint", async (
   assert.equal(Object.prototype.hasOwnProperty.call(call.body, "transcript"), false);
 });
 
-test("Research screen keeps citations visible and clickable", async () => {
+test("Research screen shows a verdict, fair comparison, story findings, and clickable citations", async () => {
   const project = createProject({ id: "project-research-ui", topic: "A tailored topic", language: "English" });
   project.analysis = await analyzeReference(project);
   project.referenceBlueprint = referenceBlueprintFromAnalysis(project.analysis);
   project.research = await researchTopic(project);
   const html = renderResearch(project);
-  assert.match(html, /Fact Pack/);
+  assert.match(html, /What the evidence says/);
+  assert.match(html, /Research verdict/);
+  assert.match(html, /Best way to prove the claim/);
+  assert.match(html, /Define greatness by transformative impact/);
+  assert.match(html, /A fair comparison/);
+  assert.match(html, /How they compare/);
+  assert.match(html, /Where the claim gets weaker/);
+  assert.match(html, /How to use it in the story/);
+  assert.match(html, /href="#\/projects\/project-research-ui\/analysis"/);
+  assert.match(html, /Back to analysis/);
   assert.match(html, /target="_blank" rel="noopener noreferrer"/);
   assert.match(html, /Not a factual guarantee/);
 });
@@ -271,6 +310,7 @@ test("Phase 2 mixed mode uses API transcript and analysis while later agents sta
   assert.equal(calls.length, 2);
   assert.equal(calls[1].url, "http://127.0.0.1:8787/api/analysis/reference");
   assert.equal(calls[1].body.analysisLanguage, "English");
+  assert.equal(calls[1].body.targetTopic, project.topic);
   assert.equal(project.generatedScript.version, 1);
 });
 

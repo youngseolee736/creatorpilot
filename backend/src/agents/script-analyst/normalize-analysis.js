@@ -9,7 +9,7 @@ const REQUIRED_STRINGS = [
   "callToAction",
 ];
 const REQUIRED_ARRAYS = ["reusablePatterns", "doNotCopy", "retentionMap"];
-const REQUIRED_OBJECTS = ["hookMechanics", "narrativeStyle", "informationFlow"];
+const REQUIRED_OBJECTS = ["hookMechanics", "narrativeStyle", "informationFlow", "appliedExamples"];
 
 function invalid(path, reason) {
   return new AppError(
@@ -37,6 +37,12 @@ function parseAnalysisJSON(value) {
 function stringField(value, path, maxLength = 500) {
   if (typeof value !== "string" || !value.trim() || value.trim().length > maxLength) throw invalid(path, "required_string");
   return value.replace(/\s+/g, " ").trim();
+}
+
+function conciseStringField(value, path, maxWords) {
+  const normalized = stringField(value, path);
+  if (normalizedWords(normalized).length > maxWords) throw invalid(path, `must_not_exceed_${maxWords}_words`);
+  return normalized;
 }
 
 function stringArray(value, path, { minItems = 0, maxItems = 12 } = {}) {
@@ -108,7 +114,10 @@ function normalizeAnalysis(raw, input) {
     if (!(field in raw)) throw invalid(field, "required");
   }
 
-  const normalized = Object.fromEntries(REQUIRED_STRINGS.map((field) => [field, stringField(raw[field], field)]));
+  const normalized = Object.fromEntries(REQUIRED_STRINGS.map((field) => [
+    field,
+    field === "summary" ? conciseStringField(raw[field], field, 18) : stringField(raw[field], field),
+  ]));
   normalized.hookDuration = finiteNumber(raw.hookDuration, "hookDuration", { min: 0, max: 30 });
   normalized.reusablePatterns = stringArray(raw.reusablePatterns, "reusablePatterns", { minItems: 2, maxItems: 3 });
   normalized.doNotCopy = stringArray(raw.doNotCopy, "doNotCopy", { minItems: 1, maxItems: 3 });
@@ -146,6 +155,13 @@ function normalizeAnalysis(raw, input) {
     pattern: stringField(informationFlow.pattern, "informationFlow.pattern", 200),
     explanation: stringField(informationFlow.explanation, "informationFlow.explanation", 500),
     sequence: stringArray(informationFlow.sequence, "informationFlow.sequence", { minItems: 2, maxItems: 10 }),
+  };
+
+  const appliedExamples = plainObject(raw.appliedExamples, "appliedExamples");
+  normalized.appliedExamples = {
+    opening: conciseStringField(appliedExamples.opening, "appliedExamples.opening", 24),
+    build: conciseStringField(appliedExamples.build, "appliedExamples.build", 24),
+    payoff: conciseStringField(appliedExamples.payoff, "appliedExamples.payoff", 24),
   };
 
   if (!Array.isArray(raw.retentionMap) || raw.retentionMap.length < 1 || raw.retentionMap.length > 3) {

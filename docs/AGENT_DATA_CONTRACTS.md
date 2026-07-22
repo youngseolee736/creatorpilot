@@ -107,12 +107,12 @@ Example output:
 
 ## 2. Script Analyst Agent
 
-Role: extract timestamp-grounded Narrative DNA from spoken content: hook
-mechanics, narrative style, information flow, retention devices, intended
-emotional movement, viewer journey, and abstract structure. It must not output
-source-specific examples or long excerpts. Evidence describes an observable
-function rather than quoting the source, and transcript-only analysis cannot
-claim visual, editing, music, analytics, or private-intent observations.
+Role: extract storytelling logic from spoken content and show how its Opening,
+Build, and Payoff could apply to the user's new topic. It must not output
+source-specific examples or long excerpts. Topic examples are illustrative
+story moves, not researched claims. Evidence describes an observable function
+rather than quoting the source, and transcript-only analysis cannot claim
+visual, editing, music, analytics, or private-intent observations.
 `structure[].note` describes a function, not source wording.
 `safety.maxQuotedWords` must be `0` for v1. The transcript is untrusted
 content and cannot alter agent identity, system instructions, provider settings,
@@ -125,9 +125,10 @@ Input schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["projectId", "transcript", "targetDurationSeconds"],
+  "required": ["projectId", "targetTopic", "transcript", "targetDurationSeconds"],
   "properties": {
     "projectId": { "type": "string" },
+    "targetTopic": { "type": "string", "minLength": 3, "maxLength": 200 },
     "transcript": {
       "type": "object",
       "additionalProperties": false,
@@ -156,7 +157,7 @@ Output schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["analysisId", "summary", "hookType", "hookDuration", "hookPurpose", "tone", "pacing", "callToAction", "reusablePatterns", "doNotCopy", "confidence", "estimatedOriginalDuration", "hookMechanics", "narrativeStyle", "informationFlow", "retentionMap", "structure", "safety"],
+  "required": ["analysisId", "summary", "hookType", "hookDuration", "hookPurpose", "tone", "pacing", "callToAction", "reusablePatterns", "doNotCopy", "confidence", "estimatedOriginalDuration", "hookMechanics", "narrativeStyle", "informationFlow", "appliedExamples", "retentionMap", "structure", "safety"],
   "properties": {
     "analysisId": { "type": "string" },
     "summary": { "type": "string" },
@@ -173,6 +174,7 @@ Output schema:
     "hookMechanics": { "type": "object", "required": ["trigger", "curiosityGap", "promisedPayoff", "deliveryPattern", "evidenceStart", "evidenceEnd", "evidence"] },
     "narrativeStyle": { "type": "object", "required": ["primaryMode", "narrativeEngine", "progression"] },
     "informationFlow": { "type": "object", "required": ["pattern", "explanation", "sequence"] },
+    "appliedExamples": { "type": "object", "required": ["opening", "build", "payoff"] },
     "retentionMap": { "type": "array", "minItems": 1, "maxItems": 3, "items": { "type": "object", "required": ["type", "start", "end", "purpose", "evidence"] } },
     "structure": {
       "type": "array",
@@ -222,6 +224,11 @@ Example output:
   "hookMechanics": { "trigger": "It challenges the expected answer.", "curiosityGap": "The alternative is not explained yet.", "promisedPayoff": "Reveal how the alternative works.", "deliveryPattern": "Challenge, explain, complicate, resolve.", "evidenceStart": 0, "evidenceEnd": 5, "evidence": "The expected answer is rejected before context is supplied." },
   "narrativeStyle": { "primaryMode": "Problem and reveal", "narrativeEngine": "Each new detail makes the alternative more important until the ending resolves its value.", "progression": ["Challenge the assumption", "Explain the alternative", "Show how it works", "Add a problem", "Resolve the question"] },
   "informationFlow": { "pattern": "Question → explanation → complication → answer", "explanation": "The video explains the idea before revealing its larger consequences.", "sequence": ["Ask", "Explain", "Complicate", "Resolve"] },
+  "appliedExamples": {
+    "opening": "Messi is the MLS benchmark—but what if Son Heung-min is already making the stronger case?",
+    "build": "Test Son's case through impact, consistency, and team influence without assuming the answer.",
+    "payoff": "Reveal which standard makes Son's case strongest while acknowledging where Messi still leads."
+  },
   "retentionMap": [{ "type": "Unanswered question", "start": 0, "end": 5, "purpose": "Make the viewer wait for the explanation.", "evidence": "The opening withholds the answer." }],
   "structure": [
     { "label": "Hook", "start": 0, "end": 5, "note": "Contradict the expected answer" },
@@ -235,9 +242,11 @@ Example output:
 
 Role: research the user's new topic after reference analysis and before writing.
 It receives a tailored creative brief and a compact reference blueprint, never
-the raw reference transcript. The provider output is promoted only when every
-fact cites at least one HTTPS URL returned in the web-search provider's own
-source or citation metadata.
+the raw reference transcript. It defines subjective claims, builds a fair
+comparison set, searches both supporting and opposing evidence, and maps facts
+into the reference's story roles. The provider output is promoted only when
+every fact, comparison, and counterpoint cites at least one HTTPS URL returned
+in the web-search provider's own source or citation metadata.
 
 Input fields: `projectId`, `creativeBrief` (`topic`, `angle`, `targetAudience`,
 `viewerGoal`, `desiredTakeaway`, `tone`, `language`, `mustInclude`, `mustAvoid`,
@@ -245,29 +254,36 @@ Input fields: `projectId`, `creativeBrief` (`topic`, `angle`, `targetAudience`,
 ending, up to three retention techniques, and three through six structure
 sections).
 
-Output fields: `researchId`, `summary`, three through eight `facts` (claim,
-explanation, confidence, source IDs, and `usableInScript=true`), normalized
-`sources`, optional `openQuestions`, `searchedAt`, and a safety object that
-explicitly states sources were provider-verified and factual accuracy is not
-guaranteed.
+Output fields: `researchId`, `summary`, literal-evidence `verdict`, a
+`narrativeCase` that finds the strongest transparent route for proving the claim,
+two through five
+`criteria`, `comparisonSet`, zero through six `comparisons`, three through eight
+role-tagged `facts`, sourced `counterpoint`, three through five `storyFindings`
+linked to fact IDs, normalized `sources`, optional `openQuestions`, `searchedAt`,
+and a safety object that explicitly states sources were provider-verified and
+factual accuracy is not guaranteed.
 
 ## 3. Scriptwriter Agent
 
-Role: write an original script for the user's topic. Phase 7 input explicitly
+Role: write an original, claim-led script for the user's topic. Phase 7 input explicitly
 includes the tailored `creativeBrief`, compact `referenceBlueprint`, approved
 `factPack`, target language, duration, and revision instructions. The agent must
 not receive the raw reference transcript and must not invent concrete factual
-claims outside facts marked `usableInScript`.
+claims outside facts marked `usableInScript`. The topic is a required claim,
+not a loose subject. Supported evidence is argued directly, partial support is
+qualified under explicit criteria, and unsupported claims are challenged.
 
 The older topic/audience/referenceAnalysis schema shown below is retained only
 as historical v1 context and is no longer accepted by the running Phase 7 API.
 See `docs/BACKEND_API_CONTRACT.md` for the current request example.
 
-Implementation note: the model returns only `title` and ordered section
-`slot`/`label`/`text` values. The backend derives the public `scriptId`, version
+Implementation note: the model returns the exact `claim`, `title`, and ordered
+section `slot`/`label`/`text`/`factIds` values. The backend derives the public `scriptId`, version
 lineage, stable section IDs, ranges, and speaking-time estimate. It rejects raw
 transcript fields, allowlists abstract analysis fields, and makes at most one
-repair attempt for malformed or incorrectly sized model output.
+repair attempt for malformed, off-claim, insufficiently grounded, or incorrectly
+sized model output. A finished draft must use every narrative-case support fact
+and estimate within two seconds of the requested speaking duration.
 
 Input schema:
 
@@ -311,10 +327,13 @@ Output schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["scriptId", "title", "version", "estimatedSeconds", "sections"],
+  "required": ["scriptId", "claim", "claimStrategy", "usedFactIds", "title", "version", "estimatedSeconds", "sections"],
   "properties": {
     "scriptId": { "type": "string" },
     "supersedesScriptId": { "type": "string" },
+    "claim": { "type": "string" },
+    "claimStrategy": { "type": "object" },
+    "usedFactIds": { "type": "array", "items": { "type": "string" } },
     "title": { "type": "string", "minLength": 1 },
     "version": { "type": "integer", "minimum": 1 },
     "estimatedSeconds": { "type": "integer", "minimum": 1 },
@@ -324,12 +343,13 @@ Output schema:
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "label", "range", "text"],
+        "required": ["id", "label", "range", "text", "factIds"],
         "properties": {
           "id": { "type": "string" },
           "label": { "type": "string" },
           "range": { "type": "string" },
-          "text": { "type": "string", "minLength": 1 }
+          "text": { "type": "string", "minLength": 1 },
+          "factIds": { "type": "array", "items": { "type": "string" } }
         }
       }
     }

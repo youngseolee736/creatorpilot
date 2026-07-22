@@ -77,11 +77,27 @@ copied.
 - **Must not copy:** Adobe branding, toolbar, templates, timeline, stock assets,
   effects, or export controls.
 
+## 6. Subscribr
+
+- **Page:** AI YouTube Script Generator and product workflow
+- **URL:** <https://subscribr.ai/>
+- **Reviewed:** 2026-07-22
+- **Why selected:** Its creator workflow separates research and writing into
+  focused stages, keeping the current decision easier to scan.
+- **Adapted pattern:** Progressive disclosure, a short summary first, and a small
+  number of actionable story decisions before drafting.
+- **CreatorPilot adaptation:** Reference analysis shows one story sentence, a
+  five-step flow, three decisions (Opening, Build, Payoff), and two or three
+  reusable instructions. Evidence and transcript details remain collapsed.
+- **Must not copy:** Subscribr branding, orange styling, navigation labels,
+  chat/editor layout, proprietary prompts, or product language.
+
 ## Synthesis
 
 CreatorPilot uses YouTube Studio's creator-oriented orientation, Descript's
 script-first editing, Frame.io's explicit review decision, Runway's asynchronous
-generation lifecycle, and Adobe Express's approachable scene model. The result
-uses an editorial neutral palette, dense but readable work surfaces, lines and
-alignment before cards, text-plus-shape status indicators, and no chatbot or
-generic AI gradient treatment.
+generation lifecycle, Adobe Express's approachable scene model, and Subscribr's
+focused progressive disclosure. The result uses an editorial neutral palette,
+dense but readable work surfaces, lines and alignment before cards,
+text-plus-shape status indicators, and no chatbot or generic AI gradient
+treatment.
