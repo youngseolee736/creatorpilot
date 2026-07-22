@@ -35,6 +35,16 @@ let newProjectDraft = {};
 let lastRouteKey = "";
 let autosaveTimer = null;
 
+function fitScriptTextarea(field) {
+  if (!field) return;
+  field.style.height = "auto";
+  field.style.height = `${field.scrollHeight}px`;
+}
+
+function fitScriptTextareas() {
+  document.querySelectorAll("[data-script-section]").forEach(fitScriptTextarea);
+}
+
 function currentContext() {
   const route = parseRoute();
   const project = route.projectId ? store.getProject(route.projectId) : null;
@@ -57,6 +67,7 @@ function render({ preserveFocus = false } = {}) {
   const { route, project } = currentContext();
   const routeKey = `${route.name}:${route.projectId || ""}`;
   app.innerHTML = appShell({ content: pageFor(route, project), route, project });
+  fitScriptTextareas();
   document.title = `${project ? `${project.title} — ` : ""}${route.name === "dashboard" ? "Dashboard" : route.name === "new" ? "New project" : route.name} · CreatorPilot`;
   if (!preserveFocus && routeKey !== lastRouteKey) {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -178,12 +189,16 @@ async function ensureResearch(project) {
         research: null,
         status: "researching",
         referenceBlueprint,
-        pipeline: updatePipeline(current, "researcher", "in_progress", "Testing the claim with current evidence"),
+        pipeline: resetResearchPipeline(current, "in_progress", "Testing the claim with current evidence"),
       });
       render({ preserveFocus: true });
       const research = await researchTopic(current);
       current = store.updateProject(project.id, {
         research,
+        generatedScript: null,
+        originalityReview: null,
+        storyboard: null,
+        render: null,
         status: "research_ready",
         pipeline: updatePipeline(current, "researcher", "completed", `${research.facts.length} story-ready findings`),
       });
@@ -194,10 +209,21 @@ async function ensureResearch(project) {
   });
 }
 
+function resetResearchPipeline(project, status, detail) {
+  return {
+    ...updatePipeline(project, "researcher", status, detail),
+    writer: { status: "waiting", detail: "Waiting for the new research" },
+    reviewer: { status: "waiting", detail: "Waiting for the previous stage" },
+    producer: { status: "waiting", detail: "Waiting for the previous stage" },
+  };
+}
+
 function hasResearchStrategy(research) {
   return Boolean(
     research
     && research.verdict?.status
+    && research.narrativeCase?.mode
+    && Array.isArray(research.narrativeCase?.supportFactIds)
     && Array.isArray(research.criteria)
     && Array.isArray(research.comparisonSet)
     && Array.isArray(research.comparisons)
@@ -315,8 +341,8 @@ async function startRender(project) {
 function ensureRouteData(route, project) {
   if (!project || project.error) return;
   if (route.name === "analysis" && !hasStoryLogic(project.analysis)) ensureAnalysis(project);
-  if (route.name === "research" && !project.research) ensureResearch(project);
-  if (route.name === "script" && !project.research) navigate(routeFor("research", project.id));
+  if (route.name === "research" && !hasResearchStrategy(project.research)) ensureResearch(project);
+  if (route.name === "script" && !hasResearchStrategy(project.research)) navigate(routeFor("research", project.id));
   else if (route.name === "script" && !project.generatedScript) ensureScript(project);
   if (route.name === "review" && !project.originalityReview) ensureReview(project);
   if (route.name === "production" && !project.storyboard.length) ensureStoryboard(project);
@@ -406,6 +432,7 @@ app.addEventListener("input", (event) => {
     return;
   }
   if (!event.target.matches("[data-script-section]")) return;
+  fitScriptTextarea(event.target);
   const form = event.target.form;
   const text = [...form.querySelectorAll("[data-script-section]")].map((field) => field.value).join(" ");
   const display = form.querySelector("#word-count");
@@ -442,6 +469,31 @@ app.addEventListener("click", async (event) => {
   const { route, project } = currentContext();
   if (!project && !["clear-projects", "delete-project"].includes(action)) return;
   if (action === "research-topic") navigate(routeFor("research", project.id));
+  if (action === "rerun-analysis") {
+    const pipeline = {
+      ...updatePipeline(project, "analyst", "waiting", "New analysis queued"),
+      researcher: { status: "waiting", detail: "Waiting for the new analysis" },
+      writer: { status: "waiting", detail: "Waiting for the previous stage" },
+      reviewer: { status: "waiting", detail: "Waiting for the previous stage" },
+      producer: { status: "waiting", detail: "Waiting for the previous stage" },
+    };
+    store.updateProject(project.id, { error: null, analysis: null, referenceBlueprint: null, research: null, generatedScript: null, originalityReview: null, storyboard: null, render: null, pipeline });
+    render({ preserveFocus: true });
+    ensureAnalysis(store.getProject(project.id));
+  }
+  if (action === "rerun-research") {
+    store.updateProject(project.id, {
+      error: null,
+      research: null,
+      generatedScript: null,
+      originalityReview: null,
+      storyboard: null,
+      render: null,
+      pipeline: resetResearchPipeline(project, "waiting", "New research queued"),
+    });
+    render({ preserveFocus: true });
+    ensureResearch(store.getProject(project.id));
+  }
   if (action === "generate-script") navigate(routeFor("script", project.id));
   if (action === "regenerate-script") {
     const saved = saveScriptForm(project);
@@ -488,7 +540,18 @@ app.addEventListener("click", async (event) => {
       error: null,
       analysis: null,
       referenceBlueprint: null,
-      pipeline: updatePipeline(project, project.transcript ? "analyst" : "transcript", "waiting", "Retry queued"),
+      research: null,
+      generatedScript: null,
+      originalityReview: null,
+      storyboard: null,
+      render: null,
+      pipeline: {
+        ...updatePipeline(project, project.transcript ? "analyst" : "transcript", "waiting", "Retry queued"),
+        researcher: { status: "waiting", detail: "Waiting for the new analysis" },
+        writer: { status: "waiting", detail: "Waiting for the previous stage" },
+        reviewer: { status: "waiting", detail: "Waiting for the previous stage" },
+        producer: { status: "waiting", detail: "Waiting for the previous stage" },
+      },
     });
     render({ preserveFocus: true });
     ensureAnalysis(store.getProject(project.id));
@@ -504,7 +567,7 @@ app.addEventListener("click", async (event) => {
     }
   }
   if (action === "retry-research") {
-    store.updateProject(project.id, { error: null, research: null, pipeline: updatePipeline(project, "researcher", "waiting", "Retry queued") });
+    store.updateProject(project.id, { error: null, research: null, generatedScript: null, originalityReview: null, storyboard: null, render: null, pipeline: resetResearchPipeline(project, "waiting", "Retry queued") });
     render({ preserveFocus: true });
     ensureResearch(store.getProject(project.id));
   }

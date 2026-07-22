@@ -45,16 +45,41 @@ export function statusBadge(status) {
   return `<span class="status-badge status-${escapeHtml(status)}"><span aria-hidden="true"></span>${escapeHtml(STATUS_LABELS[status] || status)}</span>`;
 }
 
-export function pipeline(project, { compact = false } = {}) {
+const PIPELINE_ROUTES = {
+  transcript: "analysis",
+  analyst: "analysis",
+  researcher: "research",
+  writer: "script",
+  reviewer: "review",
+  producer: "production",
+};
+
+function pipelineStepAvailable(project, stepId, currentRoute) {
+  if (PIPELINE_ROUTES[stepId] === currentRoute) return true;
+  if (["transcript", "analyst"].includes(stepId)) return true;
+  if (stepId === "researcher") return Boolean(project.analysis);
+  if (stepId === "writer") return Boolean(project.research);
+  if (stepId === "reviewer") return Boolean(project.generatedScript);
+  if (stepId === "producer") return Boolean(project.originalityReview?.status === "passed" || project.storyboard?.length || project.render);
+  return false;
+}
+
+export function pipeline(project, { compact = false, currentRoute = "" } = {}) {
+  const currentStep = currentRoute === "analysis"
+    ? (project.pipeline.transcript?.status === "in_progress" ? "transcript" : "analyst")
+    : ({ research: "researcher", script: "writer", review: "reviewer", production: "producer" })[currentRoute];
   return `<ol class="agent-pipeline${compact ? " pipeline-compact" : ""}" aria-label="Production pipeline">
     ${PIPELINE_STEPS.map((step, index) => {
       const state = project.pipeline[step.id] || { status: "waiting", detail: "Waiting" };
       const symbol = state.status === "completed" ? icon("check", 15) : state.status === "in_progress" ? `<span class="pipeline-spinner" aria-hidden="true"></span>` : String(index + 1);
-      return `<li class="pipeline-step pipeline-${escapeHtml(state.status)}" aria-current="${state.status === "in_progress" ? "step" : "false"}">
-        <span class="pipeline-marker">${symbol}</span>
-        <span class="pipeline-copy"><strong>${escapeHtml(step.label)}</strong><small>${escapeHtml(state.detail)}</small></span>
-        <span class="sr-only">${escapeHtml(STATUS_LABELS[state.status] || state.status)}</span>
-      </li>`;
+      const destination = PIPELINE_ROUTES[step.id];
+      const active = step.id === currentStep;
+      const available = pipelineStepAvailable(project, step.id, currentRoute);
+      const contents = `<span class="pipeline-marker">${symbol}</span><span class="pipeline-copy"><strong>${escapeHtml(step.label)}</strong><small>${escapeHtml(state.detail)}</small></span><span class="sr-only">${escapeHtml(STATUS_LABELS[state.status] || state.status)}</span>`;
+      const control = available
+        ? `<a class="pipeline-link" href="${routeFor(destination, project.id)}" aria-label="Open ${escapeHtml(step.label)}">${contents}</a>`
+        : `<span class="pipeline-link is-disabled" aria-disabled="true" title="Complete the previous stage first">${contents}</span>`;
+      return `<li class="pipeline-step pipeline-${escapeHtml(state.status)}${active ? " is-current" : ""}"${active ? ' aria-current="step"' : ""}>${control}</li>`;
     }).join("")}
   </ol>`;
 }
@@ -82,7 +107,7 @@ export function appShell({ content, route, project = null }) {
         <div class="topbar-meta"><span class="availability-dot"></span>Studio online</div>
       </header>
       <div class="app-body${inWorkspace ? " has-workspace" : ""}">
-        ${inWorkspace ? `<aside class="workspace-rail"><a class="back-link" href="${routeFor("dashboard")}">← All projects</a><div class="rail-project"><span>Current production</span><strong>${escapeHtml(project.title)}</strong>${statusBadge(project.status)}</div>${pipeline(project)}<button class="rail-delete" type="button" data-action="delete-project">${icon("trash", 14)}Delete project</button></aside>` : ""}
+        ${inWorkspace ? `<aside class="workspace-rail"><a class="back-link" href="${routeFor("dashboard")}">← All projects</a><div class="rail-project"><span>Current production</span><strong>${escapeHtml(project.title)}</strong>${statusBadge(project.status)}</div>${pipeline(project, { currentRoute: route.name })}<button class="rail-delete" type="button" data-action="delete-project">${icon("trash", 14)}Delete project</button></aside>` : ""}
         <main id="page-content" class="page-content" tabindex="-1">${content}</main>
       </div>
     </div>
@@ -129,6 +154,13 @@ export function errorNotice(error, retryAction, agentLabel = "Script Analyst") {
     must_be_exact_source_excerpt: "The Reviewer proposed evidence that was not an exact excerpt from the submitted text.",
     out_of_range: "The model returned a score outside the accepted range.",
     invalid_enum: "The model returned an unsupported review risk level.",
+    must_match_required_claim: "The draft changed the user's required claim instead of answering it directly.",
+    must_match_section_plan: "The draft did not follow the selected storytelling structure.",
+    insufficient_fact_use: "The draft did not use enough verified facts.",
+    insufficient_narrative_case_facts: "The draft did not use enough evidence for the selected narrative case.",
+    claim_not_expressed: "The spoken narration did not clearly express the user's claim.",
+    script_too_short: "The narration was too short for the requested speaking time.",
+    script_too_long: "The narration was too long for the requested speaking time.",
   };
   const message = error.code === "INVALID_LLM_RESPONSE" && validationHints[validationReason]
     ? `${error.message || error} ${validationHints[validationReason]}`

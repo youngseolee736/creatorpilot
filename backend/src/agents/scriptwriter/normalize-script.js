@@ -178,7 +178,10 @@ function normalizeScript(raw, input, plan, mode, fingerprint) {
   });
   if (fullText.length > 30000) throw invalid("sections", "script_too_large");
   if (usedFactIds.size < 2) throw invalid("sections", "insufficient_fact_use");
-  if (input.factPack.narrativeCase.supportFactIds.some((factId) => !usedFactIds.has(factId))) throw invalid("sections", "missing_narrative_case_fact");
+  const narrativeFactIds = input.factPack.narrativeCase.supportFactIds;
+  const requiredNarrativeFacts = Math.min(2, narrativeFactIds.length);
+  const usedNarrativeFacts = narrativeFactIds.filter((factId) => usedFactIds.has(factId)).length;
+  if (usedNarrativeFacts < requiredNarrativeFacts) throw invalid("sections", "insufficient_narrative_case_facts");
 
   const expectedWords = meaningfulClaimWords(claim);
   const narrationWords = new Set((fullText.toLowerCase().match(/[\p{L}\p{N}']+/gu) || []));

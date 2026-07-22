@@ -1,4 +1,4 @@
-import { escapeHtml } from "../core.mjs";
+import { escapeHtml, routeFor } from "../core.mjs";
 import { errorNotice, icon, loadingPanel, pageHeading, projectFormat } from "../components.mjs";
 
 function list(value) {
@@ -6,10 +6,11 @@ function list(value) {
 }
 
 export function renderAnalysis(project) {
-  if (project.error) return `${pageHeading("Script Analyst Agent", "Reference analysis paused.", "The project remains saved and can be retried without starting over.")}${errorNotice(project.error, "retry-analysis")}`;
+  const backToProjects = `<a class="button button-secondary" href="${routeFor("dashboard")}">← Back to projects</a>`;
+  if (project.error) return `${pageHeading("Script Analyst Agent", "Reference analysis paused.", "The project remains saved and can be retried without starting over.", backToProjects)}${errorNotice(project.error, "retry-analysis")}`;
   if (!project.analysis) {
     const message = project.transcript ? "Finding the video's storytelling logic…" : "Extracting the reference transcript…";
-    return `${pageHeading("Script Analyst Agent", "Reading the reference like a storyteller.", "CreatorPilot looks for how the story opens, develops, and pays off.")}${loadingPanel(project.transcript ? "Script Analyst Agent" : "Transcript extraction", message)}`;
+    return `${pageHeading("Script Analyst Agent", "Reading the reference like a storyteller.", "CreatorPilot looks for how the story opens, develops, and pays off.", backToProjects)}${loadingPanel(project.transcript ? "Script Analyst Agent" : "Transcript extraction", message)}`;
   }
 
   const analysis = project.analysis;
@@ -23,7 +24,7 @@ export function renderAnalysis(project) {
   const ending = structure[structure.length - 1]?.note || analysis.callToAction || "Resolve the opening question.";
   const storyFlow = list(narrative.progression).slice(0, 5);
 
-  return `${pageHeading("Script Analyst Agent · Complete", "The story behind the video.", "See the core flow, then reuse it with a different topic.", `<button class="button button-primary" type="button" data-action="research-topic">Research your topic ${icon("arrow")}</button>`)}
+  return `${pageHeading("Script Analyst Agent · Complete", "The story behind the video.", "See the core flow, then reuse it with a different topic.", `<div class="button-row">${backToProjects}<button class="button button-secondary" type="button" data-action="rerun-analysis">${icon("retry")}Analyze again</button><button class="button button-primary" type="button" data-action="research-topic">Research your topic ${icon("arrow")}</button></div>`)}
     <div class="analysis-layout compact-analysis-layout">
       <section class="analysis-main">
         <section class="story-snapshot" aria-labelledby="story-snapshot-heading">

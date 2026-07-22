@@ -1,4 +1,4 @@
-const { createLLMProvider } = require("../../services/llm");
+const { createLLMProvider, resolveLLMConfig } = require("../../services/llm");
 const { mapLLMError } = require("../../services/llm/llm-errors");
 const {
   createSectionPlan,
@@ -16,11 +16,18 @@ const { validateScriptRequest } = require("./scriptwriter-schema");
 
 class Scriptwriter {
   constructor(options = {}) {
+    const environment = options.llmOptions?.environment || process.env;
+    const config = resolveLLMConfig("SCRIPTWRITER", environment);
+    const hasScopedTimeout = Boolean(environment.SCRIPTWRITER_LLM_TIMEOUT_MS);
     this.provider = options.provider || createLLMProvider({
       ...(options.llmOptions || {}),
       envPrefix: "SCRIPTWRITER",
       agentLabel: "Scriptwriter",
       unsupportedErrorCode: "SCRIPT_INTERNAL_ERROR",
+      openAICompatibleOptions: {
+        timeoutMs: hasScopedTimeout ? config.timeoutMs : Math.max(Number(config.timeoutMs) || 0, 300000),
+        ...(options.llmOptions?.openAICompatibleOptions || {}),
+      },
     });
     this.completed = new Map();
     this.inFlight = new Map();
@@ -60,19 +67,24 @@ class Scriptwriter {
   async generateCandidate(input, mode, fingerprint) {
     const sectionPlan = createSectionPlan(input);
     const options = { revision: mode === "revision" };
-    const raw = await this.providerComplete([
+    let raw = await this.providerComplete([
       { role: "system", content: SCRIPTWRITER_SYSTEM_PROMPT },
       { role: "user", content: buildScriptUserPrompt(input, sectionPlan, options) },
     ]);
-    try {
-      return normalizeScript(parseScriptJSON(raw), input, sectionPlan, mode, fingerprint);
-    } catch (error) {
-      const repaired = await this.providerComplete([
+    let validationError;
+    for (let repairAttempt = 0; repairAttempt <= 2; repairAttempt += 1) {
+      try {
+        return normalizeScript(parseScriptJSON(raw), input, sectionPlan, mode, fingerprint);
+      } catch (error) {
+        validationError = error;
+      }
+      if (repairAttempt === 2) break;
+      raw = await this.providerComplete([
         { role: "system", content: SCRIPT_REPAIR_SYSTEM_PROMPT },
-        { role: "user", content: buildScriptRepairPrompt(raw, error, input, sectionPlan, options) },
+        { role: "user", content: buildScriptRepairPrompt(raw, validationError, input, sectionPlan, options) },
       ]);
-      return normalizeScript(parseScriptJSON(repaired), input, sectionPlan, mode, fingerprint);
     }
+    throw validationError;
   }
 
   generate(request) {

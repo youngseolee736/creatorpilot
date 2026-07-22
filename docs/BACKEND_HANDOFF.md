@@ -62,7 +62,7 @@ remain separate upstream responsibilities.
 | `extractTranscript(project)` | `frontend/mock-services.mjs` | `POST /api/transcripts/extract` | `app.js#ensureAnalysis`, `pages/analysis.mjs`, shared pipeline | Extracting reference transcript | Inline agent error with Retry; distinguish invalid/private/no transcript from transient provider failure | No | Cache by canonical video ID + caption language; respect transcript retention policy |
 | `analyzeReference(project)` | same | `POST /api/analysis/reference` | `app.js#ensureAnalysis`, `pages/analysis.mjs` | Mapping hook, pacing, and structure | Retry for transient model errors; invalid/short transcript requires new source | No | Cache by transcript content hash + analyzer version |
 | `researchTopic(project)` | same | `POST /api/research/topic` | `app.js#ensureResearch`, `pages/research.mjs` | Testing the claim against current sources and fair comparisons | Retry transient web-search errors; never promote uncited facts, comparisons, or counterpoints | No | Cache by exact brief + blueprint within the running backend |
-| `generateScript(project)` | same | `POST /api/scripts/generate` | `app.js#ensureScript`, `pages/script-editor.mjs` | Turning verified findings into a claim-led narration / Writing a new version | Retry without duplicate versions; reject claim drift and unknown Fact IDs | No | Do not shared-cache creative output; store immutable result per project/version |
+| `generateScript(project)` | same | `POST /api/scripts/generate` | `app.js#ensureScript`, `pages/script-editor.mjs` | Turning verified findings into a claim-led narration / Writing a new version; allow up to five minutes per model call | Retry without duplicate versions; reject claim drift and unknown Fact IDs | No | Do not shared-cache creative output; store immutable result per project/version |
 | `reviewOriginality(project)` | same | `POST /api/scripts/review` | `app.js#ensureReview`, `pages/review.mjs` | Comparing language and story structure | Retry; never convert an unavailable review into a pass | No | Cache by reference hash + exact script hash + reviewer version |
 | `generateStoryboard(project)` | same | `POST /api/storyboards/generate` | `app.js#ensureStoryboard`, `pages/production.mjs` | Planning scenes and visual evidence | Retry; reject non-passed or stale review | No | Store by approved script/review ID; invalidate when script changes |
 | `renderVideo(project, onProgress)` | same | `POST /api/videos/render`, then `GET /api/videos/:renderId/status` | `app.js#startRender`, `pages/production.mjs` | Preparing, staged progress, final result | Retry start/status separately; preserve `renderId`; terminal provider failure must stop polling | Yes, 1.5 s default | Never HTTP-cache live status; persist final render metadata and use signed media URLs |
@@ -170,7 +170,8 @@ Current response:
 ```
 
 The implemented backend adds `scriptId`, derives section IDs/ranges and duration,
-and makes one repair attempt for invalid JSON or length. Identical requests are
+and makes up to two targeted repair attempts for invalid JSON, claim coverage,
+evidence use, structure, or length. Identical requests are
 coalesced/cached within the running process, so retries do not silently create a
 new version. This cache is not durable across restarts. User edits invalidate
 `project.originalityReview`.
@@ -305,6 +306,14 @@ increment the version, link `supersedesScriptId`, and preserve section IDs.
 ## Error and loading behavior already available
 
 - Each agent step marks its shared pipeline state `in_progress`, `completed`, `revision_required`, or `failed`.
+- The shared pipeline is also the workspace navigation: available stages are
+  links, the current stage is identified, and unavailable future stages remain
+  disabled until their prerequisites exist.
+- Every agent page keeps a visible previous-stage action in completed, loading,
+  and error states, so a timeout never traps the user on the Retry screen.
+- Re-running Script Analysis clears Research and every later artifact. Re-running
+  Research clears the Script and every later artifact; simple backward/forward
+  navigation preserves all saved work.
 - A failed service stores `{ message, code }`, renders an alert, focuses it, and offers the stage-specific Retry action.
 - Successful prior stages remain in local state and are not repeated on retry.
 - API errors are normalized in `service-client.mjs` to `message`, `code`, `status`, `retryable`, and `details`.

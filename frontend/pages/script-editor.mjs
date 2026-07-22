@@ -2,9 +2,10 @@ import { escapeHtml, routeFor, wordCount } from "../core.mjs";
 import { errorNotice, icon, loadingPanel, pageHeading } from "../components.mjs";
 
 export function renderScriptEditor(project) {
-  if (project.error) return `${pageHeading("Scriptwriter Agent", "Script generation paused.", "Retry without losing the completed reference analysis or current draft.")}${errorNotice(project.error, "retry-script", "Scriptwriter")}`;
+  const backToResearch = `<a class="button button-secondary" href="${routeFor("research", project.id)}">← Back to research</a>`;
+  if (project.error) return `${pageHeading("Scriptwriter Agent", "Script generation paused.", "Retry without losing the completed reference analysis or current draft.", backToResearch)}${errorNotice(project.error, "retry-script", "Scriptwriter")}`;
   if (!project.generatedScript) {
-    return `${pageHeading("Scriptwriter Agent", "Building the case.", "The reference logic shapes the story while verified findings support the claim.")}${loadingPanel("Scriptwriter Agent", "Turning verified findings into a claim-led narration…")}`;
+    return `${pageHeading("Scriptwriter Agent", "Building the case.", "The reference logic shapes the story while verified findings support the claim.", backToResearch)}${loadingPanel("Scriptwriter Agent", "Turning verified findings into a full-duration, claim-led narration. This can take a few minutes—keep this tab open.")}`;
   }
   const script = project.generatedScript;
   const count = wordCount(script);
@@ -15,9 +16,9 @@ export function renderScriptEditor(project) {
       <section class="script-workspace">
         <div class="editor-toolbar"><div><span>Draft ${script.version}</span><span id="autosave-state">Auto-saved locally</span></div><div><span><strong id="word-count">${count}</strong> words</span><span><strong>${script.estimatedSeconds}</strong> sec</span></div></div>
         <div class="title-field"><label for="script-title">Video title</label><textarea id="script-title" name="title" rows="4" maxlength="120">${escapeHtml(script.title)}</textarea></div>
-        <div class="script-document" aria-label="Full narration, divided into editable script sections">
-          <div class="document-heading"><p class="eyebrow">Full narration</p><span>Edit by production section</span></div>
-          ${script.sections.map((section, index) => `<section class="script-section" data-section-id="${escapeHtml(section.id)}"><div class="script-section-meta"><span>0${index + 1}</span><div><strong>${escapeHtml(section.label)}</strong><small>${escapeHtml(section.range)}</small>${section.factIds?.length ? `<small class="section-facts">${section.factIds.map((factId) => escapeHtml(factId.replace("fact_", "Fact "))).join(" · ")}</small>` : ""}</div></div><label class="sr-only" for="section-${escapeHtml(section.id)}">${escapeHtml(section.label)} narration</label><textarea id="section-${escapeHtml(section.id)}" name="section-${escapeHtml(section.id)}" data-script-section rows="${Math.max(2, Math.ceil(section.text.length / 82))}">${escapeHtml(section.text)}</textarea></section>`).join("")}
+        <div class="script-document" aria-label="Full narration, divided into editable paragraphs">
+          <div class="document-heading"><p class="eyebrow">Full narration</p><span>Read and edit one paragraph at a time</span></div>
+          ${script.sections.map((section, index) => `<section class="script-section script-paragraph" data-section-id="${escapeHtml(section.id)}"><header class="script-paragraph-header"><div class="paragraph-identity"><span>Paragraph ${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(section.label)}</strong></div><div class="paragraph-details"><small>${escapeHtml(section.range)}</small>${section.factIds?.length ? `<small class="section-facts">${section.factIds.map((factId) => escapeHtml(factId.replace("fact_", "Fact "))).join(" · ")}</small>` : ""}</div></header><label class="sr-only" for="section-${escapeHtml(section.id)}">${escapeHtml(section.label)} paragraph</label><textarea id="section-${escapeHtml(section.id)}" name="section-${escapeHtml(section.id)}" data-script-section rows="${Math.max(3, Math.ceil(section.text.length / 56))}">${escapeHtml(section.text)}</textarea></section>`).join("")}
         </div>
       </section>
       <aside class="editor-aside">

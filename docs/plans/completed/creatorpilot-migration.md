@@ -17,6 +17,8 @@ production workspace and always expose the responsible agent and current state.
 - The full hash-routed workflow works without a backend.
 - Five-state multi-agent pipeline remains visible within project workspaces.
 - Script content is editable and survives navigation and refresh.
+- Every available agent stage is directly navigable from the shared pipeline;
+  users can move backward and forward without losing completed work.
 - Similarity language is explicitly an estimate rather than a legal conclusion.
 - Storyboard contains 7–10 realistic scenes and rendering exposes named stages.
 - Loading, success, failure, revision, and retry states are implemented.
@@ -58,6 +60,9 @@ The first browser-complete implementation exposed five weaknesses:
    now persists on the project and appears in the final package.
 5. The script title was clipped in the narrow editor column. It now uses a
    multiline editable title field that keeps the complete title visible.
+6. The pipeline originally displayed progress but could not navigate. It now
+   links every available stage, disables only unmet prerequisites, and resets
+   downstream artifacts when Analysis or Research is intentionally rerun.
 
 The final visual review confirmed that the interface uses lists, rules, document
 surfaces, and timelines as its main hierarchy rather than repeated dashboard
@@ -67,9 +72,10 @@ cards. All agent states include text and shape in addition to color.
 
 - Native module syntax checks passed for `app.js`, `core.mjs`,
   `mock-services.mjs`, `components.mjs`, and every page module.
-- `node frontend/tests/creatorpilot.test.mjs`: 6/6 passed.
+- `node frontend/tests/creatorpilot.test.mjs`: 31/31 passed.
 - `python3 frontend/tests/browser-cdp.py`: complete production workflow passed,
-  including a return-to-Scriptwriter revision loop.
+  including Production → Analyst → Research → Scriptwriter → Reviewer →
+  Production navigation with completed state preserved.
 - Chrome viewport checks passed at 1280×900, 768×1024, and 390×844 with no
   horizontal document overflow.
 - Dashboard empty state and mobile dashboard overflow were checked.

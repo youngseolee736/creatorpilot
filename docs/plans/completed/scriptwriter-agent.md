@@ -92,8 +92,8 @@ mocked.
 
 ### Validation
 
-- Backend: the complete 131-test suite passed, including 18 Scriptwriter tests.
-- Frontend: syntax checks and 30 service/core/UI tests passed.
+- Backend: the complete 136-test suite passed, including 22 Scriptwriter tests.
+- Frontend: syntax checks and 32 service/core/UI tests passed.
 - Dependency audit: 0 vulnerabilities across 76 packages.
 - Browser: the complete API-backed fixture workflow passed, including claim
   lock, Fact ID visibility, Research navigation, revision lineage, and clean runtime.
@@ -102,6 +102,12 @@ mocked.
   route focus was correct, and the browser console/runtime were clean.
 
 ### Self-review and revisions
+
+- The Scriptwriter previously inherited the shared 50-second deadline while
+  Research had a five-minute override. It now has its own five-minute default
+  and explicit environment setting, with scoped override tests.
+- Previous-stage buttons now remain visible during loading and timeout/error
+  states, including `Back to research` on the Scriptwriter timeout screen.
 
 - The first browser fixture used repetitive filler words, which made valid test
   output look like a poor script. Replaced it with coherent topic-specific

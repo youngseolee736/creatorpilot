@@ -21,7 +21,7 @@ import {
   reviewOriginality,
 } from "../mock-services.mjs";
 import { createServices, getServiceConfig } from "../service-client.mjs";
-import { errorNotice } from "../components.mjs";
+import { errorNotice, pipeline } from "../components.mjs";
 import { renderDashboard } from "../pages/dashboard.mjs";
 import { renderAnalysis } from "../pages/analysis.mjs";
 import { renderReview } from "../pages/review.mjs";
@@ -86,6 +86,23 @@ test("pipeline updates preserve every other agent state", () => {
   assert.equal(pipeline.writer.status, "waiting");
 });
 
+test("the workspace pipeline links every available stage and disables future work", () => {
+  const project = createProject({ id: "project-pipeline-nav" });
+  project.analysis = { ready: true };
+  let html = pipeline(project, { currentRoute: "research" });
+  assert.match(html, /href="#\/projects\/project-pipeline-nav\/analysis"/);
+  assert.match(html, /href="#\/projects\/project-pipeline-nav\/research"/);
+  assert.match(html, /aria-disabled="true" title="Complete the previous stage first">.*Scriptwriter/s);
+  project.research = { ready: true };
+  project.generatedScript = { ready: true };
+  project.originalityReview = { ready: true, status: "passed" };
+  html = pipeline(project, { currentRoute: "review" });
+  assert.match(html, /href="#\/projects\/project-pipeline-nav\/script"/);
+  assert.match(html, /href="#\/projects\/project-pipeline-nav\/review"/);
+  assert.match(html, /href="#\/projects\/project-pipeline-nav\/production"/);
+  assert.match(html, /pipeline-step pipeline-waiting is-current/);
+});
+
 test("missing transcript metadata preserves the existing reference title", () => {
   assert.equal(referenceTitleFromTranscript({ title: null }, "Reference video"), "Reference video");
   assert.equal(referenceTitleFromTranscript({ title: "  Live reference  " }, "Reference video"), "Live reference");
@@ -138,8 +155,21 @@ test("the writing workspace keeps the claim and research evidence visible", asyn
   assert.match(html, /Narrative case/);
   assert.match(html, /3 research findings used/);
   assert.match(html, /Fact 1/);
+  assert.match(html, /Paragraph 01/);
+  assert.match(html, /Read and edit one paragraph at a time/);
+  assert.match(html, /script-paragraph/);
   assert.match(html, /Back to research/);
   assert.match(html, /#\/projects\/project-writing-ui\/research/);
+});
+
+test("every agent error screen keeps its previous-stage navigation", () => {
+  const project = createProject({ id: "project-back-navigation", topic: "A claim" });
+  project.error = { code: "LLM_TIMEOUT", message: "Timed out", retryable: true };
+  assert.match(renderAnalysis(project), /href="#\/dashboard"[^>]*>← Back to projects/);
+  assert.match(renderResearch(project), /href="#\/projects\/project-back-navigation\/analysis"[^>]*>← Back to analysis/);
+  assert.match(renderScriptEditor(project), /href="#\/projects\/project-back-navigation\/research"[^>]*>← Back to research/);
+  assert.match(renderReview(project), /href="#\/projects\/project-back-navigation\/script"[^>]*>← Back to Scriptwriter/);
+  assert.match(renderProduction(project), /href="#\/projects\/project-back-navigation\/review"[^>]*>← Back to review/);
 });
 
 test("story analysis presents simple storytelling logic without a timeline", async () => {
@@ -235,6 +265,7 @@ test("Research screen shows a verdict, fair comparison, story findings, and clic
   assert.match(html, /Research verdict/);
   assert.match(html, /Best way to prove the claim/);
   assert.match(html, /Define greatness by transformative impact/);
+  assert.match(html, /data-action="rerun-research"/);
   assert.match(html, /A fair comparison/);
   assert.match(html, /How they compare/);
   assert.match(html, /Where the claim gets weaker/);
@@ -447,6 +478,10 @@ test("the review screen distinguishes medium and high overlap risks", () => {
   const html = renderReview(project);
   assert.match(html, /class="risk-medium"/);
   assert.match(html, /class="risk-high"/);
+  assert.equal((html.match(/class="score-card /g) || []).length, 4);
+  assert.match(html, /aria-label="Hook strength 80 out of 100"/);
+  assert.match(html, /Four practical writing checks/);
+  assert.doesNotMatch(html, /score-ring/);
   assert.doesNotMatch(html, /class="risk-low">Medium/);
 });
 

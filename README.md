@@ -85,15 +85,23 @@ STORYBOARD_LLM_MODEL=visual-planning-model
 
 The Research Agent uses the OpenAI Responses API `web_search` tool rather than
 the Chat Completions adapter. It may reuse the shared OpenAI base URL, key, and
-model, or use its own server-side overrides. Web research defaults to a 120
-second timeout when no scoped timeout is supplied:
+model, or use its own server-side overrides. Web research defaults to a five-minute
+timeout when no scoped timeout is supplied:
 
 ```dotenv
 RESEARCH_LLM_PROVIDER=openai-web-search
 RESEARCH_LLM_API_BASE_URL=https://api.openai.com/v1
 RESEARCH_LLM_API_KEY=research-server-side-key
 RESEARCH_LLM_MODEL=web-search-capable-model
-RESEARCH_LLM_TIMEOUT_MS=120000
+RESEARCH_LLM_TIMEOUT_MS=300000
+```
+
+Claim-led full-duration Scriptwriter calls also default to five minutes per
+model call so a contract repair pass is not cut off by the shorter shared
+timeout. Override it independently when needed:
+
+```dotenv
+SCRIPTWRITER_LLM_TIMEOUT_MS=300000
 ```
 
 The supported prefixes are `ANALYST_`, `RESEARCH_`, `SCRIPTWRITER_`, `REVIEWER_`, and
@@ -240,8 +248,8 @@ Without those LLM variables, the command reports `SKIP` and makes no paid API
 request.
 
 To perform the full live transcript, analysis, and first-draft check, explicitly
-provide a new topic. This can make more than one paid LLM request because invalid
-JSON or script length receives one repair attempt:
+provide a new topic. This can make more than one paid LLM request because an invalid
+draft can receive up to two targeted repair attempts:
 
 ```sh
 cd backend

@@ -14,11 +14,12 @@ function verdictLabel(value) {
 }
 
 export function renderResearch(project) {
+  const backToAnalysis = `<a class="button button-secondary" href="${routeFor("analysis", project.id)}">← Back to analysis</a>`;
   if (project.error) {
-    return `${pageHeading("Research Agent", "Topic research paused.", "Your analysis and tailored brief remain saved.")}${errorNotice(project.error, "retry-research", "Research Agent")}`;
+    return `${pageHeading("Research Agent", "Topic research paused.", "Your analysis and tailored brief remain saved.", backToAnalysis)}${errorNotice(project.error, "retry-research", "Research Agent")}`;
   }
   if (!project.research) {
-    return `${pageHeading("Research Agent", "Testing the claim against the evidence.", "The agent is defining fair criteria, comparing relevant peers, and checking both sides of the premise.")}${loadingPanel("Research Agent", "Searching current sources and building a fair comparison. This can take a few minutes—keep this tab open.")}`;
+    return `${pageHeading("Research Agent", "Testing the claim against the evidence.", "The agent is defining fair criteria, comparing relevant peers, and checking both sides of the premise.", backToAnalysis)}${loadingPanel("Research Agent", "Searching current sources and building a fair comparison. This can take a few minutes—keep this tab open.")}`;
   }
   const research = project.research;
   const brief = project.creativeBrief;
@@ -32,7 +33,7 @@ export function renderResearch(project) {
   const verdict = research.verdict || { status: "insufficient_evidence", headline: research.summary, explanation: "Review the sourced findings before writing." };
   const narrativeCase = research.narrativeCase;
   const sourceLinks = (sourceIds, label) => `<div class="fact-sources" aria-label="${escapeHtml(label)}">${list(sourceIds).map((sourceId) => { const source = sources.find((item) => item.sourceId === sourceId); return source ? `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.domain)} ${icon("external", 13)}</a>` : ""; }).join("")}</div>`;
-  return `${pageHeading("Research Agent · Complete", "What the evidence says.", "See the verdict, the fair comparison, and the facts that can carry your story.", `<div class="button-row"><a class="button button-secondary" href="${routeFor("analysis", project.id)}">← Back to analysis</a><button class="button button-primary" type="button" data-action="generate-script">Write from research ${icon("arrow")}</button></div>`)}
+  return `${pageHeading("Research Agent · Complete", "What the evidence says.", "See the verdict, the strongest narrative case, and the facts that can carry your story.", `<div class="button-row"><a class="button button-secondary" href="${routeFor("analysis", project.id)}">← Back to analysis</a><button class="button button-secondary" type="button" data-action="rerun-research">${icon("retry")}Research again</button><button class="button button-primary" type="button" data-action="generate-script">Write from research ${icon("arrow")}</button></div>`)}
     <div class="research-layout">
       <section class="research-main">
         <div class="research-summary research-verdict"><div class="verdict-meta"><p class="eyebrow">Research verdict</p><span class="verdict-status verdict-${escapeHtml(verdict.status)}">${verdictLabel(verdict.status)}</span></div><h2>${escapeHtml(verdict.headline)}</h2><p>${escapeHtml(verdict.explanation)}</p><small>${facts.length} usable findings · ${sources.length} verified sources</small></div>

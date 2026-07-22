@@ -124,6 +124,16 @@ function writerWith(outputs) {
   return { writer: new Scriptwriter({ provider }), provider };
 }
 
+test("gives the Scriptwriter a five-minute default deadline", () => {
+  const writer = new Scriptwriter({ llmOptions: { environment: { LLM_API_BASE_URL: "https://api.openai.com/v1", LLM_API_KEY: "test-key", LLM_MODEL: "test-model", LLM_TIMEOUT_MS: "50000" } } });
+  assert.equal(writer.provider.timeoutMs, 300000);
+});
+
+test("honors an explicit Scriptwriter deadline", () => {
+  const writer = new Scriptwriter({ llmOptions: { environment: { LLM_API_BASE_URL: "https://api.openai.com/v1", LLM_API_KEY: "test-key", LLM_MODEL: "test-model", SCRIPTWRITER_LLM_TIMEOUT_MS: "240000" } } });
+  assert.equal(writer.provider.timeoutMs, 240000);
+});
+
 async function endpointResult(path, requestBody, outputs) {
   const { writer } = writerWith(outputs);
   return request(createApp({ scriptwriter: writer }), path, requestBody);
@@ -208,11 +218,31 @@ test("repairs a 68-second draft back to the full 60-second target", async () => 
   assert.match(provider.calls[1][1].content, /script_too_long/);
 });
 
-test("rejects invalid output after the single repair attempt", async () => {
+test("retries validation twice before rejecting an invalid output", async () => {
   const requestBody = validRequest();
-  const { writer, provider } = writerWith(["broken", "still broken"]);
+  const { writer, provider } = writerWith(["broken", "still broken", "still invalid"]);
   await assert.rejects(writer.generate(requestBody), (error) => error.code === "INVALID_LLM_RESPONSE");
-  assert.equal(provider.calls.length, 2);
+  assert.equal(provider.calls.length, 3);
+});
+
+test("can recover when the first repair still violates the contract", async () => {
+  const requestBody = validRequest();
+  requestBody.factPack.narrativeCase.supportFactIds = ["fact_1", "fact_2"];
+  const shortCandidate = validCandidate(requestBody, 3);
+  const missingNarrativeFacts = validCandidate(requestBody);
+  missingNarrativeFacts.sections.forEach((section, index) => {
+    section.factIds = index % 2 ? ["fact_3"] : ["fact_1"];
+  });
+  const { writer, provider } = writerWith([
+    JSON.stringify(shortCandidate),
+    JSON.stringify(missingNarrativeFacts),
+    JSON.stringify(validCandidate(requestBody)),
+  ]);
+  const result = await writer.generate(requestBody);
+  assert.ok(Math.abs(result.estimatedSeconds - 60) <= 2);
+  assert.equal(provider.calls.length, 3);
+  assert.match(provider.calls[1][1].content, /script_too_short/);
+  assert.match(provider.calls[2][1].content, /insufficient_narrative_case_facts/);
 });
 
 test("rejects section slots that do not match the server plan", async () => {
