@@ -7,6 +7,8 @@
 node_modules/
 dist/
 build/
+/public/
+/.vercel/
 coverage/
 .cache/
 
