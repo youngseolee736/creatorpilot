@@ -20,7 +20,6 @@ class TranscriptService {
     if (this.providerName !== "local") {
       throw new AppError(500, "INTERNAL_ERROR", "CreatorPilot transcript provider configuration is invalid.", false);
     }
-
     try {
       return await this.localProvider.extract(context);
     } catch (error) {

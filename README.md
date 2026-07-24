@@ -23,6 +23,9 @@ YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboar
 - **AI Image Preview:** can optionally generate storyboard still images
   (OpenRouter Images API)
 
+If transcript extraction fails, the user can also paste the reference
+transcript manually and continue the workflow without starting over.
+
 ## Deep Research mode
 
 Deep Research mode uses multiple models through OpenRouter for analysis and

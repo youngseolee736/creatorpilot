@@ -1,5 +1,6 @@
 import {
   createProject,
+  manualTranscriptFromText,
   createStore,
   referenceBlueprintFromAnalysis,
   parseRoute,
@@ -464,6 +465,54 @@ app.addEventListener("submit", (event) => {
     const project = store.addProject(createProject(values));
     newProjectDraft = {};
     navigate(routeFor("analysis", project.id));
+  }
+  if (event.target.id === "manual-transcript-form") {
+    const { project } = currentContext();
+    if (!project) return;
+    const values = Object.fromEntries(new FormData(event.target));
+    const references = project.references || [];
+    const manualByReferenceId = new Map(
+      Object.entries(values)
+        .filter(([key, value]) => key.startsWith("manualTranscript:") && String(value || "").trim())
+        .map(([key, value]) => [key.split(":")[1], String(value || "").trim()]),
+    );
+    if (!manualByReferenceId.size) {
+      store.updateProject(project.id, {
+        error: { message: "Paste at least one transcript before continuing.", code: "MANUAL_TRANSCRIPT_REQUIRED", retryable: false, details: null },
+      });
+      render({ preserveFocus: true });
+      return;
+    }
+    const nextReferences = references.map((reference) => {
+      const text = manualByReferenceId.get(reference.referenceId);
+      if (!text) return reference;
+      return {
+        ...reference,
+        transcript: manualTranscriptFromText({
+          projectId: project.id,
+          referenceId: reference.referenceId,
+          title: reference.title,
+          language: project.language,
+          text,
+          estimatedDuration: project.duration,
+        }),
+      };
+    });
+    const updated = store.updateProject(project.id, {
+      error: null,
+      references: nextReferences,
+      transcript: nextReferences[0]?.transcript || project.transcript,
+      referenceTitle: nextReferences[0]?.title || project.referenceTitle,
+      pipeline: {
+        ...updatePipeline(project, "transcript", "completed", `${nextReferences.filter((reference) => reference.transcript).length} of ${nextReferences.length} transcripts ready`),
+        analyst: { status: "waiting", detail: "Manual transcript ready for analysis" },
+        researcher: { status: "waiting", detail: "Waiting for the previous stage" },
+        writer: { status: "waiting", detail: "Waiting for the previous stage" },
+        producer: { status: "waiting", detail: "Waiting for the previous stage" },
+      },
+    });
+    render({ preserveFocus: true });
+    ensureAnalysis(updated);
   }
   if (event.target.id === "script-form") {
     const { project } = currentContext();

@@ -4,6 +4,7 @@ import {
   PIPELINE_STEPS,
   createProject,
   createStore,
+  manualTranscriptFromText,
   parseRoute,
   referenceBlueprintFromAnalysis,
   referenceTitleFromTranscript,
@@ -303,6 +304,36 @@ test("story analysis does not crash on an incomplete saved analysis", () => {
   const html = renderAnalysis(project);
   assert.match(html, /The story behind the video/);
   assert.match(html, /Use this for your script/);
+});
+
+test("analysis error screen offers a manual transcript fallback", () => {
+  const project = createProject({ id: "project-manual-fallback", topic: "A topic", language: "English" });
+  project.references = [
+    { referenceId: "reference-1", position: 1, title: "Reference 1", transcript: null, analysis: null },
+    { referenceId: "reference-2", position: 2, title: "Reference 2", transcript: { source: "youtube_captions", text: "Ready transcript" }, analysis: null },
+  ];
+  project.error = { code: "TRANSCRIPT_UNAVAILABLE", message: "Captions are disabled for this video.", retryable: false };
+  const html = renderAnalysis(project);
+  assert.match(html, /Paste the transcript manually/);
+  assert.match(html, /manual-transcript-form/);
+  assert.match(html, /manualTranscript:reference-1/);
+  assert.doesNotMatch(html, /manualTranscript:reference-2/);
+});
+
+test("manual transcript helper builds a normalized transcript object", () => {
+  const transcript = manualTranscriptFromText({
+    projectId: "project-1",
+    referenceId: "reference-1",
+    title: "Reference title",
+    language: "English",
+    text: "  This is a pasted transcript with enough words to normalize well.  ",
+    estimatedDuration: 60,
+  });
+  assert.equal(transcript.transcriptId, "tr_manual_project-1_reference-1");
+  assert.equal(transcript.source, "manual");
+  assert.equal(transcript.wordCount, 11);
+  assert.equal(transcript.estimatedDuration, 60);
+  assert.deepEqual(transcript.segments, []);
 });
 
 test("mock services expose retryable named failures", async () => {

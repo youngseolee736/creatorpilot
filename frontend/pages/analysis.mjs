@@ -7,7 +7,27 @@ function list(value) {
 
 export function renderAnalysis(project) {
   const backToProjects = `<a class="button button-secondary" href="${routeFor("dashboard")}">← Back to projects</a>`;
-  if (project.error) return `${pageHeading("Script Analyst Agent", "Reference analysis paused.", "The project remains saved and can be retried without starting over.", backToProjects)}${errorNotice(project.error, "retry-analysis")}`;
+  if (project.error) {
+    const references = list(project.references);
+    const missingTranscriptReferences = references.filter((reference) => !reference.transcript);
+    const manualFallback = missingTranscriptReferences.length
+      ? `<section class="manual-transcript-fallback">
+          <div class="section-bar"><div><p class="eyebrow">Fallback option</p><h2>Paste the transcript manually</h2></div></div>
+          <p>If YouTube captions fail, you can paste the transcript here and continue without restarting the project.</p>
+          <form id="manual-transcript-form" class="reference-form" novalidate>
+            ${missingTranscriptReferences.map((reference) => `<div class="field-group">
+              <label for="manual-transcript-${reference.referenceId}">${escapeHtml(reference.title || `Reference ${reference.position}`)}</label>
+              <textarea class="field-textarea" id="manual-transcript-${reference.referenceId}" name="manualTranscript:${reference.referenceId}" rows="8" placeholder="Paste the transcript for this reference video here."></textarea>
+            </div>`).join("")}
+            <div class="button-row">
+              <button class="button button-secondary" type="button" data-action="retry-analysis">${icon("retry")}Try captions again</button>
+              <button class="button button-primary" type="submit">Use pasted transcript ${icon("arrow")}</button>
+            </div>
+          </form>
+        </section>`
+      : "";
+    return `${pageHeading("Script Analyst Agent", "Reference analysis paused.", "The project remains saved and can be retried without starting over.", backToProjects)}${errorNotice(project.error, "retry-analysis")}${manualFallback}`;
+  }
   if (!project.analysis) {
     const references = list(project.references);
     const transcriptCount = references.filter((reference) => reference.transcript).length;

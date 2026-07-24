@@ -27,6 +27,21 @@ export function referenceTitleFromTranscript(transcript, fallback = "Reference v
   return String(transcript?.title || "").trim() || fallback;
 }
 
+export function manualTranscriptFromText({ projectId, referenceId, title, language, text, estimatedDuration }) {
+  const normalizedText = String(text || "").replace(/\s+/g, " ").trim();
+  const wordCount = normalizedText ? normalizedText.split(/\s+/).filter(Boolean).length : 0;
+  return {
+    transcriptId: `tr_manual_${projectId}_${referenceId}`,
+    source: "manual",
+    title: String(title || "").trim() || "Manual transcript",
+    text: normalizedText,
+    language: language || null,
+    wordCount,
+    estimatedDuration: Number(estimatedDuration) || null,
+    segments: [],
+  };
+}
+
 export function youtubeVideoId(value) {
   try {
     const url = new URL(String(value || "").trim());

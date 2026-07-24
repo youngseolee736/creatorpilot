@@ -2,21 +2,19 @@
 
 ## Transcript provider limitations
 
-CreatorPilot uses the unofficial `youtube-transcript` package from the
-backend only. It reads YouTube caption endpoints without an official YouTube API
-contract, so upstream markup, response formats, blocking behavior, and transcript
-availability can change without notice. Some public, private, age-restricted, or
-caption-disabled videos do not expose transcripts. Auto-generated captions may
-contain transcription and timing errors. The local adapter currently returns
-`null` for the video title because caption extraction does not provide title
-metadata.
+CreatorPilot uses the unofficial `youtube-transcript` package from the backend
+only. It reads YouTube caption endpoints without an official YouTube API
+contract, so upstream markup, response formats, blocking behavior, and
+transcript availability can change without notice. Some public, private,
+age-restricted, or caption-disabled videos do not expose transcripts.
+Auto-generated captions may contain transcription and timing errors. The local
+adapter currently returns `null` for the video title because caption extraction
+does not provide title metadata.
 
-The optional hosted adapter defaults to
-`youtube-transcript-api-tau-one.vercel.app` when explicitly enabled. During
-validation on 2026-07-18, that endpoint returned the same unsupported stream-like
-placeholder for two different captioned public videos. CreatorPilot correctly
-rejected those responses with `502 TRANSCRIPT_PROVIDER_ERROR`; do not enable the
-hosted adapter or fallback without verifying the endpoint first.
+CreatorPilot can also use a hosted transcript fallback when explicitly enabled.
+That may improve success rate for some videos, but it adds an extra external
+dependency, extra waiting time, and possibly extra cost depending on the
+endpoint you use.
 
 Access public transcripts responsibly and do not treat transcript availability
 as permission to republish source text.

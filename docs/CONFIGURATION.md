@@ -7,17 +7,18 @@ provider credentials in frontend files. Keep real credentials only in your local
 ## Transcript provider
 
 Transcript extraction uses the local `youtube-transcript` adapter by default.
-The hosted HTTP adapter is retained only as an explicit compatibility option:
+The hosted HTTP adapter is retained as a fallback option when local transcript
+access is temporarily blocked or unstable.
 
 ```dotenv
+TRANSCRIPT_TIMEOUT_MS=10000
 TRANSCRIPT_PROVIDER=local
 TRANSCRIPT_HTTP_FALLBACK_ENABLED=false
 ```
 
 Set `TRANSCRIPT_PROVIDER=hosted` to use `TRANSCRIPT_API_URL` directly, or set
-`TRANSCRIPT_HTTP_FALLBACK_ENABLED=true` to try that endpoint only after a
-retryable local-provider failure. Keep fallback disabled unless the configured
-endpoint is trusted and its request and response contract has been verified.
+`TRANSCRIPT_HTTP_FALLBACK_ENABLED=true` to try the hosted endpoint only after a
+retryable local-provider failure.
 
 ## LLM agents
 
