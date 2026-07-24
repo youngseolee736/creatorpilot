@@ -14,11 +14,19 @@ services:
       - key: LLM_API_KEY
         sync: false
       - key: LLM_MODEL
-        sync: false
+        value: google/gemini-2.5-flash-lite
       - key: LLM_TIMEOUT_MS
         value: 300000
       - key: OPENROUTER_APP_TITLE
         value: CreatorPilot
+      - key: ANALYST_LLM_MODEL
+        value: google/gemini-2.5-flash-lite
+      - key: RESEARCH_LLM_MODEL
+        value: google/gemini-2.5-flash-lite
+      - key: SCRIPTWRITER_LLM_MODEL
+        value: google/gemini-2.5-flash-lite
+      - key: STORYBOARD_LLM_MODEL
+        value: google/gemini-2.5-flash-lite
       - key: TRANSCRIPT_TIMEOUT_MS
         value: 10000
       - key: TRANSCRIPT_PROVIDER
