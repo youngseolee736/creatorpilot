@@ -102,6 +102,22 @@ function failProject(project, stepId, error) {
   requestAnimationFrame(() => document.querySelector("#service-error")?.focus());
 }
 
+const TRANSIENT_SERVICE_ERRORS = new Set(["LLM_TIMEOUT", "LLM_RATE_LIMITED", "LLM_PROVIDER_ERROR"]);
+
+async function retryTransientService(task, maxAttempts = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      lastError = error;
+      if (!error?.retryable || !TRANSIENT_SERVICE_ERRORS.has(error.code) || attempt === maxAttempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 750));
+    }
+  }
+  throw lastError;
+}
+
 async function ensureAnalysis(project) {
   await runTask(`analysis:${project.id}`, async () => {
     let current = store.getProject(project.id);
@@ -142,18 +158,17 @@ async function ensureAnalysis(project) {
           pipeline: updatePipeline(current, "analyst", "in_progress", `Analyzing ${missingAnalyses.length} references independently`),
         });
         render({ preserveFocus: true });
-        const analysisResults = await Promise.allSettled(missingAnalyses.map(async (reference) => ({
-          referenceId: reference.referenceId,
-          analysis: await analyzeReference(current, reference),
-        })));
-        const completedAnalyses = new Map(analysisResults.filter((result) => result.status === "fulfilled").map((result) => [result.value.referenceId, result.value.analysis]));
-        const nextReferences = current.references.map((item) => completedAnalyses.has(item.referenceId) ? { ...item, analysis: completedAnalyses.get(item.referenceId) } : item);
-        current = store.updateProject(project.id, {
-          references: nextReferences,
-          pipeline: updatePipeline(current, "analyst", "in_progress", `${nextReferences.filter((reference) => hasStoryLogic(reference.analysis)).length} of ${current.references.length} analyses ready`),
-        });
-        const analysisFailure = analysisResults.find((result) => result.status === "rejected");
-        if (analysisFailure) throw analysisFailure.reason;
+        for (const reference of missingAnalyses) {
+          const analysis = await retryTransientService(() => analyzeReference(current, reference));
+          const nextReferences = current.references.map((item) => (
+            item.referenceId === reference.referenceId ? { ...item, analysis } : item
+          ));
+          current = store.updateProject(project.id, {
+            references: nextReferences,
+            pipeline: updatePipeline(current, "analyst", "in_progress", `${nextReferences.filter((item) => hasStoryLogic(item.analysis)).length} of ${current.references.length} analyses ready`),
+          });
+          render({ preserveFocus: true });
+        }
       }
 
       current = store.getProject(project.id);
@@ -170,7 +185,7 @@ async function ensureAnalysis(project) {
         });
         render({ preserveFocus: true });
         const analysis = current.references.length >= 3
-          ? await synthesizeReferences(current)
+          ? await retryTransientService(() => synthesizeReferences(current))
           : current.references[0]?.analysis;
         current = store.updateProject(project.id, {
           analysis,
