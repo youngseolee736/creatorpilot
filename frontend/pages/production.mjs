@@ -1,5 +1,5 @@
-import { escapeHtml, formatTime, routeFor } from "../core.mjs";
-import { errorNotice, icon, loadingPanel, pageHeading, statusBadge } from "../components.mjs";
+import { escapeHtml, formatTime, routeFor } from "../lib/core.mjs";
+import { errorNotice, icon, loadingPanel, pageHeading, statusBadge } from "../ui/components.mjs";
 
 function safeImageSource(value) {
   const source = String(value || "").trim();

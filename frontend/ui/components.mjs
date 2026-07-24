@@ -1,5 +1,5 @@
-import { PIPELINE_STEPS, STATUS_LABELS, escapeHtml, routeFor } from "./core.mjs";
-import { serviceConfig } from "./service-client.mjs";
+import { PIPELINE_STEPS, STATUS_LABELS, escapeHtml, routeFor } from "../lib/core.mjs";
+import { serviceConfig } from "../services/api-client.mjs";
 
 function studioConnectionLabel() {
   const services = serviceConfig.services || {};

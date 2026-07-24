@@ -1,7 +1,7 @@
 const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
-const { llmConfigurationError, mapLLMError } = require("../llm/llm-errors");
-const { isOpenRouter, openRouterHeaders } = require("../llm/openrouter");
+const { llmConfigurationError, mapLLMError } = require("./llm/llm-errors");
+const { isOpenRouter, openRouterHeaders } = require("./llm/openrouter");
 
 function validHttpsSource(source) {
   try {

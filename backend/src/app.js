@@ -12,8 +12,8 @@ const { ScriptAnalyst } = require("./agents/script-analyst/script-analyst");
 const { Researcher } = require("./agents/researcher/researcher");
 const { Scriptwriter } = require("./agents/scriptwriter/scriptwriter");
 const { StoryboardAgent } = require("./agents/storyboard/storyboard");
-const { OpenRouterImageProvider } = require("./services/image/openrouter-image-provider");
-const { TranscriptService } = require("./services/transcript-service");
+const { OpenRouterImageProvider } = require("./services/image-provider");
+const { TranscriptService } = require("./services/transcript");
 const { createRequestId } = require("./utils/request-id");
 
 function createApp(options = {}) {

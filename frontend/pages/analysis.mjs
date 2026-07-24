@@ -1,5 +1,5 @@
-import { escapeHtml, routeFor } from "../core.mjs";
-import { errorNotice, icon, loadingPanel, pageHeading, projectFormat } from "../components.mjs";
+import { escapeHtml, routeFor } from "../lib/core.mjs";
+import { errorNotice, icon, loadingPanel, pageHeading, projectFormat } from "../ui/components.mjs";
 
 function list(value) {
   return Array.isArray(value) ? value : [];

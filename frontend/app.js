@@ -8,7 +8,7 @@ import {
   updatePipeline,
   wordCount,
   youtubeVideoId,
-} from "./core.mjs";
+} from "./lib/core.mjs";
 import {
   analyzeReference,
   extractTranscript,
@@ -18,8 +18,8 @@ import {
   researchTopic,
   reviseScript,
   synthesizeReferences,
-} from "./service-client.mjs";
-import { appShell } from "./components.mjs";
+} from "./services/api-client.mjs";
+import { appShell } from "./ui/components.mjs";
 import { renderDashboard } from "./pages/dashboard.mjs";
 import { renderNewProject } from "./pages/new-project.mjs";
 import { renderAnalysis } from "./pages/analysis.mjs";

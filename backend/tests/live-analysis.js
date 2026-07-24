@@ -1,6 +1,6 @@
 const assert = require("assert");
 const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst");
-const { TranscriptService } = require("../src/services/transcript-service");
+const { TranscriptService } = require("../src/services/transcript");
 const { hasLLMConfiguration } = require("../src/services/llm");
 const { extractYouTubeVideo } = require("../src/utils/youtube-url");
 

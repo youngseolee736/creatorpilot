@@ -1,7 +1,7 @@
 const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
-const { AppError } = require("../../middleware/error-handler");
-const { openRouterHeaders } = require("../llm/openrouter");
+const { AppError } = require("../middleware/error-handler");
+const { openRouterHeaders } = require("./llm/openrouter");
 
 function clean(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();

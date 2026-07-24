@@ -1,5 +1,5 @@
-import { escapeHtml } from "../core.mjs";
-import { icon, pageHeading } from "../components.mjs";
+import { escapeHtml } from "../lib/core.mjs";
+import { icon, pageHeading } from "../ui/components.mjs";
 
 function referenceRows(draft) {
   return [1, 2, 3, 4, 5].map((position) => {

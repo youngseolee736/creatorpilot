@@ -1,5 +1,5 @@
-import { PIPELINE_STEPS, escapeHtml, formatDate, routeFor } from "../core.mjs";
-import { icon, pageHeading, statusBadge } from "../components.mjs";
+import { PIPELINE_STEPS, escapeHtml, formatDate, routeFor } from "../lib/core.mjs";
+import { icon, pageHeading, statusBadge } from "../ui/components.mjs";
 
 const FLOW_ROLES = {
   transcript: ["Reference intake", "Transcripts and timing in"],

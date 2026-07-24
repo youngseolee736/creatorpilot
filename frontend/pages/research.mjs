@@ -1,5 +1,5 @@
-import { escapeHtml, routeFor } from "../core.mjs";
-import { errorNotice, icon, loadingPanel, pageHeading } from "../components.mjs";
+import { escapeHtml, routeFor } from "../lib/core.mjs";
+import { errorNotice, icon, loadingPanel, pageHeading } from "../ui/components.mjs";
 
 function confidenceLabel(value) {
   return value === "high" ? "High confidence" : value === "medium" ? "Medium confidence" : "Needs caution";

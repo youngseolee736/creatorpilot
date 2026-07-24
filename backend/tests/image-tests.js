@@ -2,7 +2,7 @@ const assert = require("assert");
 const http = require("http");
 const AbortController = require("abort-controller");
 const { createApp } = require("../src/app");
-const { OpenRouterImageProvider, safeImagePrompt } = require("../src/services/image/openrouter-image-provider");
+const { OpenRouterImageProvider, safeImagePrompt } = require("../src/services/image-provider");
 
 const tests = [];
 function test(name, callback) { tests.push({ name, callback }); }

@@ -1,5 +1,5 @@
-import { escapeHtml, routeFor, wordCount } from "../core.mjs";
-import { errorNotice, icon, loadingPanel, pageHeading } from "../components.mjs";
+import { escapeHtml, routeFor, wordCount } from "../lib/core.mjs";
+import { errorNotice, icon, loadingPanel, pageHeading } from "../ui/components.mjs";
 
 export function renderScriptEditor(project) {
   const backToResearch = `<a class="button button-secondary" href="${routeFor("research", project.id)}">← Back to research</a>`;

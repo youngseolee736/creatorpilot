@@ -2,7 +2,7 @@ const assert = require("assert");
 const http = require("http");
 const AbortController = require("abort-controller");
 const { Researcher } = require("../src/agents/researcher/researcher");
-const { OpenAIWebResearchProvider, responseParts } = require("../src/services/research/openai-web-research-provider");
+const { OpenAIWebResearchProvider, responseParts } = require("../src/services/research-provider");
 const { createApp } = require("../src/app");
 
 const tests = [];
