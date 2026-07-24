@@ -45,7 +45,7 @@ function memoryStorage() {
 }
 
 test("new projects use the complete waiting pipeline", () => {
-  const project = createProject({ topic: "A new topic", referenceTranscript1: "This is a reference transcript with enough words to analyze clearly." });
+  const project = createProject({ topic: "A new topic", referenceUrl1: "https://youtu.be/CPDemo12345" });
   assert.equal(Object.keys(project.pipeline).length, PIPELINE_STEPS.length);
   assert.ok(Object.values(project.pipeline).every((step) => step.status === "waiting"));
   assert.equal(project.duration, 60);
@@ -55,11 +55,12 @@ test("new projects use the complete waiting pipeline", () => {
 test("new production intake shows three required and two optional references", () => {
   const html = renderNewProject();
   assert.equal((html.match(/name="referenceUrl[1-5]"/g) || []).length, 5);
-  assert.equal((html.match(/name="referenceTranscript[1-5]"/g) || []).length, 5);
+  assert.equal((html.match(/name="referenceTranscript[1-5]"/g) || []).length, 0);
   assert.equal((html.match(/<span class="requirement-label">Required<\/span>/g) || []).length, 3);
   assert.equal((html.match(/<span class="requirement-label">Optional<\/span>/g) || []).length, 2);
   assert.match(html, /3 required · up to 5 total/);
-  assert.match(html, /Paste three reference transcripts/);
+  assert.match(html, /Add three YouTube URLs/);
+  assert.match(html, /fetches each transcript automatically/);
   assert.match(html, /Deep analysis/);
   assert.match(html, /Two independent candidates \+ final Judge/);
   assert.match(html, /name="duration" type="number" min="1" max="7200" value="60"/);
@@ -68,14 +69,15 @@ test("new production intake shows three required and two optional references", (
 test("project state preserves three to five independent references", () => {
   const project = createProject({
     topic: "A new topic",
-    referenceTranscript1: "First transcript has enough words to be useful for analysis.",
-    referenceTranscript2: "Second transcript also has enough words to be useful here.",
-    referenceTranscript3: "Third transcript gives another strong reference for comparison.",
-    referenceTranscript4: "Fourth transcript is optional but still available for comparison.",
+    referenceUrl1: "https://youtu.be/CPDemo12345",
+    referenceUrl2: "https://youtu.be/CPDemo22345",
+    referenceUrl3: "https://youtu.be/CPDemo32345",
+    referenceUrl4: "https://youtu.be/CPDemo42345",
   });
   assert.equal(project.references.length, 4);
   assert.deepEqual(project.references.map((reference) => reference.required), [true, true, true, false]);
-  assert.equal(project.references[0].transcript.source, "manual");
+  assert.equal(project.references[0].transcript, null);
+  assert.equal(project.references[0].url, "https://youtu.be/CPDemo12345");
 });
 
 test("deep analysis selection persists with the project", () => {
@@ -95,9 +97,9 @@ test("mock synthesis combines three independent analyses", async () => {
     id: "project-synthesis",
     topic: "A new topic",
     language: "English",
-    referenceTranscript1: "First transcript has enough words to be analyzed properly in the synthesis test.",
-    referenceTranscript2: "Second transcript also contains enough words to support a separate analysis pass.",
-    referenceTranscript3: "Third transcript gives one more usable reference for comparison in this test.",
+    referenceUrl1: "https://youtu.be/CPDemo12345",
+    referenceUrl2: "https://youtu.be/CPDemo22345",
+    referenceUrl3: "https://youtu.be/CPDemo32345",
   });
   for (const reference of project.references) {
     reference.transcript = await extractTranscript(project, reference);
@@ -135,7 +137,7 @@ test("deep mode keeps Research lightweight while Scriptwriter compares drafts", 
 });
 
 test("Korean target language localizes generated mock content", async () => {
-  const project = createProject({ id: "project-korean", topic: "손흥민이 최고의 선수인 이유", language: "Korean", referenceTranscript1: "이 참조 스크립트는 분석에 충분한 단어 수를 가진 한국어 예시 텍스트입니다." });
+  const project = createProject({ id: "project-korean", topic: "손흥민이 최고의 선수인 이유", language: "Korean", referenceUrl1: "https://youtu.be/CPDemo12345" });
   project.analysis = await analyzeReference(project);
   project.research = await researchTopic(project);
   project.generatedScript = await generateScript(project);
@@ -232,7 +234,7 @@ test("hash routes round-trip project workspaces", () => {
 test("the complete mock service chain returns a storyboard preview", async () => {
   const project = createProject({
     topic: "Why procrastination is not laziness",
-    referenceTranscript1: "This transcript explains procrastination with enough detail for analysis and scripting.",
+    referenceUrl1: "https://youtu.be/CPDemo12345",
     language: "English",
   });
   project.transcript = await extractTranscript(project);
