@@ -26,6 +26,12 @@ YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboar
 If transcript extraction fails, the user can also paste the reference
 transcript manually and continue the workflow without starting over.
 
+For transcript extraction, I used the unofficial youtube-transcript Node.js
+package: https://www.npmjs.com/package/youtube-transcript
+
+Most other transcript APIs I looked at would add extra cost, so I decided not
+to depend on them for this project.
+
 ## Deep Research mode
 
 Deep Research mode uses multiple models through OpenRouter for analysis and
