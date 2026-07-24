@@ -22,7 +22,11 @@ services:
       - key: TRANSCRIPT_TIMEOUT_MS
         value: 10000
       - key: TRANSCRIPT_PROVIDER
-        value: local
+        value: transcriptapi
+      - key: TRANSCRIPTAPI_API_KEY
+        sync: false
+      - key: TRANSCRIPTAPI_API_URL
+        value: https://transcriptapi.com/api/v2/youtube/transcript
       - key: TRANSCRIPT_HTTP_FALLBACK_ENABLED
         value: "false"
       - key: ANALYST_A_LLM_MODEL

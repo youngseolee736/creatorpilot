@@ -6,19 +6,30 @@ provider credentials in frontend files. Keep real credentials only in your local
 
 ## Transcript provider
 
-Transcript extraction uses the local `youtube-transcript` adapter by default.
-The hosted HTTP adapter is retained as a fallback option when local transcript
-access is temporarily blocked or unstable.
+TranscriptAPI is the recommended production provider. It uses a server-side
+Bearer key and returns timestamped YouTube caption segments. The local
+`youtube-transcript` adapter remains available for development, and the generic
+hosted HTTP adapter remains available for legacy deployments.
 
 ```dotenv
 TRANSCRIPT_TIMEOUT_MS=10000
-TRANSCRIPT_PROVIDER=local
+TRANSCRIPT_PROVIDER=transcriptapi
+TRANSCRIPTAPI_API_KEY=replace-with-server-side-key
+TRANSCRIPTAPI_API_URL=https://transcriptapi.com/api/v2/youtube/transcript
 TRANSCRIPT_HTTP_FALLBACK_ENABLED=false
 ```
 
-Set `TRANSCRIPT_PROVIDER=hosted` to use `TRANSCRIPT_API_URL` directly, or set
+Set `TRANSCRIPT_PROVIDER=local` to use the local adapter. Set
+`TRANSCRIPT_PROVIDER=hosted` to use the legacy `TRANSCRIPT_API_URL` adapter, or set
 `TRANSCRIPT_HTTP_FALLBACK_ENABLED=true` to try the hosted endpoint only after a
 retryable local-provider failure.
+
+TranscriptAPI charges one credit only for a successful transcript response.
+CreatorPilot requests JSON timestamps and metadata, keeps the key on the
+backend, and caches successful responses in memory for the lifetime of the
+server process. Set `preferredCaptionLanguage` on an extraction request only
+when a specific caption track is required; otherwise TranscriptAPI selects
+English or the first available track.
 
 ## LLM agents
 

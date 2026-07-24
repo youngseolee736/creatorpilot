@@ -1,7 +1,7 @@
 const { AppError } = require("../../middleware/error-handler");
 
-const MIN_TARGET_DURATION = 15;
-const MAX_TARGET_DURATION = 180;
+const MIN_TARGET_DURATION = 1;
+const MAX_TARGET_DURATION = 7200;
 const MAX_SCRIPT_CHARACTERS = 30000;
 const TOP_LEVEL_FIELDS = new Set([
   "projectId",

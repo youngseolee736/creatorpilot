@@ -2,8 +2,8 @@
 
 Live website: https://creatorpilot-95k2.onrender.com
 
-CreatorPilot is an AI project I made to help plan a 10-15 minute YouTube
-video. Instead of trying to make the full video automatically, the main idea is
+CreatorPilot is an AI project I made to help plan YouTube videos of different
+lengths. Instead of trying to make the full video automatically, the main idea is
 to study strong reference transcripts, research the topic, write a new script,
 and give guidance on the flow of the video, like the hook, structure, and
 conclusion.

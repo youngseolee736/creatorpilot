@@ -151,7 +151,7 @@ test("ignores model attempts to control IDs, timing, and narration", async () =>
 test("rejects unsupported format, duration, and scene count", async () => {
   const format = await endpointResult(validRequest({ format: "4:3" }), "{}");
   assert.equal(format.body.error.code, "INVALID_STORYBOARD_INPUT");
-  const duration = await endpointResult(validRequest({ targetDurationSeconds: 10 }), "{}");
+  const duration = await endpointResult(validRequest({ targetDurationSeconds: 0 }), "{}");
   assert.equal(duration.body.error.details[0].field, "targetDurationSeconds");
   const count = await endpointResult(validRequest({ sceneCount: 61 }), "{}");
   assert.equal(count.body.error.details[0].field, "sceneCount");
