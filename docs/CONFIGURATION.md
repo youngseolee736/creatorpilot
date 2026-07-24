@@ -49,18 +49,6 @@ OPENROUTER_HTTP_REFERER=https://your-app.example
 OPENROUTER_APP_TITLE=CreatorPilot
 ```
 
-For the fastest Standard workflow, use Gemini Flash Lite for every single-model
-stage. Deep analysis and Deep writing still use their separate candidate and
-Judge settings below:
-
-```dotenv
-LLM_MODEL=google/gemini-2.5-flash-lite
-ANALYST_LLM_MODEL=google/gemini-2.5-flash-lite
-RESEARCH_LLM_MODEL=google/gemini-2.5-flash-lite
-SCRIPTWRITER_LLM_MODEL=google/gemini-2.5-flash-lite
-STORYBOARD_LLM_MODEL=google/gemini-2.5-flash-lite
-```
-
 Each LLM Agent can override any shared value independently. Blank or omitted
 Agent values fall back field-by-field to `LLM_*`, so a deployment can change
 only a model while reusing the same OpenRouter key and endpoint:

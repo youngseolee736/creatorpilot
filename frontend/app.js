@@ -155,24 +155,20 @@ async function ensureAnalysis(project) {
       const missingAnalyses = current.references.filter((reference) => !hasStoryLogic(reference.analysis));
       if (missingAnalyses.length) {
         current = store.updateProject(project.id, {
-          pipeline: updatePipeline(current, "analyst", "in_progress", `Analyzing ${missingAnalyses.length} references in parallel`),
+          pipeline: updatePipeline(current, "analyst", "in_progress", `Analyzing ${missingAnalyses.length} references independently`),
         });
         render({ preserveFocus: true });
-        const analysisResults = await Promise.allSettled(missingAnalyses.map(async (reference) => {
+        for (const reference of missingAnalyses) {
           const analysis = await retryTransientService(() => analyzeReference(current, reference));
-          const latest = store.getProject(project.id);
-          const nextReferences = latest.references.map((item) => (
+          const nextReferences = current.references.map((item) => (
             item.referenceId === reference.referenceId ? { ...item, analysis } : item
           ));
           current = store.updateProject(project.id, {
             references: nextReferences,
-            pipeline: updatePipeline(latest, "analyst", "in_progress", `${nextReferences.filter((item) => hasStoryLogic(item.analysis)).length} of ${latest.references.length} analyses ready`),
+            pipeline: updatePipeline(current, "analyst", "in_progress", `${nextReferences.filter((item) => hasStoryLogic(item.analysis)).length} of ${current.references.length} analyses ready`),
           });
           render({ preserveFocus: true });
-          return analysis;
-        }));
-        const analysisFailure = analysisResults.find((result) => result.status === "rejected");
-        if (analysisFailure) throw analysisFailure.reason;
+        }
       }
 
       current = store.getProject(project.id);
