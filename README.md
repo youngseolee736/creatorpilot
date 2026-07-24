@@ -1,5 +1,7 @@
 # CreatorPilot
 
+Live website: https://creatorpilot-95k2.onrender.com
+
 CreatorPilot is an AI project I made for YouTube script writing and storyboard
 planning. Instead of starting from nothing, the idea is to learn from strong
 reference transcripts, research the topic, write a new script, and then turn
@@ -8,17 +10,17 @@ that into a storyboard.
 ## What it does
 
 ```text
-Reference transcript → Script Analyst → Research Agent → Scriptwriter → Storyboard Agent
+Reference transcript → Script Analysis → Research → Script Draft → Storyboard
 ```
 
-- **Script Analyst**: looks at a reference transcript and pulls out the hook,
+- **Script Analysis**: looks at a reference transcript and pulls out the hook,
   pacing, and overall structure
   (manual transcript input + OpenRouter chat models)
-- **Research Agent**: makes a simple fact pack from web sources
+- **Research**: makes a simple fact pack from web sources
   (OpenRouter Responses API + `openrouter:web_search`)
-- **Scriptwriter:** writes a new script based on the structure and research
+- **Script Draft:** writes a new script based on the structure and research
   (OpenRouter models)
-- **Storyboard Agent:** turns the script into timed scenes, captions, visuals,
+- **Storyboard:** turns the script into timed scenes, captions, visuals,
   B-roll ideas, and AI image prompts (OpenRouter models)
 - **AI Image Preview:** can optionally generate storyboard still images
   (OpenRouter Images API)

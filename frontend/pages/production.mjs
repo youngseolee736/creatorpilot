@@ -54,15 +54,15 @@ function timeline(project) {
 export function renderProduction(project) {
   const backToScript = `<a class="button button-secondary" href="${routeFor("script", project.id)}">← Back to script</a>`;
   if (project.error) {
-    return `${pageHeading("Storyboard Agent", "Storyboard preview paused.", "The approved script remains saved.", backToScript)}${errorNotice(project.error, "retry-storyboard", "Storyboard Agent")}`;
+    return `${pageHeading("Storyboard", "Storyboard preview paused.", "The approved script remains saved.", backToScript)}${errorNotice(project.error, "retry-storyboard", "Storyboard")}`;
   }
   if (!project.storyboard.length) {
-    return `${pageHeading("Storyboard Agent", "Building the storyboard preview.", "The agent is turning narration into timed scenes, visual direction, captions, and B-roll search cues.", backToScript)}${loadingPanel("Storyboard Agent", "Generating storyboard preview…")}`;
+    return `${pageHeading("Storyboard", "Building the storyboard preview.", "This stage turns narration into timed scenes, visual direction, captions, and B-roll search cues.", backToScript)}${loadingPanel("Storyboard", "Generating storyboard preview…")}`;
   }
   const imageButtonLabel = project.imagePreviewStatus === "failed" ? "Retry key images" : project.imagePreviewStatus === "in_progress" ? "Generate key images again" : "Generate key images";
   return `${pageHeading("Preview Storyboard", "Storyboard ready.", "No MP4 is rendered here. This board is the final artifact: the decisions an AI production team would hand to an editor or presenter.", `<div class="button-row production-actions"><a class="button button-secondary" href="${routeFor("script", project.id)}">← Back to script</a><button class="button button-secondary" type="button" data-action="regenerate-storyboard">${icon("retry")}Regenerate</button><button class="image-inline-action" type="button" data-action="generate-storyboard-images">${icon("spark", 16)}${imageButtonLabel}</button></div>`)}
     <section class="storyboard-hero-panel">
-      <div><p class="eyebrow">Storyboard Agent</p><h2>${escapeHtml(project.title)}</h2><p>${project.storyboard.length} timed scenes showing narration, visual intent, captions, transitions, and suggested B-roll.</p></div>
+      <div><p class="eyebrow">Storyboard</p><h2>${escapeHtml(project.title)}</h2><p>${project.storyboard.length} timed scenes showing narration, visual intent, captions, transitions, and suggested B-roll.</p></div>
       ${statusBadge("under_review")}
     </section>
     ${timeline(project)}

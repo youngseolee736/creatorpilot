@@ -16,10 +16,10 @@ function verdictLabel(value) {
 export function renderResearch(project) {
   const backToAnalysis = `<a class="button button-secondary" href="${routeFor("analysis", project.id)}">← Back to analysis</a>`;
   if (project.error) {
-    return `${pageHeading("Research Agent", "Topic research paused.", "Your analysis and tailored brief remain saved.", backToAnalysis)}${errorNotice(project.error, "retry-research", "Research Agent")}`;
+    return `${pageHeading("Research", "Topic research paused.", "Your analysis and tailored brief remain saved.", backToAnalysis)}${errorNotice(project.error, "retry-research", "Research")}`;
   }
   if (!project.research) {
-    return `${pageHeading("Research Agent", "Collecting the strongest usable evidence.", "The agent is finding a small set of current sources, key facts, and one fair counterpoint.", backToAnalysis)}${loadingPanel("Research Agent", "Searching current sources and building a compact evidence pack. Keep this tab open.")}`;
+    return `${pageHeading("Research", "Collecting the strongest usable evidence.", "This stage is finding a small set of current sources, key facts, and one fair counterpoint.", backToAnalysis)}${loadingPanel("Research", "Searching current sources and building a compact evidence pack. Keep this tab open.")}`;
   }
   const research = project.research;
   const brief = project.creativeBrief;
@@ -35,7 +35,7 @@ export function renderResearch(project) {
   const sourceLinks = (sourceIds, label) => `<div class="fact-sources" aria-label="${escapeHtml(label)}">${list(sourceIds).map((sourceId) => { const source = sources.find((item) => item.sourceId === sourceId); return source ? `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.domain)} ${icon("external", 13)}</a>` : ""; }).join("")}</div>`;
   const narrativeModeLabel = narrativeCase?.mode === "direct" ? "Direct evidence" : narrativeCase?.mode === "reframe" ? "Stronger narrative lens" : "No honest route yet";
   const supportFactLabels = list(narrativeCase?.supportFactIds).map((factId) => escapeHtml(factId.replace("fact_", "Fact "))).join(" · ");
-  return `${pageHeading("Research Agent · Complete", "What the evidence says.", "See the verdict, the strongest narrative case, and the facts that can carry your story.", `<div class="button-row"><a class="button button-secondary" href="${routeFor("analysis", project.id)}">← Back to analysis</a><button class="button button-secondary" type="button" data-action="rerun-research">${icon("retry")}Research again</button><button class="button button-primary" type="button" data-action="generate-script">Write from research ${icon("arrow")}</button></div>`)}
+  return `${pageHeading("Research · Complete", "What the evidence says.", "See the verdict, the strongest narrative case, and the facts that can carry your story.", `<div class="button-row"><a class="button button-secondary" href="${routeFor("analysis", project.id)}">← Back to analysis</a><button class="button button-secondary" type="button" data-action="rerun-research">${icon("retry")}Research again</button><button class="button button-primary" type="button" data-action="generate-script">Write from research ${icon("arrow")}</button></div>`)}
     <div class="research-layout">
       <section class="research-main">
         <div class="research-summary research-verdict">

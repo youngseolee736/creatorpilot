@@ -26,7 +26,7 @@ export function renderAnalysis(project) {
           </form>
         </section>`
       : "";
-    return `${pageHeading("Script Analyst Agent", "Reference analysis paused.", "The project remains saved and can be retried without starting over.", backToProjects)}${errorNotice(project.error, "retry-analysis")}${manualFallback}`;
+    return `${pageHeading("Script Analysis", "Reference analysis paused.", "The project remains saved and can be retried without starting over.", backToProjects)}${errorNotice(project.error, "retry-analysis", "Script Analysis")}${manualFallback}`;
   }
   if (!project.analysis) {
     const references = list(project.references);
@@ -38,7 +38,7 @@ export function renderAnalysis(project) {
       : analysisCount < references.length
         ? `Analyzing story logic ${analysisCount + 1} of ${references.length}…`
         : "Combining the strongest storytelling patterns…";
-    return `${pageHeading("Script Analyst Agent", "Reading the references like a storyteller.", "Each video stays separate before CreatorPilot combines what makes the stories work.", backToProjects)}${loadingPanel(extracting ? "Reference intake" : "Script Analyst Agent", message)}`;
+    return `${pageHeading("Script Analysis", "Reading the references like a storyteller.", "Each video stays separate before CreatorPilot combines what makes the stories work.", backToProjects)}${loadingPanel(extracting ? "Reference intake" : "Script Analysis", message)}`;
   }
 
   const analysis = project.analysis;
@@ -54,7 +54,7 @@ export function renderAnalysis(project) {
   const references = list(project.references).length ? list(project.references) : project.transcript ? [{ position: 1, title: project.referenceTitle || "Reference video", transcript: project.transcript, analysis: project.analysis }] : [];
   const ensemble = analysis.ensemble;
 
-  return `${pageHeading("Script Analyst Agent · Complete", "The story behind the video.", "See the core flow, then reuse it with a different topic.", `<div class="button-row">${backToProjects}<button class="button button-secondary" type="button" data-action="rerun-analysis">${icon("retry")}Analyze again</button><button class="button button-primary" type="button" data-action="research-topic">Research your topic ${icon("arrow")}</button></div>`)}
+  return `${pageHeading("Script Analysis · Complete", "The story behind the video.", "See the core flow, then reuse it with a different topic.", `<div class="button-row">${backToProjects}<button class="button button-secondary" type="button" data-action="rerun-analysis">${icon("retry")}Analyze again</button><button class="button button-primary" type="button" data-action="research-topic">Research your topic ${icon("arrow")}</button></div>`)}
     <div class="analysis-layout compact-analysis-layout">
       <section class="analysis-main">
         <section class="story-snapshot" aria-labelledby="story-snapshot-heading">

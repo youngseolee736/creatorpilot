@@ -3,8 +3,8 @@ import { icon, pageHeading, statusBadge } from "../ui/components.mjs";
 
 const FLOW_ROLES = {
   transcript: ["Reference intake", "Transcripts and timing in"],
-  analyst: ["Script Analyst", "Extracts hook, pacing, structure"],
-  researcher: ["Research Agent", "Grounds the angle in sources"],
+  analyst: ["Script Analysis", "Extracts hook, pacing, structure"],
+  researcher: ["Research", "Grounds the angle in sources"],
   writer: ["Script Draft", "Turns the research into narration"],
   producer: ["Storyboard Preview", "Plans final scene board"],
 };
@@ -55,7 +55,7 @@ export function renderDashboard(state) {
     <section class="dashboard-summary" aria-label="Project summary">
       <div><span>Active projects</span><strong>${projects.filter((project) => !project.storyboard?.length).length}</strong><small>Across analysis, research, and writing</small></div>
       <div><span>Ready storyboards</span><strong>${projects.filter((project) => project.storyboard?.length).length}</strong><small>Scene previews completed</small></div>
-      <div class="summary-note"><span>Studio model</span><strong>5-stage agent pipeline</strong><small>Structure, facts, writing, scenes</small></div>
+      <div class="summary-note"><span>Studio model</span><strong>5-stage workflow</strong><small>Structure, facts, writing, scenes</small></div>
     </section>
     <section class="project-list-section"><div class="section-bar"><div><p class="eyebrow">Workspace</p><h2>Recent projects</h2></div><span>${projects.length} project${projects.length === 1 ? "" : "s"}</span></div><div class="project-list" role="list">${projects.map(projectRow).join("")}</div></section>`;
 }
