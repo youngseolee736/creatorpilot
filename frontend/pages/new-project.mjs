@@ -28,7 +28,7 @@ export function renderNewProject(draft = {}, error = null) {
           </div>
         </section>
         <section class="form-section" aria-labelledby="topic-heading">
-          <div class="section-index">02</div><div><h2 id="topic-heading">Original direction</h2><p>Describe the idea the new 60-second video should explain.</p></div>
+          <div class="section-index">02</div><div><h2 id="topic-heading">Original direction</h2><p>Describe the idea the new 10-15 minute video should explain.</p></div>
           <div class="field-group field-span"><label for="project-topic">New video topic</label><textarea class="field-textarea" id="project-topic" name="topic" required maxlength="140" placeholder="Why procrastination is not laziness">${escapeHtml(draft.topic || "")}</textarea><span class="field-hint">Be specific enough to guide evidence and visual choices.</span></div>
         </section>
         <section class="form-section" aria-labelledby="tailoring-heading">
@@ -46,7 +46,7 @@ export function renderNewProject(draft = {}, error = null) {
               <div class="field-group"><label for="must-include">Must include</label><textarea class="field-textarea field-textarea-compact" id="must-include" name="mustInclude" maxlength="1200" placeholder="One item per line">${escapeHtml(draft.mustInclude || "")}</textarea></div>
               <div class="field-group"><label for="must-avoid">Must avoid</label><textarea class="field-textarea field-textarea-compact" id="must-avoid" name="mustAvoid" maxlength="1200" placeholder="Clickbait promises&#10;Unverified statistics">${escapeHtml(draft.mustAvoid || "")}</textarea></div>
             </div>
-            <div class="field-group"><label for="call-to-action">Call to action</label><input class="field-input" id="call-to-action" name="callToAction" maxlength="300" value="${escapeHtml(draft.callToAction || "")}" placeholder="Invite viewers to follow for more one-minute explainers" /></div>
+            <div class="field-group"><label for="call-to-action">Call to action</label><input class="field-input" id="call-to-action" name="callToAction" maxlength="300" value="${escapeHtml(draft.callToAction || "")}" placeholder="Invite viewers to subscribe for more long-form explainers" /></div>
             </details>
           </div>
         </section>
@@ -54,7 +54,7 @@ export function renderNewProject(draft = {}, error = null) {
           <div class="section-index">04</div><div><h2 id="output-heading">Output</h2><p>These settings stay editable before rendering.</p></div>
           <div class="form-grid field-span">
             <div class="field-group"><label for="language">Target language</label><select class="field-select" id="language" name="language"><option${draft.language !== "English" ? " selected" : ""}>Korean</option><option${draft.language === "English" ? " selected" : ""}>English</option></select></div>
-            <div class="field-group"><label for="duration">Target duration</label><div class="field-unit"><input class="field-input" id="duration" name="duration" type="number" min="15" max="180" value="${escapeHtml(draft.duration || 60)}" /><span>seconds</span></div></div>
+            <div class="field-group"><label for="duration">Target duration</label><div class="field-unit"><input class="field-input" id="duration" name="duration" type="number" min="600" max="900" value="${escapeHtml(draft.duration || 720)}" /><span>seconds</span></div></div>
             <div class="field-group"><label for="format">Video format</label><select class="field-select" id="format" name="format"><option>9:16</option><option>1:1</option><option>16:9</option></select></div>
           </div>
           <fieldset class="analysis-depth field-span"><legend>Analysis depth</legend>
