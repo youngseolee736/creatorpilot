@@ -7,10 +7,6 @@ function referenceRows(draft) {
     return `<div class="reference-url-row">
       <div class="reference-url-meta"><span class="reference-number">${String(position).padStart(2, "0")}</span><span class="requirement-label">${required ? "Required" : "Optional"}</span></div>
       <div class="field-group">
-        <label for="reference-title-${position}">Reference title ${position}</label>
-        <input class="field-input" id="reference-title-${position}" name="referenceTitle${position}" type="text" value="${escapeHtml(draft[`referenceTitle${position}`] || "")}" placeholder="Reference video ${position}" />
-      </div>
-      <div class="field-group">
         <label for="reference-url-${position}">YouTube URL ${position} <small>(optional)</small></label>
         <input class="field-input" id="reference-url-${position}" name="referenceUrl${position}" type="url" inputmode="url" autocomplete="url" value="${escapeHtml(draft[`referenceUrl${position}`] || (position === 1 ? draft.referenceUrl || "" : ""))}" placeholder="https://youtube.com/watch?v=..." />
       </div>
