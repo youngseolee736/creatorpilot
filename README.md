@@ -69,7 +69,7 @@ job.
 
 ## Update After Demo Day
 
-After professor feedback, I changed Deep Research mode so multiple models could
+After professor feedback, I added Deep Research mode so multiple models could
 compare and judge each other's outputs and then choose a stronger final answer.
 Originally, this part only used GPT.
 
