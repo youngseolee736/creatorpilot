@@ -3,16 +3,16 @@ import { errorNotice, icon, loadingPanel, pageHeading } from "../ui/components.m
 
 export function renderScriptEditor(project) {
   const backToResearch = `<a class="button button-secondary" href="${routeFor("research", project.id)}">← Back to research</a>`;
-  if (project.error) return `${pageHeading("Scriptwriter Agent", "Script generation paused.", "Retry without losing the completed reference analysis or current draft.", backToResearch)}${errorNotice(project.error, "retry-script", "Scriptwriter")}`;
+  if (project.error) return `${pageHeading("Writing Stage", "Script generation paused.", "Retry without losing the completed reference analysis or current draft.", backToResearch)}${errorNotice(project.error, "retry-script", "Writing stage")}`;
   if (!project.generatedScript) {
-    return `${pageHeading("Scriptwriter Agent", "Building the case.", "The reference logic shapes the story while verified findings support the claim.", backToResearch)}${loadingPanel("Scriptwriter Agent", "Turning verified findings into a full-duration, claim-led narration. This can take a few minutes—keep this tab open.")}`;
+    return `${pageHeading("Writing Stage", "Building the case.", "The reference logic shapes the story while verified findings support the claim.", backToResearch)}${loadingPanel("Writing Stage", "Turning verified findings into a full-duration, claim-led narration. This can take a few minutes—keep this tab open.")}`;
   }
   const script = project.generatedScript;
   const count = wordCount(script);
   const strategyLabels = { direct_case: "Direct case", reframed_case: "Narrative case", evidence_boundary: "Evidence boundary", argue: "Direct case", qualify: "Narrative case", challenge: "Evidence boundary" };
   const strategy = script.claimStrategy || { mode: "reframed_case", explanation: "The draft makes the strongest evidence-backed case available." };
   const ensemble = script.ensemble;
-  return `${pageHeading("Scriptwriter Agent · Draft ready", "Build the case, then land the claim.", "Edit any section directly. Every marked finding comes from the completed research.", `<div class="button-row"><a class="button button-secondary" href="${routeFor("research", project.id)}">← Back to research</a><button class="button button-secondary" type="button" data-action="regenerate-script">${icon("retry")}New version</button></div>`)}
+  return `${pageHeading("Script Draft · Ready", "Build the case, then land the claim.", "Edit any section directly. Every marked finding comes from the completed research.", `<div class="button-row"><a class="button button-secondary" href="${routeFor("research", project.id)}">← Back to research</a><button class="button button-secondary" type="button" data-action="regenerate-script">${icon("retry")}New version</button></div>`)}
     <form id="script-form" class="editor-layout">
       <section class="script-workspace">
         <div class="editor-toolbar"><div><span>Draft ${script.version}</span><span id="autosave-state">Auto-saved locally</span></div><div><span><strong id="word-count">${count}</strong> words</span><span><strong>${script.estimatedSeconds}</strong> sec</span></div></div>

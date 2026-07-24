@@ -5,7 +5,7 @@ const FLOW_ROLES = {
   transcript: ["Reference intake", "Transcripts and timing in"],
   analyst: ["Script Analyst", "Extracts hook, pacing, structure"],
   researcher: ["Research Agent", "Grounds the angle in sources"],
-  writer: ["Scriptwriter", "Writes original narration only"],
+  writer: ["Script Draft", "Turns the research into narration"],
   producer: ["Storyboard Preview", "Plans final scene board"],
 };
 

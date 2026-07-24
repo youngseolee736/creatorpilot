@@ -67,7 +67,7 @@ export function renderNewProject(draft = {}, error = null) {
           </fieldset>
         </section>
       </div>
-      <aside class="form-aside"><div class="ethics-note"><span class="note-mark">CP</span><p class="eyebrow">Tailored by design</p><h2>Structure, facts, and intent stay separate.</h2><p>The Analyst extracts only story mechanics. The Research Agent finds current sources for your exact angle. The Scriptwriter receives both, plus your creative decisions.</p><ul><li>${icon("check", 16)}Target audience comes from you, not the reference</li><li>${icon("check", 16)}Claims stay attached to verifiable sources</li><li>${icon("check", 16)}You approve the final script before scene planning</li></ul></div></aside>
+      <aside class="form-aside"><div class="ethics-note"><span class="note-mark">CP</span><p class="eyebrow">Tailored by design</p><h2>Structure, facts, and intent stay separate.</h2><p>The Analyst extracts only story mechanics. The Research Agent finds current sources for your exact angle. The writing stage receives both, plus your creative decisions.</p><ul><li>${icon("check", 16)}Target audience comes from you, not the reference</li><li>${icon("check", 16)}Claims stay attached to verifiable sources</li><li>${icon("check", 16)}You approve the final script before scene planning</li></ul></div></aside>
       <div class="form-submit"><a class="button button-secondary" href="#/dashboard">Cancel</a><button class="button button-primary" type="submit">Analyze transcripts ${icon("arrow")}</button></div>
     </form>`;
 }

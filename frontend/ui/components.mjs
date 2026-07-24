@@ -16,7 +16,7 @@ function studioConnectionLabel() {
       return { mode: "Hybrid studio", detail: "4 production services connected" };
     }
     if (services.script === "api") {
-      return { mode: "Hybrid studio", detail: "Transcript + analyst + scriptwriter connected" };
+      return { mode: "Hybrid studio", detail: "Transcript + analyst + script connected" };
     }
     return { mode: "Hybrid studio", detail: "Transcript + analyst connected" };
   }

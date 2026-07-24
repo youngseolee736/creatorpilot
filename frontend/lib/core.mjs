@@ -4,7 +4,7 @@ export const PIPELINE_STEPS = [
   { id: "transcript", label: "References prepared", agent: "Reference intake" },
   { id: "analyst", label: "Script Analyst", agent: "Structure and retention" },
   { id: "researcher", label: "Research Agent", agent: "Facts and sources" },
-  { id: "writer", label: "Scriptwriter", agent: "Original narration" },
+  { id: "writer", label: "Script Draft", agent: "Original narration" },
   { id: "producer", label: "Storyboard Preview", agent: "Scene planning" },
 ];
 
