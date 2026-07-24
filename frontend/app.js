@@ -69,7 +69,7 @@ function render({ preserveFocus = false } = {}) {
   const routeKey = `${route.name}:${route.projectId || ""}`;
   app.innerHTML = appShell({ content: pageFor(route, project), route, project });
   fitScriptTextareas();
-  document.title = `${project ? `${project.title} — ` : ""}${route.name === "dashboard" ? "Dashboard" : route.name === "new" ? "New project" : route.name} · CreatorPilot`;
+  document.title = `${project ? `${project.title} · ` : ""}${route.name === "dashboard" ? "Dashboard" : route.name === "new" ? "New project" : route.name} · CreatorPilot`;
   if (!preserveFocus && routeKey !== lastRouteKey) {
     window.scrollTo({ top: 0, behavior: "instant" });
     requestAnimationFrame(() => document.querySelector("#page-content")?.focus());
@@ -96,7 +96,7 @@ function failProject(project, stepId, error) {
       retryable: error.retryable ?? true,
       details: error.details || null,
     },
-    pipeline: updatePipeline(project, stepId, "failed", "Agent stopped — retry available"),
+    pipeline: updatePipeline(project, stepId, "failed", "Agent stopped. Retry available"),
   });
   render({ preserveFocus: true });
   requestAnimationFrame(() => document.querySelector("#service-error")?.focus());

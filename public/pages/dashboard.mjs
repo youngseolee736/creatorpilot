@@ -45,7 +45,7 @@ export function renderDashboard(state) {
   const heading = pageHeading(
     "YouTube script studio",
     "Watch a reference become your script.",
-    "Paste reference links and a topic. Each agent below handles one stage — structure, facts, writing, and scenes — in the open, not in a chat box.",
+    "Paste reference links and a topic. Each agent below handles one stage: structure, facts, writing, and scenes. All in the open, not in a chat box.",
     `<a class="button button-primary" href="${routeFor("new")}">${icon("plus")}Create new video</a>`,
   );
   if (!projects.length) {

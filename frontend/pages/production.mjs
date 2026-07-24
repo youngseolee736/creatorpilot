@@ -19,7 +19,7 @@ function sceneCard(scene) {
         : "";
   return `<article class="storyboard-preview-card">
     <header>
-      <div><span>${start} — ${end}</span><strong>${escapeHtml(scene.label || `Scene ${String(scene.number).padStart(2, "0")}`)}</strong></div>
+      <div><span>${start} to ${end}</span><strong>${escapeHtml(scene.label || `Scene ${String(scene.number).padStart(2, "0")}`)}</strong></div>
       <small>${escapeHtml(scene.duration)}s</small>
     </header>
     <div class="storyboard-preview-body">
