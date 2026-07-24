@@ -1,60 +1,38 @@
 # CreatorPilot
 
-CreatorPilot is an AI multi-agent YouTube production studio that turns a proven,
-successful video into a brand-new script for you. It is built for beginners:
-instead of starting from a blank page, you start from what already works.
+CreatorPilot is an AI multi-agent YouTube script and storyboard studio.
+Instead of starting from a blank page, it studies a successful reference video,
+researches the topic, writes a new script, and turns it into a production-ready
+storyboard.
 
-## Motive
+## What it does
 
-I started making YouTube videos, and honestly, my storytelling scripts were
-terrible. A friend gave me simple advice: watch lots of videos in your niche
-and copy them at first — that's how you learn what works.
-
-So I thought: what if a service did that for you? CreatorPilot analyzes scripts
-that are already complete and successful, then builds your script around them.
-
-## How it works
-
-```
+```text
 YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboard Agent
 ```
 
-- **Script Analyst** — takes the transcript of a successful reference video and
-  extracts its storytelling mechanics: the hook, the pacing, the structure.
-  This becomes the blueprint for your script.
-- **Research Agent** — searches the web and builds a Fact Pack with verified
-  sources, so your script is grounded in real evidence, not made-up claims.
-- **Scriptwriter** — writes an original script that follows the blueprint's
-  storytelling structure but is filled with your topic and the researched
-  facts. It also handles revision requests.
-- **Storyboard Agent** — turns the approved script into timed scenes with
-  captions, visual direction, AI image prompts, transitions, and suggested
-  B-roll queries. This is the final project artifact instead of an actual MP4
-  render.
-- **AI Image Preview** — optionally generates still storyboard images with
-  OpenRouter's image API, so the board can be presented visually without a
-  video-rendering pipeline.
+- Script Analyst: extracts hook, pacing, and structure from a reference video
+- Research Agent: builds a lightweight fact pack from web sources
+- Scriptwriter: writes a new script based on the structure and evidence
+- Storyboard Agent: converts the script into timed scenes, captions, visuals,
+  B-roll ideas, and AI image prompts
+- AI Image Preview: optionally generates storyboard stills through OpenRouter
 
-### Deep Research mode
+## Deep Research mode
 
-Deep mode upgrades the Script Analyst and Scriptwriter into an ensemble of
-multiple models, currently GPT and Gemini through OpenRouter. The Research
-Agent stays lightweight so it does not bottleneck the workflow. The Judge step
-compares competing analysis or writing outputs and picks the strongest one as
-the final result.
+Deep mode uses multiple models through OpenRouter for analysis and writing.
+Right now, the comparison flow is centered on GPT and Gemini. The lightweight
+research step stays simple to avoid becoming a bottleneck, and the judge picks
+the strongest result.
+
+## Why I built it
+
+I wanted a system that helps beginner creators learn from videos that already
+work. The main idea is simple: break one big creative task into smaller agent
+roles with clear responsibilities, then let each role do one job well.
 
 ## What I learned
 
-This project taught me how to use AI effectively, not just use it more. I had
-always wanted to build an AI agent system where each agent has its own role and
-its own restrictions — and now I understand why that matters. When you hand a
-model a vague, broad instruction like "just do this," you get vague, low-quality
-output back. Giving each agent a narrow role, a specific prompt, and clear
-limits on what it can and cannot do made a visible difference in output
-quality. That shift — from one big prompt to many small, constrained ones — was
-the most meaningful lesson.
-
-Working with OpenRouter was also a new experience. Being able to route
-different agents to different models, such as GPT and Gemini, through a single
-API opened my eyes to how much model choice affects the result — and made the
-Deep Research mode's judge-based ensemble possible in the first place.
+- Smaller, tightly scoped agents produce better results than one vague prompt
+- Model choice matters, especially when comparing multiple writing strategies
+- A polished storyboard can be a stronger final artifact than full video render
