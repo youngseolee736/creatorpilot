@@ -56,6 +56,26 @@ test("honors an explicit Research Agent deadline", () => {
   assert.equal(researcher.provider.timeoutMs, 240000);
 });
 
+test("deep Research roles inherit one OpenRouter connection and select independent models", () => {
+  const researcher = new Researcher({
+    environment: {
+      LLM_PROVIDER: "openrouter",
+      LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
+      LLM_API_KEY: "shared-openrouter-key",
+      LLM_MODEL: "vendor/default-model",
+      RESEARCH_A_LLM_MODEL: "vendor-a/evidence-model",
+      RESEARCH_B_LLM_MODEL: "vendor-b/narrative-model",
+      RESEARCH_JUDGE_LLM_MODEL: "vendor-c/judge-model",
+    },
+  });
+  assert.equal(researcher.candidateAProvider.apiKey, "shared-openrouter-key");
+  assert.equal(researcher.candidateBProvider.apiBaseUrl, "https://openrouter.ai/api/v1");
+  assert.equal(researcher.candidateAProvider.model, "vendor-a/evidence-model");
+  assert.equal(researcher.candidateBProvider.model, "vendor-b/narrative-model");
+  assert.equal(researcher.judgeProvider.model, "vendor-c/judge-model");
+  assert.equal(researcher.judgeProvider.providerName, "openrouter");
+});
+
 async function request(app, path, body) {
   const server = app.listen(0, "127.0.0.1"); await new Promise((resolve) => server.once("listening", resolve));
   const payload = JSON.stringify(body);
@@ -150,9 +170,67 @@ test("builds a Responses API web_search request with structured output and sourc
   assert.equal(captured.url, "https://api.openai.com/v1/responses"); assert.deepEqual(captured.body.tools, [{ type: "web_search", search_context_size: "medium" }]); assert.deepEqual(captured.body.include, ["web_search_call.action.sources"]); assert.equal(captured.body.text.format.type, "json_schema");
 });
 
+test("builds an OpenRouter Responses request with the server web search tool", async () => {
+  let captured;
+  const fetchImpl = async (url, options) => {
+    captured = { url, headers: options.headers, body: JSON.parse(options.body) };
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        output: [{
+          type: "message",
+          content: [{
+            type: "output_text",
+            text: "{}",
+            annotations: [{ type: "url_citation", url: "https://source.example/report", title: "Source" }],
+          }],
+        }],
+      }),
+    };
+  };
+  const provider = new OpenAIWebResearchProvider({
+    providerName: "openrouter",
+    apiBaseUrl: "https://openrouter.ai/api/v1",
+    apiKey: "test-key",
+    model: "vendor/research-model",
+    httpReferer: "https://creatorpilot.example",
+    appTitle: "CreatorPilot",
+    fetchImpl,
+    AbortControllerImpl: AbortController,
+  });
+  await provider.research({ instructions: "Research", input: "Topic", schema: { type: "object" } });
+  assert.equal(captured.url, "https://openrouter.ai/api/v1/responses");
+  assert.deepEqual(captured.body.tools, [{
+    type: "openrouter:web_search",
+    parameters: { search_context_size: "medium", max_results: 5, max_total_results: 10 },
+  }]);
+  assert.equal(captured.body.max_tool_calls, 3);
+  assert.equal(Object.prototype.hasOwnProperty.call(captured.body, "include"), false);
+  assert.equal(captured.headers["HTTP-Referer"], "https://creatorpilot.example");
+  assert.equal(captured.headers["X-OpenRouter-Title"], "CreatorPilot");
+});
+
 test("collects both consulted and cited HTTPS sources", () => {
   const result = responseParts({ output: [{ type: "web_search_call", action: { sources: [{ url: "https://one.example/a", title: "One" }, { url: "http://unsafe.example", title: "Unsafe" }] } }, { type: "message", content: [{ type: "output_text", text: "result", annotations: [{ type: "url_citation", url: "https://two.example/b", title: "Two" }] }] }] });
   assert.equal(result.text, "result"); assert.deepEqual(result.sources.map((source) => source.url), ["https://one.example/a", "https://two.example/b"]);
+});
+
+test("collects OpenRouter nested citation annotations", () => {
+  const result = responseParts({
+    output: [{
+      type: "message",
+      content: [{
+        type: "output_text",
+        text: "result",
+        annotations: [{
+          type: "url_citation",
+          url_citation: { url: "https://nested.example/report", title: "Nested source" },
+        }],
+      }],
+    }],
+  });
+  assert.deepEqual(result.sources, [{ url: "https://nested.example/report", title: "Nested source" }]);
 });
 
 let failures = 0;

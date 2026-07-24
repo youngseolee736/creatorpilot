@@ -1,12 +1,14 @@
 const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
 const { llmConfigurationError, mapLLMError } = require("../llm/llm-errors");
+const { isOpenRouter, openRouterHeaders } = require("../llm/openrouter");
 
 function validHttpsSource(source) {
   try {
-    const url = new URL(source?.url);
+    const normalized = source?.url_citation || source;
+    const url = new URL(normalized?.url);
     if (url.protocol !== "https:") return null;
-    return { url: url.href, title: String(source?.title || url.hostname).trim().slice(0, 300) };
+    return { url: url.href, title: String(normalized?.title || url.hostname).trim().slice(0, 300) };
   } catch {
     return null;
   }
@@ -45,12 +47,42 @@ class OpenAIWebResearchProvider {
     this.apiKey = String(options.apiKey || "");
     this.model = String(options.model || "");
     this.timeoutMs = Number(options.timeoutMs || 30000);
+    this.providerName = String(options.providerName || "openai-web-search");
+    this.httpReferer = String(options.httpReferer || "");
+    this.appTitle = String(options.appTitle || "");
     this.fetchImpl = options.fetchImpl || fetch;
     this.AbortControllerImpl = options.AbortControllerImpl || AbortController;
   }
 
   endpoint() {
     return /\/responses$/.test(this.apiBaseUrl) ? this.apiBaseUrl : `${this.apiBaseUrl}/responses`;
+  }
+
+  usesOpenRouter() {
+    return isOpenRouter(this.providerName, this.apiBaseUrl);
+  }
+
+  requestBody({ instructions, input, schema }) {
+    const openRouter = this.usesOpenRouter();
+    return {
+      model: this.model,
+      instructions,
+      input,
+      tools: openRouter
+        ? [{
+          type: "openrouter:web_search",
+          parameters: {
+            search_context_size: "medium",
+            max_results: 5,
+            max_total_results: 10,
+          },
+        }]
+        : [{ type: "web_search", search_context_size: "medium" }],
+      tool_choice: "required",
+      ...(!openRouter ? { include: ["web_search_call.action.sources"] } : { max_tool_calls: 3 }),
+      text: { format: { type: "json_schema", name: "creatorpilot_fact_pack", strict: true, schema } },
+      store: false,
+    };
   }
 
   validateConfiguration() {
@@ -72,17 +104,18 @@ class OpenAIWebResearchProvider {
     try {
       const response = await this.fetchImpl(this.endpoint(), {
         method: "POST",
-        headers: { Accept: "application/json", Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: this.model,
-          instructions,
-          input,
-          tools: [{ type: "web_search", search_context_size: "medium" }],
-          tool_choice: "required",
-          include: ["web_search_call.action.sources"],
-          text: { format: { type: "json_schema", name: "creatorpilot_fact_pack", strict: true, schema } },
-          store: false,
-        }),
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          ...openRouterHeaders({
+            providerName: this.providerName,
+            apiBaseUrl: this.apiBaseUrl,
+            httpReferer: this.httpReferer,
+            appTitle: this.appTitle,
+          }),
+        },
+        body: JSON.stringify(this.requestBody({ instructions, input, schema })),
         signal: controller.signal,
       });
       const rawBody = await response.text();
@@ -115,4 +148,3 @@ class OpenAIWebResearchProvider {
 }
 
 module.exports = { OpenAIWebResearchProvider, responseParts };
-

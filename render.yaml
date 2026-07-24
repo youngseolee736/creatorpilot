@@ -8,12 +8,34 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: LLM_PROVIDER
-        value: openai-compatible
+        value: openrouter
       - key: LLM_API_BASE_URL
-        sync: false
+        value: https://openrouter.ai/api/v1
       - key: LLM_API_KEY
         sync: false
       - key: LLM_MODEL
+        sync: false
+      - key: LLM_TIMEOUT_MS
+        value: 300000
+      - key: OPENROUTER_APP_TITLE
+        value: CreatorPilot
+      - key: ANALYST_A_LLM_MODEL
+        sync: false
+      - key: ANALYST_B_LLM_MODEL
+        sync: false
+      - key: ANALYST_JUDGE_LLM_MODEL
+        sync: false
+      - key: RESEARCH_A_LLM_MODEL
+        sync: false
+      - key: RESEARCH_B_LLM_MODEL
+        sync: false
+      - key: RESEARCH_JUDGE_LLM_MODEL
+        sync: false
+      - key: SCRIPTWRITER_A_LLM_MODEL
+        sync: false
+      - key: SCRIPTWRITER_B_LLM_MODEL
+        sync: false
+      - key: SCRIPTWRITER_JUDGE_LLM_MODEL
         sync: false
       - key: SHOTSTACK_API_KEY
         sync: false

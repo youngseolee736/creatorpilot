@@ -457,6 +457,32 @@ test("omits temperature by default for reasoning-model compatibility", async () 
   assert.deepEqual(requestBody.response_format, { type: "json_object" });
 });
 
+test("accepts OpenRouter as an OpenAI-compatible provider and sends optional attribution", async () => {
+  let captured;
+  const provider = createLLMProvider({
+    environment: {
+      LLM_PROVIDER: "openrouter",
+      LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
+      LLM_API_KEY: "test-only-key",
+      LLM_MODEL: "vendor/test-model",
+      OPENROUTER_HTTP_REFERER: "https://creatorpilot.example",
+      OPENROUTER_APP_TITLE: "CreatorPilot",
+    },
+    openAICompatibleOptions: {
+      fetchImpl: async (url, options) => {
+        captured = { url, headers: options.headers };
+        return { ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: "{}" } }] }) };
+      },
+      AbortControllerImpl: AbortController,
+    },
+  });
+
+  await provider.complete([{ role: "user", content: "Return JSON." }]);
+  assert.equal(captured.url, "https://openrouter.ai/api/v1/chat/completions");
+  assert.equal(captured.headers["HTTP-Referer"], "https://creatorpilot.example");
+  assert.equal(captured.headers["X-OpenRouter-Title"], "CreatorPilot");
+});
+
 test("returns a clear error when provider configuration is missing", async () => {
   const provider = new OpenAICompatibleProvider({ apiBaseUrl: "", apiKey: "", model: "" });
   const result = await request(createApp({ scriptAnalyst: new ScriptAnalyst({ provider }) }), "/api/analysis/reference", validRequest());
@@ -488,13 +514,25 @@ test("Agent LLM settings override individual shared values and retain fallback",
 
 test("each LLM Agent selects its own scoped provider configuration", () => {
   const environment = {
-    LLM_API_BASE_URL: "https://shared.example/v1", LLM_API_KEY: "shared-key", LLM_MODEL: "shared-model",
+    LLM_PROVIDER: "openrouter", LLM_API_BASE_URL: "https://openrouter.ai/api/v1", LLM_API_KEY: "shared-key", LLM_MODEL: "shared-model",
     ANALYST_LLM_MODEL: "analyst-model", SCRIPTWRITER_LLM_MODEL: "writer-model",
     REVIEWER_LLM_MODEL: "reviewer-model", STORYBOARD_LLM_MODEL: "storyboard-model",
+    ANALYST_A_LLM_MODEL: "vendor-a/analyst-model", ANALYST_B_LLM_MODEL: "vendor-b/analyst-model", ANALYST_JUDGE_LLM_MODEL: "vendor-c/judge-model",
+    SCRIPTWRITER_A_LLM_MODEL: "vendor-a/writer-model", SCRIPTWRITER_B_LLM_MODEL: "vendor-b/writer-model", SCRIPTWRITER_JUDGE_LLM_MODEL: "vendor-c/judge-model",
   };
   const llmOptions = { environment };
-  assert.equal(new ScriptAnalyst({ llmOptions }).provider.model, "analyst-model");
-  assert.equal(new Scriptwriter({ llmOptions }).provider.model, "writer-model");
+  const analyst = new ScriptAnalyst({ llmOptions });
+  const writer = new Scriptwriter({ llmOptions });
+  assert.equal(analyst.provider.model, "analyst-model");
+  assert.equal(analyst.candidateAProvider.model, "vendor-a/analyst-model");
+  assert.equal(analyst.candidateBProvider.model, "vendor-b/analyst-model");
+  assert.equal(analyst.judgeProvider.model, "vendor-c/judge-model");
+  assert.equal(analyst.judgeProvider.apiKey, "shared-key");
+  assert.equal(writer.provider.model, "writer-model");
+  assert.equal(writer.candidateAProvider.model, "vendor-a/writer-model");
+  assert.equal(writer.candidateBProvider.model, "vendor-b/writer-model");
+  assert.equal(writer.judgeProvider.model, "vendor-c/judge-model");
+  assert.equal(writer.judgeProvider.apiBaseUrl, "https://openrouter.ai/api/v1");
   assert.equal(new OriginalityReviewer({ llmOptions }).provider.model, "reviewer-model");
   assert.equal(new StoryboardAgent({ llmOptions }).provider.model, "storyboard-model");
 });

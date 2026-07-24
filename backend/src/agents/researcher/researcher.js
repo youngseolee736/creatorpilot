@@ -23,6 +23,9 @@ class Researcher {
         apiKey: config.apiKey,
         model: config.model,
         timeoutMs: hasScopedTimeout ? config.timeoutMs : Math.max(Number(config.timeoutMs) || 0, 300000),
+        providerName: config.providerName,
+        httpReferer: environment.OPENROUTER_HTTP_REFERER,
+        appTitle: environment.OPENROUTER_APP_TITLE,
         ...(options.providerOptions || {}),
       });
     };

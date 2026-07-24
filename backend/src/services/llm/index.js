@@ -3,14 +3,18 @@ const { hasLLMConfiguration, resolveLLMConfig } = require("./llm-config");
 const { OpenAICompatibleProvider } = require("./openai-compatible-provider");
 
 function createLLMProvider(options = {}) {
-  const resolved = resolveLLMConfig(options.envPrefix, options.environment || process.env);
+  const environment = options.environment || process.env;
+  const resolved = resolveLLMConfig(options.envPrefix, environment);
   const providerName = String(options.providerName || resolved.providerName).toLowerCase();
   if (options.provider) return options.provider;
-  if (providerName === "openai-compatible") return new OpenAICompatibleProvider({
+  if (providerName === "openai-compatible" || providerName === "openrouter") return new OpenAICompatibleProvider({
     apiBaseUrl: resolved.apiBaseUrl || "",
     apiKey: resolved.apiKey || "",
     model: resolved.model || "",
     timeoutMs: resolved.timeoutMs,
+    providerName,
+    httpReferer: environment.OPENROUTER_HTTP_REFERER,
+    appTitle: environment.OPENROUTER_APP_TITLE,
     ...(options.openAICompatibleOptions || {}),
     agentLabel: options.agentLabel,
   });

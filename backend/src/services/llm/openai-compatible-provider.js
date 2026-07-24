@@ -2,6 +2,7 @@ const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
 const { LLMProvider } = require("./llm-provider");
 const { llmConfigurationError, mapLLMError } = require("./llm-errors");
+const { openRouterHeaders } = require("./openrouter");
 
 class OpenAICompatibleProvider extends LLMProvider {
   constructor(options = {}) {
@@ -10,6 +11,9 @@ class OpenAICompatibleProvider extends LLMProvider {
     this.apiKey = String(options.apiKey ?? process.env.LLM_API_KEY ?? "");
     this.model = String(options.model ?? process.env.LLM_MODEL ?? "");
     this.timeoutMs = Number(options.timeoutMs ?? process.env.LLM_TIMEOUT_MS ?? 30000);
+    this.providerName = String(options.providerName ?? process.env.LLM_PROVIDER ?? "openai-compatible");
+    this.httpReferer = String(options.httpReferer ?? process.env.OPENROUTER_HTTP_REFERER ?? "");
+    this.appTitle = String(options.appTitle ?? process.env.OPENROUTER_APP_TITLE ?? "");
     this.fetchImpl = options.fetchImpl || fetch;
     this.AbortControllerImpl = options.AbortControllerImpl || AbortController;
     this.agentLabel = options.agentLabel || "AI agent";
@@ -55,6 +59,12 @@ class OpenAICompatibleProvider extends LLMProvider {
           Accept: "application/json",
           Authorization: `Bearer ${this.apiKey}`,
           "Content-Type": "application/json",
+          ...openRouterHeaders({
+            providerName: this.providerName,
+            apiBaseUrl: this.apiBaseUrl,
+            httpReferer: this.httpReferer,
+            appTitle: this.appTitle,
+          }),
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,

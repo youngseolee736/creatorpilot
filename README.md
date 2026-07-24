@@ -56,55 +56,54 @@ Set `TRANSCRIPT_PROVIDER=hosted` to use `TRANSCRIPT_API_URL` directly, or set
 retryable local-provider failure. Keep fallback disabled unless the configured
 endpoint is trusted and its request and response contract has been verified.
 
-The Script Analyst, Scriptwriter, Originality Reviewer, and Storyboard Agent
-default to an OpenAI-compatible Chat Completions provider. All values remain
-server-side:
+The Script Analyst, Research Agent, Scriptwriter, Originality Reviewer, and
+Storyboard Agent can share one OpenRouter connection. An OpenRouter model slug
+selects the concrete model for each request. All values remain server-side:
 
 ```dotenv
-LLM_PROVIDER=openai-compatible
-LLM_API_BASE_URL=https://api.example.com/v1
+LLM_PROVIDER=openrouter
+LLM_API_BASE_URL=https://openrouter.ai/api/v1
 LLM_API_KEY=replace-with-server-side-key
-LLM_MODEL=replace-with-model-id
-LLM_TIMEOUT_MS=30000
+LLM_MODEL=vendor/default-model-slug
+LLM_TIMEOUT_MS=300000
+
+# Optional OpenRouter attribution.
+OPENROUTER_HTTP_REFERER=https://your-app.example
+OPENROUTER_APP_TITLE=CreatorPilot
 ```
 
 Each LLM Agent can override any shared value independently. Blank or omitted
 Agent values fall back field-by-field to `LLM_*`, so a deployment can change
-only a model or provide a completely separate endpoint and key:
+only a model while reusing the same OpenRouter key and endpoint:
 
 ```dotenv
-ANALYST_LLM_MODEL=fast-analysis-model
+ANALYST_LLM_MODEL=vendor/standard-analysis-model
 
-# Optional Deep analysis roles. Set only MODEL to share the Analyst endpoint/key,
-# or override the full provider configuration for a different vendor.
-ANALYST_A_LLM_MODEL=hook-specialist-model
-ANALYST_B_LLM_MODEL=structure-specialist-model
-ANALYST_JUDGE_LLM_MODEL=strong-judge-model
+# Deep analysis: two independent candidates and a final Judge.
+ANALYST_A_LLM_MODEL=vendor-a/hook-specialist-model
+ANALYST_B_LLM_MODEL=vendor-b/structure-specialist-model
+ANALYST_JUDGE_LLM_MODEL=vendor-c/strong-judge-model
 
-SCRIPTWRITER_LLM_API_BASE_URL=https://writer-provider.example/v1
-SCRIPTWRITER_LLM_API_KEY=writer-server-side-key
-SCRIPTWRITER_LLM_MODEL=strong-writing-model
+SCRIPTWRITER_LLM_MODEL=vendor/standard-writing-model
 
-REVIEWER_LLM_MODEL=conservative-review-model
-STORYBOARD_LLM_MODEL=visual-planning-model
+REVIEWER_LLM_MODEL=vendor/conservative-review-model
+STORYBOARD_LLM_MODEL=vendor/visual-planning-model
 ```
 
-The Research Agent uses the OpenAI Responses API `web_search` tool rather than
-the Chat Completions adapter. It may reuse the shared OpenAI base URL, key, and
-model, or use its own server-side overrides. Web research defaults to a five-minute
-timeout when no scoped timeout is supplied:
+The Research Agent uses the Responses API rather than Chat Completions. It
+automatically sends OpenRouter's `openrouter:web_search` server tool when the
+provider or base URL identifies OpenRouter. It reuses the shared URL and key;
+only role-specific model slugs are needed. Web research defaults to a
+five-minute timeout:
 
 ```dotenv
-RESEARCH_LLM_PROVIDER=openai-web-search
-RESEARCH_LLM_API_BASE_URL=https://api.openai.com/v1
-RESEARCH_LLM_API_KEY=research-server-side-key
-RESEARCH_LLM_MODEL=web-search-capable-model
+RESEARCH_LLM_MODEL=vendor/standard-research-model
 RESEARCH_LLM_TIMEOUT_MS=300000
 
-# Optional Deep research roles; each must support Responses API web_search.
-RESEARCH_A_LLM_MODEL=direct-evidence-model
-RESEARCH_B_LLM_MODEL=narrative-research-model
-RESEARCH_JUDGE_LLM_MODEL=research-judge-model
+# Deep research roles share LLM_API_KEY and LLM_API_BASE_URL.
+RESEARCH_A_LLM_MODEL=vendor-a/direct-evidence-model
+RESEARCH_B_LLM_MODEL=vendor-b/narrative-research-model
+RESEARCH_JUDGE_LLM_MODEL=vendor-c/research-judge-model
 ```
 
 Claim-led full-duration Scriptwriter calls also default to five minutes per
@@ -115,9 +114,9 @@ timeout. Override it independently when needed:
 SCRIPTWRITER_LLM_TIMEOUT_MS=300000
 
 # Optional Deep writing roles.
-SCRIPTWRITER_A_LLM_MODEL=storytelling-model
-SCRIPTWRITER_B_LLM_MODEL=evidence-writing-model
-SCRIPTWRITER_JUDGE_LLM_MODEL=writing-judge-model
+SCRIPTWRITER_A_LLM_MODEL=vendor-a/storytelling-model
+SCRIPTWRITER_B_LLM_MODEL=vendor-b/evidence-writing-model
+SCRIPTWRITER_JUDGE_LLM_MODEL=vendor-c/writing-judge-model
 ```
 
 Deep analysis is an optional project-wide ensemble. The Analyst compares hook
@@ -129,8 +128,10 @@ the first validated candidate. Blank Deep-role values reuse that stage's main
 provider, which is useful for local development but does not create true model
 diversity. Configure distinct `*_A_LLM_MODEL`, `*_B_LLM_MODEL`, and
 `*_JUDGE_LLM_MODEL` values when independent models are required. Research roles
-must support the OpenAI Responses API `web_search` tool; Analyst and Scriptwriter
-roles use the OpenAI-compatible Chat Completions contract. Deep mode can use
+use OpenRouter's Responses API server web search tool; Analyst and Scriptwriter
+roles use OpenRouter's OpenAI-compatible Chat Completions contract. OpenRouter
+routing and fallback are separate from this ensemble: the backend starts both
+candidates and sends their validated results to the Judge. Deep mode can use
 three calls per stage plus contract-repair calls, so it costs more and takes
 longer than Standard.
 
@@ -139,9 +140,10 @@ The supported prefixes are `ANALYST_`, `ANALYST_A_`, `ANALYST_B_`,
 `RESEARCH_JUDGE_`, `SCRIPTWRITER_`, `SCRIPTWRITER_A_`, `SCRIPTWRITER_B_`,
 `SCRIPTWRITER_JUDGE_`, `REVIEWER_`, and `STORYBOARD_`;
 each accepts `LLM_PROVIDER`, `LLM_API_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and
-`LLM_TIMEOUT_MS`. Current LLM adapters must expose the
-OpenAI-compatible Chat Completions contract. Native Gemini or Anthropic
-contracts require an additional provider adapter.
+`LLM_TIMEOUT_MS`. Set `LLM_PROVIDER=openrouter` for the built-in OpenRouter
+gateway, or `openai-compatible` for another compatible Chat Completions
+endpoint. Native Gemini or Anthropic contracts require an additional provider
+adapter.
 
 The backend and mock-only frontend work without these values. Calling any real
 LLM endpoint without complete configuration returns `LLM_NOT_CONFIGURED`.
