@@ -38,10 +38,10 @@ YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboar
 ### Deep Research mode
 
 Deep mode upgrades the Script Analyst and Scriptwriter into an ensemble of
-multiple models, currently GPT and Gemini through OpenRouter. The Research
-Agent stays lightweight so it does not bottleneck the workflow. The Judge step
-compares competing analysis or writing outputs and picks the strongest one as
-the final result.
+two models — Gemini, and GPT. The Research Agent stays lightweight so
+it does not bottleneck the workflow. The Judge step compares the competing
+analysis or writing outputs and picks the strongest one as the final result.
+At first, I was going to put claude, but it was too costly and expensive. 
 
 ## What I learned
 
@@ -55,6 +55,6 @@ quality. That shift — from one big prompt to many small, constrained ones — 
 the most meaningful lesson.
 
 Working with OpenRouter was also a new experience. Being able to route
-different agents to different models, such as GPT and Gemini, through a single
+different agents to different models (Claude, Gemini, GPT) through a single
 API opened my eyes to how much model choice affects the result — and made the
 Deep Research mode's judge-based ensemble possible in the first place.
