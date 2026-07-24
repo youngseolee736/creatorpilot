@@ -6,10 +6,6 @@ function referenceRows(draft) {
     const required = position <= 3;
     return `<div class="reference-url-row">
       <div class="reference-url-meta"><span class="reference-number">${String(position).padStart(2, "0")}</span><span class="requirement-label">${required ? "Required" : "Optional"}</span></div>
-      <div class="field-group">
-        <label for="reference-url-${position}">YouTube URL ${position} <small>(optional)</small></label>
-        <input class="field-input" id="reference-url-${position}" name="referenceUrl${position}" type="url" inputmode="url" autocomplete="url" value="${escapeHtml(draft[`referenceUrl${position}`] || (position === 1 ? draft.referenceUrl || "" : ""))}" placeholder="https://youtube.com/watch?v=..." />
-      </div>
       <div class="field-group field-span">
         <label for="reference-transcript-${position}">Transcript ${position}</label>
         <textarea class="field-textarea" id="reference-transcript-${position}" name="referenceTranscript${position}" ${required ? "required" : ""} aria-describedby="reference-set-hint" placeholder="Paste the transcript for this reference video here.">${escapeHtml(draft[`referenceTranscript${position}`] || "")}</textarea>
@@ -26,7 +22,7 @@ export function renderNewProject(draft = {}, error = null) {
         <section class="form-section reference-set-section" aria-labelledby="reference-heading">
           <div class="section-index">01</div><div><h2 id="reference-heading">Reference set</h2><p>Paste three reference transcripts. Two more can strengthen the comparison.</p></div>
           <div class="field-span reference-set-fields">
-            <div class="reference-set-intro" id="reference-set-hint"><strong>3 required · up to 5 total</strong><span>Each transcript is analyzed separately before CreatorPilot combines the storytelling patterns. You can still add the YouTube URL as a reference, but the pasted transcript is what drives the analysis.</span></div>
+            <div class="reference-set-intro" id="reference-set-hint"><strong>3 required · up to 5 total</strong><span>Each transcript is analyzed separately before CreatorPilot combines the storytelling patterns.</span></div>
             ${referenceRows(draft)}
             <details class="transcript-preview-placeholder"><summary>Reference analysis preview <span>Available after analysis</span></summary><p>Each transcript and story analysis stays attached to its own video. CreatorPilot combines only abstract story mechanics.</p></details>
           </div>
