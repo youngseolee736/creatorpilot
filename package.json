@@ -10,7 +10,7 @@
     "test": "npm --prefix backend test"
   },
   "engines": {
-    "node": ">=20"
+    "node": "20.x"
   },
   "dependencies": {
     "abort-controller": "3.0.0",
