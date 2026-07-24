@@ -1,49 +1,70 @@
 import { escapeHtml, formatTime, routeFor } from "../core.mjs";
 import { errorNotice, icon, loadingPanel, pageHeading, statusBadge } from "../components.mjs";
-import { serviceConfig } from "../service-client.mjs";
+
+function safeImageSource(value) {
+  const source = String(value || "").trim();
+  return /^(data:image\/|https:\/\/|http:\/\/127\.0\.0\.1|http:\/\/localhost)/i.test(source) ? source : "";
+}
 
 function sceneCard(scene) {
-  return `<article class="scene-row"><div class="scene-number"><span>Scene</span><strong>${String(scene.number).padStart(2, "0")}</strong><small>${scene.start}–${scene.end}s</small></div><div class="scene-thumb" aria-label="B-roll thumbnail placeholder"><span>${escapeHtml(scene.caption)}</span><i style="--scene:${scene.number}"></i></div><div class="scene-copy"><div><span>Narration</span><p>${escapeHtml(scene.narration)}</p></div><div class="scene-caption"><span>On-screen caption</span><strong>${escapeHtml(scene.caption)}</strong></div></div><dl class="scene-meta"><div><dt>Visual direction</dt><dd>${escapeHtml(scene.visual)}</dd></div><div><dt>Search query</dt><dd>${escapeHtml(scene.searchQuery)}</dd></div><div><dt>Transition</dt><dd>${escapeHtml(scene.transition)}</dd></div><div><dt>Duration</dt><dd>${scene.duration}s</dd></div></dl></article>`;
+  const start = formatTime(scene.start);
+  const end = formatTime(scene.end);
+  const imageSource = safeImageSource(scene.imageDataUrl || scene.imageUrl);
+  const imageState = scene.imageStatus === "in_progress"
+    ? `<small class="storyboard-image-state">Generating image…</small>`
+    : scene.imageError
+      ? `<small class="storyboard-image-state is-error">${escapeHtml(scene.imageError)}</small>`
+      : scene.imagePrompt
+        ? `<small class="storyboard-image-state">${escapeHtml(scene.imagePrompt)}</small>`
+        : "";
+  return `<article class="storyboard-preview-card">
+    <header>
+      <div><span>${start} — ${end}</span><strong>${escapeHtml(scene.label || `Scene ${String(scene.number).padStart(2, "0")}`)}</strong></div>
+      <small>${escapeHtml(scene.duration)}s</small>
+    </header>
+    <div class="storyboard-preview-body">
+      <figure class="storyboard-frame" role="img" aria-label="Visual preview for ${escapeHtml(scene.caption)}">
+        ${imageSource
+          ? `<img src="${escapeHtml(imageSource)}" alt="${escapeHtml(scene.caption)}">`
+          : `<span>${scene.imageStatus === "in_progress" ? "Generating…" : "Visual Preview"}</span><i style="--scene:${scene.number}"></i>`}
+      </figure>
+      <dl class="storyboard-notes">
+        <div><dt>🎙 Narration</dt><dd>“${escapeHtml(scene.narration)}”</dd></div>
+        <div><dt>🎥 Visual</dt><dd>${escapeHtml(scene.visual)}</dd></div>
+        <div><dt>🖼 Image Prompt</dt><dd>${imageState || "Ready for AI image generation"}</dd></div>
+        <div><dt>📝 Caption</dt><dd>“${escapeHtml(scene.caption)}”</dd></div>
+        <div><dt>🔍 Suggested B-roll</dt><dd>“${escapeHtml(scene.searchQuery)}”</dd></div>
+        <div><dt>Transition</dt><dd>${escapeHtml(scene.transition)}</dd></div>
+      </dl>
+    </div>
+  </article>`;
 }
 
-function renderProgress(project) {
-  const render = project.render || { stage: "Preparing production", progress: 0 };
-  const providerRender = render.source === "provider" || Boolean(render.renderId);
-  const tasks = ["Planning scenes", "Finding B-roll", "Generating narration", "Creating captions", "Combining scenes", "Rendering final video"];
-  const activeIndex = Math.max(0, tasks.indexOf(render.stage));
-  return `${pageHeading("Video Producer Agent", "Building the vertical cut.", "Named production tasks show what the agent is doing and what remains.", `<div class="button-row"><a class="button button-secondary" href="${routeFor("review", project.id)}">← Back to review</a>${statusBadge("video_rendering")}</div>`)}
-    <section class="render-workspace" aria-live="polite"><div class="render-preview"><div class="video-frame is-rendering"><div class="frame-grid"></div><span class="render-scan"></span><div><span>${project.format}</span><strong>${render.progress}%</strong><small>${providerRender ? "Provider render" : "Mock render"}</small></div></div></div><div class="render-status"><p class="eyebrow">Video Producer Agent</p><h2>${escapeHtml(render.stage)}</h2><p>CreatorPilot is assembling ${project.storyboard.length} approved scenes into a ${project.duration}-second vertical video.</p><div class="progress-large"><span style="width:${render.progress}%"></span></div><div class="render-percent"><span>Render progress</span><strong>${render.progress}%</strong></div><ol class="render-tasks">${tasks.map((task, index) => `<li class="${index < activeIndex ? "is-done" : index === activeIndex ? "is-active" : ""}"><span>${index < activeIndex ? icon("check", 14) : String(index + 1)}</span>${escapeHtml(task)}</li>`).join("")}</ol><p class="render-note">${providerRender ? "The configured provider is processing this production. Delivery links appear only after completion." : "This is an asynchronous frontend demonstration. No media is uploaded or generated."}</p></div></section>`;
-}
-
-function finalResult(project) {
-  const render = project.render;
-  const providerRender = render.source === "provider" && render.videoUrl;
-  const packageAction = render.productionPackageUrl
-    ? `<a class="button button-secondary" href="${escapeHtml(render.productionPackageUrl)}" target="_blank" rel="noopener">${icon("download")}Production package</a>`
-    : "";
-  const deliveryActions = providerRender
-    ? `<a class="button button-primary" href="${escapeHtml(render.videoUrl)}" target="_blank" rel="noopener">${icon("external")}Open rendered video</a>${packageAction}`
-    : `<button class="button button-primary" type="button" data-action="export-video">${icon("download")}Export mock package</button><button class="button button-secondary" type="button" data-action="regenerate-video">${icon("retry")}Regenerate video</button>`;
-  return `${pageHeading("Video Producer Agent · Complete", "Your production package is ready.", providerRender ? "The configured provider completed this render. Use the signed delivery links to inspect the media and package." : "Review the mock vertical-video result and the settings used to assemble it.", `<div class="button-row"><a class="button button-secondary" href="${routeFor("review", project.id)}">← Back to review</a>${statusBadge("completed")}</div>`)}
-    <div class="final-layout"><section class="final-player"><div class="video-frame is-complete" role="img" aria-label="${providerRender ? "Provider render delivery" : "Mock vertical video preview"} for ${escapeHtml(project.title)}"><div class="frame-grid"></div><span class="video-kicker">CreatorPilot · ${providerRender ? "Provider render" : "Demo render"}</span><div class="video-title"><small>01:00 EXPLAINER</small><strong>${escapeHtml(project.title)}</strong></div>${providerRender ? "" : `<button class="preview-play" type="button" data-action="toggle-preview" aria-label="Play mock video preview">${icon("play", 25)}</button>`}<div class="video-caption">Today's choice shapes tomorrow</div><div class="video-controls"><span>0:00</span><i><b></b></i><span>1:00</span></div></div><p>${providerRender ? "The provider reported this render complete; CreatorPilot does not proxy or autoplay the delivered media." : "This poster-style player represents the completed mock render; no real video file was generated."}</p></section>
-      <aside class="delivery-panel"><p class="eyebrow">Production details</p><h2>Vertical short package</h2><dl><div><dt>Format</dt><dd>${escapeHtml(render.format)}</dd></div><div><dt>Total duration</dt><dd>${formatTime(render.duration)}</dd></div><div><dt>Scenes</dt><dd>${project.storyboard.length}</dd></div><div><dt>Voice</dt><dd>${escapeHtml(render.voice)}</dd></div><div><dt>Captions</dt><dd>${escapeHtml(render.captionStyle)}</dd></div><div><dt>Background music</dt><dd>${render.music ? "Enabled" : "Off"}</dd></div></dl><div class="delivery-actions">${deliveryActions}</div><p class="delivery-note">${providerRender ? "Delivery URLs are supplied by the configured provider and may expire." : "Export downloads project metadata only. No real media file was generated."}</p></aside></div>
-    <section class="scene-recap"><div class="section-bar"><div><p class="eyebrow">Approved storyboard</p><h2>${project.storyboard.length} scenes in the final cut</h2></div></div><div class="scene-strip">${project.storyboard.map((scene) => `<div><span>0${scene.number}</span><strong>${escapeHtml(scene.caption)}</strong><small>${scene.duration}s</small></div>`).join("")}</div></section>`;
+function timeline(project) {
+  const total = Number(project.duration) || project.storyboard.at(-1)?.end || 60;
+  return `<section class="storyboard-timeline" aria-label="Storyboard timeline">
+    <div class="section-bar"><div><p class="eyebrow">Timeline</p><h2>${project.storyboard.length} scenes across ${formatTime(total)}</h2></div><span>${escapeHtml(project.format)}</span></div>
+    <ol>${project.storyboard.map((scene) => {
+      const width = Math.max(6, Math.min(100, (Number(scene.duration) / total) * 100));
+      return `<li style="--scene:${scene.number};--width:${width}%"><span>${String(scene.number).padStart(2, "0")}</span><strong>${escapeHtml(scene.caption)}</strong><small>${formatTime(scene.start)}–${formatTime(scene.end)}</small></li>`;
+    }).join("")}</ol>
+  </section>`;
 }
 
 export function renderProduction(project) {
-  const backToReview = `<a class="button button-secondary" href="${routeFor("review", project.id)}">← Back to review</a>`;
+  const backToScript = `<a class="button button-secondary" href="${routeFor("script", project.id)}">← Back to script</a>`;
   if (project.error) {
-    const agent = project.storyboard.length ? "Video Producer" : "Storyboard Agent";
-    return `${pageHeading(agent, "Production paused.", "The approved script and storyboard remain saved.", backToReview)}${errorNotice(project.error, project.storyboard.length ? "retry-render" : "retry-storyboard", agent)}`;
+    return `${pageHeading("Storyboard Agent", "Storyboard preview paused.", "The approved script remains saved.", backToScript)}${errorNotice(project.error, "retry-storyboard", "Storyboard Agent")}`;
   }
-  if (!project.storyboard.length) return `${pageHeading("Storyboard Agent", "Turning narration into scenes.", "The agent is planning visual evidence, captions, transitions, and pacing.", backToReview)}${loadingPanel("Storyboard Agent", "Generating an eight-scene storyboard…")}`;
-  if (project.render?.completed) return finalResult(project);
-  if (project.status === "video_rendering") return renderProgress(project);
-  const settings = project.productionSettings;
-  const videoApi = serviceConfig.services.video === "api";
-  const selected = (value, current) => value === current ? " selected" : "";
-  return `${pageHeading("Storyboard Agent · Plan ready", "A visual plan for every second.", videoApi ? "Review the scene sequence and settings before submitting them to the configured render provider." : "Review the scene sequence and production settings before starting the mock render.", `<div class="button-row"><a class="button button-secondary" href="${routeFor("review", project.id)}">← Back to review</a><button class="button button-primary" type="button" data-action="render-video">${videoApi ? "Start provider render" : "Render vertical video"} ${icon("play")}</button></div>`)}
-    <section class="production-settings"><div><span>Voice</span><select aria-label="Voice selection" data-project-setting="voice"><option${selected("Sora — Warm documentary", settings.voice)}>Sora — Warm documentary</option><option${selected("Min — Clear explainer", settings.voice)}>Min — Clear explainer</option><option${selected("Alex — Direct news", settings.voice)}>Alex — Direct news</option></select></div><div><span>Caption style</span><select aria-label="Caption style" data-project-setting="captions"><option${selected("Editorial high contrast", settings.captions)}>Editorial high contrast</option><option${selected("Minimal lower third", settings.captions)}>Minimal lower third</option><option${selected("Centered bold", settings.captions)}>Centered bold</option></select></div><div><span>Background music</span><label class="switch"><input type="checkbox" ${settings.music ? "checked " : ""}data-project-setting="music"/><span></span><b>${settings.music ? "Enabled" : "Off"}</b></label></div><div><span>Output</span><strong>${escapeHtml(project.format)} · ${project.duration}s</strong></div></section>
-    <section class="storyboard-section"><div class="section-bar"><div><p class="eyebrow">Production board</p><h2>${project.storyboard.length} generated scenes</h2></div><span>Total ${formatTime(project.duration)}</span></div><div class="storyboard-list">${project.storyboard.map(sceneCard).join("")}</div></section>
-    <div class="sticky-action"><span><strong>Storyboard ready for production</strong><small>${videoApi ? "The approved package will be sent to the configured provider." : "No stock footage or audio will be fetched in this frontend demonstration."}</small></span><button class="button button-primary" type="button" data-action="render-video">${videoApi ? "Start provider render" : "Render vertical video"} ${icon("play")}</button></div>`;
+  if (!project.storyboard.length) {
+    return `${pageHeading("Storyboard Agent", "Building the storyboard preview.", "The agent is turning narration into timed scenes, visual direction, captions, and B-roll search cues.", backToScript)}${loadingPanel("Storyboard Agent", "Generating storyboard preview…")}`;
+  }
+  const imageButtonLabel = project.imagePreviewStatus === "failed" ? "Retry key images" : project.imagePreviewStatus === "in_progress" ? "Generate key images again" : "Generate key images";
+  return `${pageHeading("Preview Storyboard", "Storyboard ready.", "No MP4 is rendered here. This board is the final artifact: the decisions an AI production team would hand to an editor or presenter.", `<div class="button-row production-actions"><a class="button button-secondary" href="${routeFor("script", project.id)}">← Back to script</a><button class="button button-secondary" type="button" data-action="regenerate-storyboard">${icon("retry")}Regenerate</button><button class="image-inline-action" type="button" data-action="generate-storyboard-images">${icon("spark", 16)}${imageButtonLabel}</button></div>`)}
+    <section class="storyboard-hero-panel">
+      <div><p class="eyebrow">Storyboard Agent</p><h2>${escapeHtml(project.title)}</h2><p>${project.storyboard.length} timed scenes showing narration, visual intent, captions, transitions, and suggested B-roll.</p></div>
+      ${statusBadge("under_review")}
+    </section>
+    ${timeline(project)}
+    <section class="storyboard-preview-grid" aria-label="Storyboard preview scenes">${project.storyboard.map(sceneCard).join("")}</section>`;
 }

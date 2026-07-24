@@ -3,11 +3,9 @@ import * as mockServices from "./mock-services.mjs";
 const DEFAULT_CONFIG = Object.freeze({
   useMockServices: true,
   apiBaseUrl: "",
-  renderPollIntervalMs: 1500,
-  renderPollLimit: 240,
 });
 
-const SERVICE_KEYS = ["transcript", "analysis", "research", "script", "review", "storyboard", "video"];
+const SERVICE_KEYS = ["transcript", "analysis", "research", "script", "storyboard", "image"];
 
 export function getServiceConfig(runtimeConfig = globalThis.CREATORPILOT_CONFIG) {
   const config = { ...DEFAULT_CONFIG, ...(runtimeConfig || {}) };
@@ -21,8 +19,6 @@ export function getServiceConfig(runtimeConfig = globalThis.CREATORPILOT_CONFIG)
     useMockServices: SERVICE_KEYS.every((key) => services[key] === "mock"),
     services,
     apiBaseUrl: String(config.apiBaseUrl || "").replace(/\/$/, ""),
-    renderPollIntervalMs: Math.max(250, Number(config.renderPollIntervalMs) || 1500),
-    renderPollLimit: Math.max(1, Number(config.renderPollLimit) || 240),
   };
 }
 
@@ -67,8 +63,6 @@ function makeApiServices(config, fetchImpl) {
   }
 
   const post = (path, payload) => request(path, { method: "POST", body: JSON.stringify(payload) });
-  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
   return {
     extractTranscript(project, reference = project.references?.[0]) {
       return post("/api/transcripts/extract", {
@@ -120,17 +114,6 @@ function makeApiServices(config, fetchImpl) {
         revisionInstructions: [],
       });
     },
-    reviewOriginality(project) {
-      return post("/api/scripts/review", {
-        projectId: project.id,
-        reviewLanguage: project.language,
-        referenceAnalysis: project.analysis,
-        referenceTranscript: project.transcript,
-        referenceAnalyses: (project.references || []).map((reference) => reference.analysis).filter(Boolean),
-        referenceTranscripts: (project.references || []).map((reference) => reference.transcript).filter(Boolean),
-        script: scriptPayload(project),
-      });
-    },
     reviseScript(project, revisionInstructions) {
       return post("/api/scripts/revise", {
         projectId: project.id,
@@ -148,7 +131,6 @@ function makeApiServices(config, fetchImpl) {
     generateStoryboard(project) {
       return post("/api/storyboards/generate", {
         projectId: project.id,
-        approvedReviewId: project.originalityReview?.reviewId,
         script: scriptPayload(project),
         format: project.format,
         targetDurationSeconds: project.duration,
@@ -156,41 +138,19 @@ function makeApiServices(config, fetchImpl) {
         visualConstraints: ["Use licensed, original, or generated assets only."],
       });
     },
-    async renderVideo(project, onProgress = () => {}) {
-      const started = await post("/api/videos/render", {
+    generateStoryboardImage(project, scene) {
+      return post("/api/images/generate", {
         projectId: project.id,
-        approvedReviewId: project.originalityReview?.reviewId,
-        storyboard: project.storyboard,
-        productionSettings: project.productionSettings,
+        sceneId: scene.id,
+        number: scene.number,
         format: project.format,
-        durationSeconds: project.duration,
+        title: project.title,
+        narration: scene.narration,
+        caption: scene.caption,
+        visual: scene.visual,
+        imagePrompt: scene.imagePrompt,
+        aspectRatio: "16:9",
       });
-      onProgress(started);
-      if (started.status === "failed") {
-        const error = new Error(started.error?.message || "Video rendering failed.");
-        error.code = started.error?.code || "RENDER_FAILED";
-        error.retryable = started.error?.retryable ?? true;
-        throw error;
-      }
-      if (started.completed) return started;
-      if (!started.renderId) throw new Error("The render API did not return a renderId.");
-
-      for (let pollCount = 0; pollCount < config.renderPollLimit; pollCount += 1) {
-        await wait(config.renderPollIntervalMs);
-        const status = await request(`/api/videos/${encodeURIComponent(started.renderId)}/status`);
-        onProgress(status);
-        if (status.status === "failed") {
-          const error = new Error(status.error?.message || "Video rendering failed.");
-          error.code = status.error?.code || "RENDER_FAILED";
-          error.retryable = status.error?.retryable ?? true;
-          throw error;
-        }
-        if (status.completed || status.status === "completed") return status;
-      }
-      const error = new Error("CreatorPilot stopped polling after the render status deadline.");
-      error.code = "RENDER_STATUS_TIMEOUT";
-      error.retryable = true;
-      throw error;
     },
   };
 }
@@ -207,9 +167,8 @@ export function createServices(runtimeConfig, fetchImpl = globalThis.fetch?.bind
     researchTopic: select("research", mockServices.researchTopic, apiServices?.researchTopic),
     generateScript: select("script", mockServices.generateScript, apiServices?.generateScript),
     reviseScript: select("script", mockServices.reviseScript, apiServices?.reviseScript),
-    reviewOriginality: select("review", mockServices.reviewOriginality, apiServices?.reviewOriginality),
     generateStoryboard: select("storyboard", mockServices.generateStoryboard, apiServices?.generateStoryboard),
-    renderVideo: select("video", mockServices.renderVideo, apiServices?.renderVideo),
+    generateStoryboardImage: select("image", mockServices.generateStoryboardImage, apiServices?.generateStoryboardImage),
   };
 }
 
@@ -221,7 +180,6 @@ export const analyzeReference = services.analyzeReference;
 export const synthesizeReferences = services.synthesizeReferences;
 export const researchTopic = services.researchTopic;
 export const generateScript = services.generateScript;
-export const reviewOriginality = services.reviewOriginality;
 export const reviseScript = services.reviseScript;
 export const generateStoryboard = services.generateStoryboard;
-export const renderVideo = services.renderVideo;
+export const generateStoryboardImage = services.generateStoryboardImage;

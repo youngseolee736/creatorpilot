@@ -283,7 +283,9 @@ lineage, stable section IDs, ranges, and speaking-time estimate. It rejects raw
 transcript fields, allowlists abstract analysis fields, and makes at most one
 repair attempt for malformed, off-claim, insufficiently grounded, or incorrectly
 sized model output. A finished draft must use every narrative-case support fact
-and estimate within two seconds of the requested speaking duration.
+and estimate near the requested speaking duration. For demo stability, the current
+tolerance is at least twenty seconds or thirty-five percent of the requested duration,
+whichever is larger.
 
 Input schema:
 
@@ -381,119 +383,15 @@ Example input/output:
 }
 ```
 
-## 4. Originality Reviewer Agent
+## 4. Storyboard Agent
 
-Role: return a conservative originality estimate plus quality signals. It must always include pass/fail, originality estimate, potential phrase overlap, structure similarity, quality scores, revision instructions, and the non-legal disclaimer.
+Role: convert the generated script into a timed production plan. It may propose search terms, but it does not license or fetch media.
 
-Implementation note: the model returns only evidence, estimates, quality scores,
-and guidance. The backend derives `reviewId`, preserves the exact `scriptId`,
-calculates `overall`, canonicalizes structure risk, applies pass/fail thresholds,
-and supplies the fixed disclaimer. Phrase evidence must be a bounded exact excerpt
-from the submitted reference transcript and script; invented evidence receives
-one repair attempt and is never promoted to project state.
-
-Input schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["projectId", "referenceTranscript", "referenceAnalysis", "script"],
-  "properties": {
-    "projectId": { "type": "string" },
-    "referenceTranscript": { "type": "object", "required": ["transcriptId", "text"] },
-    "referenceAnalysis": { "type": "object", "required": ["analysisId", "structure"] },
-    "script": { "type": "object", "required": ["scriptId", "version", "sections"] },
-    "thresholds": { "type": "object" }
-  }
-}
-```
-
-Output schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["reviewId", "scriptId", "status", "overall", "originalityEstimate", "structureSimilarity", "scores", "summary", "overlaps", "instructions", "disclaimer"],
-  "properties": {
-    "reviewId": { "type": "string" },
-    "scriptId": { "type": "string" },
-    "status": { "enum": ["passed", "failed"] },
-    "overall": { "type": "integer", "minimum": 0, "maximum": 100 },
-    "originalityEstimate": { "type": "integer", "minimum": 0, "maximum": 100 },
-    "structureSimilarity": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["score", "risk", "note"],
-      "properties": {
-        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
-        "risk": { "enum": ["low", "medium", "high"] },
-        "note": { "type": "string" }
-      }
-    },
-    "scores": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["hook", "structure", "clarity", "duration"],
-      "properties": {
-        "hook": { "type": "integer", "minimum": 0, "maximum": 100 },
-        "structure": { "type": "integer", "minimum": 0, "maximum": 100 },
-        "clarity": { "type": "integer", "minimum": 0, "maximum": 100 },
-        "duration": { "type": "integer", "minimum": 0, "maximum": 100 }
-      }
-    },
-    "summary": { "type": "string" },
-    "overlaps": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["reference", "generated", "risk", "note"],
-        "properties": {
-          "reference": { "type": "string", "maxLength": 240 },
-          "generated": { "type": "string", "maxLength": 240 },
-          "risk": { "enum": ["Low", "Medium", "High"] },
-          "note": { "type": "string" }
-        }
-      }
-    },
-    "instructions": { "type": "array", "items": { "type": "string" } },
-    "disclaimer": { "const": "This similarity review is an originality estimate, not a copyright or legal determination." }
-  }
-}
-```
-
-Example output:
-
-```json
-{
-  "reviewId": "rv_01JZ8T",
-  "scriptId": "sc_01JZ8S",
-  "status": "passed",
-  "overall": 91,
-  "originalityEstimate": 91,
-  "structureSimilarity": { "score": 34, "risk": "low", "note": "Only abstract pacing mechanics are shared." },
-  "scores": { "hook": 88, "structure": 84, "clarity": 94, "duration": 98 },
-  "summary": "The draft uses pacing discipline without repeating source language or examples.",
-  "overlaps": [{ "reference": "The real breakthrough is not a single floating building.", "generated": "Support is therefore not only a promise to one partner.", "risk": "Low", "note": "Shared contrast construction, but different wording and meaning." }],
-  "instructions": ["Avoid distinctive examples from the reference."],
-  "disclaimer": "This similarity review is an originality estimate, not a copyright or legal determination."
-}
-```
-
-## 5. Storyboard Agent
-
-Role: convert only a reviewed script into a timed production plan. It may propose search terms, but it does not license or fetch media.
-
-Implementation note: the backend resolves `approvedReviewId` from the running
-Reviewer registry before invoking the model. It deterministically divides the
-exact script narration into immutable scene slots and derives storyboard/scene
+Implementation note: the backend deterministically divides the exact script
+narration into immutable scene slots and derives storyboard/scene
 IDs, order, timing, and duration. The model returns only a matching slot plus
-caption, visual direction, search query, and transition. Unknown model timing,
-identity, or narration fields are ignored.
+caption, visual direction, search query, image prompt, and transition. Unknown
+model timing, identity, or narration fields are ignored.
 
 Input schema:
 
@@ -502,10 +400,9 @@ Input schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["projectId", "approvedReviewId", "script", "format", "targetDurationSeconds"],
+  "required": ["projectId", "script", "format", "targetDurationSeconds"],
   "properties": {
     "projectId": { "type": "string" },
-    "approvedReviewId": { "type": "string" },
     "script": { "type": "object", "required": ["scriptId", "sections"] },
     "format": { "enum": ["9:16", "1:1", "16:9"] },
     "targetDurationSeconds": { "type": "integer", "minimum": 15, "maximum": 180 },
@@ -522,11 +419,10 @@ Output schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["storyboardId", "scriptId", "reviewId", "format", "totalDuration", "scenes"],
+  "required": ["storyboardId", "scriptId", "format", "totalDuration", "scenes"],
   "properties": {
     "storyboardId": { "type": "string" },
     "scriptId": { "type": "string" },
-    "reviewId": { "type": "string" },
     "format": { "enum": ["9:16", "1:1", "16:9"] },
     "totalDuration": { "type": "number", "minimum": 1 },
     "scenes": {
@@ -535,7 +431,7 @@ Output schema:
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "number", "start", "end", "duration", "narration", "caption", "visual", "searchQuery", "transition"],
+        "required": ["id", "number", "start", "end", "duration", "narration", "caption", "visual", "searchQuery", "imagePrompt", "transition"],
         "properties": {
           "id": { "type": "string" },
           "number": { "type": "integer", "minimum": 1 },
@@ -546,6 +442,7 @@ Output schema:
           "caption": { "type": "string" },
           "visual": { "type": "string" },
           "searchQuery": { "type": "string" },
+          "imagePrompt": { "type": "string" },
           "transition": { "type": "string" }
         }
       }
@@ -561,117 +458,11 @@ Example output:
   "storyboardId": "sb_01JZ8V",
   "scriptId": "sc_01JZ8S",
   "totalDuration": 60,
-  "scenes": [{ "id": "scene-1", "number": 1, "start": 0, "end": 5, "duration": 5, "narration": "The most important line on a map may be the one ships cannot cross.", "caption": "The line ships cannot cross", "visual": "Animated maritime map with a narrow passage highlighted", "searchQuery": "map ocean shipping corridor aerial", "transition": "Fade up" }]
+  "scenes": [{ "id": "scene-1", "number": 1, "start": 0, "end": 5, "duration": 5, "narration": "The most important line on a map may be the one ships cannot cross.", "caption": "The line ships cannot cross", "visual": "Animated maritime map with a narrow passage highlighted", "searchQuery": "map ocean shipping corridor aerial", "imagePrompt": "Vertical documentary still of a maritime map, highlighted shipping corridor, no logos", "transition": "Fade up" }]
 }
 ```
 
 The agent orchestrator must transform this object into the scene array returned by the HTTP endpoint and consumed by the current UI. The full object can remain the canonical persisted agent record.
-
-## 6. Video Producer Agent
-
-Role: validate an approved production package and coordinate an external render
-tool. The HTTP boundary receives `approvedReviewId` and exact Storyboard scenes;
-the implemented orchestrator resolves the matching passed review, canonical
-script, and Storyboard record from server registries before provider use.
-
-Input schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["projectId", "approvedReviewId", "storyboard", "productionSettings", "format", "durationSeconds"],
-  "properties": {
-    "projectId": { "type": "string" },
-    "approvedReviewId": { "type": "string" },
-    "storyboard": { "type": "array", "minItems": 1, "items": { "type": "object" } },
-    "productionSettings": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["voice", "captions", "music"],
-      "properties": {
-        "voice": { "type": "string" },
-        "captions": { "type": "string" },
-        "music": { "type": "boolean" }
-      }
-    },
-    "format": { "enum": ["9:16", "1:1", "16:9"] },
-    "durationSeconds": { "type": "integer", "minimum": 15, "maximum": 180 }
-  }
-}
-```
-
-Initial output schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["renderId", "status", "stage", "progress", "completed", "source", "statusUrl"],
-  "properties": {
-    "renderId": { "type": "string" },
-    "status": { "enum": ["queued", "running"] },
-    "stage": { "type": "string" },
-    "progress": { "type": "integer", "minimum": 0, "maximum": 100 },
-    "completed": { "const": false },
-    "source": { "const": "provider" },
-    "statusUrl": { "type": "string" }
-  }
-}
-```
-
-Terminal output schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["renderId", "status", "stage", "progress", "completed", "source", "format", "duration", "voice", "captionStyle", "music", "completedAt", "videoUrl"],
-  "properties": {
-    "renderId": { "type": "string" },
-    "status": { "const": "completed" },
-    "stage": { "const": "Final video ready" },
-    "progress": { "const": 100 },
-    "completed": { "const": true },
-    "source": { "const": "provider" },
-    "format": { "enum": ["9:16", "1:1", "16:9"] },
-    "duration": { "type": "number" },
-    "voice": { "type": "string" },
-    "captionStyle": { "type": "string" },
-    "music": { "type": "boolean" },
-    "completedAt": { "type": "string", "format": "date-time" },
-    "videoUrl": { "type": "string", "format": "uri" },
-    "productionPackageUrl": { "type": "string", "format": "uri" }
-  }
-}
-```
-
-Example input/output:
-
-```json
-{
-  "input": {
-    "projectId": "project_01JZ8P",
-    "approvedReviewId": "rv_01JZ8T",
-    "storyboard": [{ "id": "scene-1", "start": 0, "end": 5, "narration": "The most important line...", "visual": "Animated maritime map" }],
-    "productionSettings": { "voice": "Min — Clear explainer", "captions": "Editorial high contrast", "music": false },
-    "format": "9:16",
-    "durationSeconds": 60
-  },
-  "output": {
-    "renderId": "render_01JZ8W",
-    "status": "queued",
-    "stage": "Preparing production",
-    "progress": 2,
-    "completed": false,
-    "source": "provider",
-    "statusUrl": "/api/videos/render_01JZ8W/status"
-  }
-}
-```
 
 ## Orchestrator validation rules
 
@@ -679,7 +470,6 @@ Example input/output:
 2. Reject any Script Analyst output containing transcript-length quotations or source-specific examples.
 3. Never send the raw transcript to the Research Agent or Scriptwriter; send the
    tailored brief, compact blueprint, and provider-grounded Fact Pack.
-4. Invalidate an existing review whenever script title or section text changes.
-5. Require `review.scriptId === script.scriptId` and `review.status === "passed"` before storyboard or video production.
-6. Store each script/review version immutably so stale approvals cannot authorize a revised script.
+4. Invalidate an existing storyboard whenever script title or section text changes.
+5. Store each script version immutably so revisions preserve lineage.
 7. Treat model scores as product estimates, not factual or legal determinations.

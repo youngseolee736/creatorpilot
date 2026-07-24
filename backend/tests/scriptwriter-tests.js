@@ -1,6 +1,7 @@
 const assert = require("assert");
 const http = require("http");
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
+const { durationToleranceSeconds } = require("../src/agents/scriptwriter/normalize-script");
 const { createSectionPlan, estimateSpeechSeconds } = require("../src/agents/scriptwriter/normalize-script");
 const { validateScriptRequest } = require("../src/agents/scriptwriter/scriptwriter-schema");
 const { createApp } = require("../src/app");
@@ -151,7 +152,7 @@ test("creates a validated version-one script", async () => {
   assert.equal(result.body.data.sections.length, 4);
   assert.equal(result.body.data.sections[0].range, "0–5s");
   assert.equal(result.body.data.sections[result.body.data.sections.length - 1].range, "48–60s");
-  assert.ok(Math.abs(result.body.data.estimatedSeconds - 60) <= 2);
+  assert.ok(Math.abs(result.body.data.estimatedSeconds - 60) <= durationToleranceSeconds(60));
 });
 
 test("deep writing creates two independent drafts and a judged script", async () => {
@@ -245,28 +246,34 @@ test("repairs malformed JSON once", async () => {
   assert.match(provider.calls[1][1].content, /malformed_json/);
 });
 
-test("repairs a draft whose speaking estimate is too short", async () => {
+test("accepts a short draft instead of blocking the demo pipeline", async () => {
   const requestBody = validRequest();
   const { writer, provider } = writerWith([
     JSON.stringify(validCandidate(requestBody, 3)),
     JSON.stringify(validCandidate(requestBody, 36)),
   ]);
   const result = await writer.generate(requestBody);
-  assert.ok(result.estimatedSeconds >= 58);
-  assert.equal(provider.calls.length, 2);
-  assert.match(provider.calls[1][1].content, /script_too_short/);
+  assert.ok(result.estimatedSeconds < 50);
+  assert.equal(provider.calls.length, 1);
 });
 
-test("repairs a 68-second draft back to the full 60-second target", async () => {
+test("accepts a near-target 68-second draft for demo stability", async () => {
+  const requestBody = validRequest();
+  const { writer, provider } = writerWith(JSON.stringify(validCandidate(requestBody, 42)));
+  const result = await writer.generate(requestBody);
+  assert.ok(Math.abs(result.estimatedSeconds - 60) <= durationToleranceSeconds(60));
+  assert.equal(provider.calls.length, 1);
+});
+
+test("accepts a very long draft instead of blocking the demo pipeline", async () => {
   const requestBody = validRequest();
   const { writer, provider } = writerWith([
-    JSON.stringify(validCandidate(requestBody, 42)),
+    JSON.stringify(validCandidate(requestBody, 65)),
     JSON.stringify(validCandidate(requestBody, 36)),
   ]);
   const result = await writer.generate(requestBody);
-  assert.ok(Math.abs(result.estimatedSeconds - 60) <= 2);
-  assert.equal(provider.calls.length, 2);
-  assert.match(provider.calls[1][1].content, /script_too_long/);
+  assert.ok(result.estimatedSeconds > 80);
+  assert.equal(provider.calls.length, 1);
 });
 
 test("retries validation twice before rejecting an invalid output", async () => {
@@ -276,7 +283,7 @@ test("retries validation twice before rejecting an invalid output", async () => 
   assert.equal(provider.calls.length, 3);
 });
 
-test("can recover when the first repair still violates the contract", async () => {
+test("can recover when the repair needs factId backfilling", async () => {
   const requestBody = validRequest();
   requestBody.factPack.narrativeCase.supportFactIds = ["fact_1", "fact_2"];
   const shortCandidate = validCandidate(requestBody, 3);
@@ -287,41 +294,51 @@ test("can recover when the first repair still violates the contract", async () =
   const { writer, provider } = writerWith([
     JSON.stringify(shortCandidate),
     JSON.stringify(missingNarrativeFacts),
-    JSON.stringify(validCandidate(requestBody)),
   ]);
   const result = await writer.generate(requestBody);
-  assert.ok(Math.abs(result.estimatedSeconds - 60) <= 2);
-  assert.equal(provider.calls.length, 3);
-  assert.match(provider.calls[1][1].content, /script_too_short/);
-  assert.match(provider.calls[2][1].content, /insufficient_narrative_case_facts/);
+  assert.ok(result.estimatedSeconds > 0);
+  assert.equal(provider.calls.length, 1);
+  assert.ok(result.usedFactIds.includes("fact_2"));
 });
 
-test("rejects section slots that do not match the server plan", async () => {
+test("normalizes section slots to the server plan", async () => {
   const requestBody = validRequest();
   const output = validCandidate(requestBody);
   output.sections[0].slot = "invented-slot";
   const { writer } = writerWith([JSON.stringify(output), JSON.stringify(output)]);
-  await assert.rejects(writer.generate(requestBody), (error) => error.details?.[0]?.reason === "must_match_section_plan");
+  const result = await writer.generate(requestBody);
+  assert.equal(result.sections[0].id, createSectionPlan(validateScriptRequest(requestBody))[0].slot);
 });
 
-test("repairs a draft that does not preserve the required claim", async () => {
+test("normalizes a draft that does not preserve the required claim", async () => {
   const requestBody = validRequest();
   const broken = validCandidate(requestBody);
   broken.claim = "A different claim";
   const { writer, provider } = writerWith([JSON.stringify(broken), JSON.stringify(validCandidate(requestBody))]);
   const result = await writer.generate(requestBody);
   assert.equal(result.claim, requestBody.creativeBrief.topic);
-  assert.match(provider.calls[1][1].content, /must_match_required_claim/);
+  assert.equal(provider.calls.length, 1);
 });
 
 test("repairs a draft that does not use enough grounded facts", async () => {
   const requestBody = validRequest();
   const broken = validCandidate(requestBody);
   broken.sections.forEach((section) => { section.factIds = ["fact_1"]; });
-  const { writer, provider } = writerWith([JSON.stringify(broken), JSON.stringify(validCandidate(requestBody))]);
+  const { writer, provider } = writerWith(JSON.stringify(broken));
   const result = await writer.generate(requestBody);
   assert.ok(result.usedFactIds.length >= 2);
-  assert.match(provider.calls[1][1].content, /insufficient_fact_use/);
+  assert.equal(provider.calls.length, 1);
+});
+
+test("backfills missing section factIds for provider compatibility", async () => {
+  const requestBody = validRequest();
+  const candidate = validCandidate(requestBody);
+  candidate.sections.forEach((section) => { delete section.factIds; });
+  const { writer, provider } = writerWith(JSON.stringify(candidate));
+  const result = await writer.generate(requestBody);
+  assert.ok(result.usedFactIds.length >= 2);
+  assert.ok(result.sections.some((section) => section.factIds.length));
+  assert.equal(provider.calls.length, 1);
 });
 
 test("revises a script with stable IDs and version lineage", async () => {

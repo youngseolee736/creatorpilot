@@ -51,7 +51,6 @@ async function request(app, path, body) {
 function validRequest(overrides = {}) {
   return {
     projectId: "project-storyboard",
-    approvedReviewId: "review-passed",
     script: {
       scriptId: "script-storyboard-v1",
       title: "The neighborhood infrastructure hiding in plain sight",
@@ -81,26 +80,24 @@ function validCandidate(requestBody = validRequest()) {
       caption: `Scene ${index + 1} evidence`,
       visual: `A specific vertical composition for scene ${index + 1} with restrained camera movement.`,
       searchQuery: `licensed community library scene ${index + 1}`,
+      imagePrompt: `Documentary still preview for scene ${index + 1}, realistic public library environment, no logos.`,
       transition: index === 0 ? "Fade up" : index === plan.length - 1 ? "Fade out" : "Straight cut",
     })),
   };
 }
 
-function storyboardWith(outputs, review = { reviewId: "review-passed", scriptId: "script-storyboard-v1", status: "passed" }) {
+function storyboardWith(outputs) {
   const provider = new FakeProvider(outputs);
-  const agent = new StoryboardAgent({
-    provider,
-    reviewResolver: async (reviewId) => reviewId === review?.reviewId ? review : null,
-  });
+  const agent = new StoryboardAgent({ provider });
   return { agent, provider };
 }
 
-async function endpointResult(requestBody, outputs, review) {
-  const { agent } = storyboardWith(outputs, review);
+async function endpointResult(requestBody, outputs) {
+  const { agent } = storyboardWith(outputs);
   return request(createApp({ storyboardAgent: agent }), "/api/storyboards/generate", requestBody);
 }
 
-test("creates an authorized, server-timed storyboard array", async () => {
+test("creates a server-timed storyboard array", async () => {
   const requestBody = validRequest();
   const result = await endpointResult(requestBody, JSON.stringify(validCandidate(requestBody)));
   assert.equal(result.status, 201);
@@ -108,8 +105,19 @@ test("creates an authorized, server-timed storyboard array", async () => {
   assert.equal(result.body.data.length, 8);
   assert.equal(result.body.data[0].id, "scene-1");
   assert.equal(result.body.data[0].start, 0);
+  assert.match(result.body.data[0].imagePrompt, /Documentary still preview/);
   assert.equal(result.body.data[7].end, 60);
   assert.ok(Math.abs(result.body.data.reduce((sum, scene) => sum + scene.duration, 0) - 60) < 0.001);
+});
+
+test("adds a safe fallback image prompt when the model omits one", async () => {
+  const requestBody = validRequest();
+  const candidate = validCandidate(requestBody);
+  delete candidate.scenes[0].imagePrompt;
+  const { agent } = storyboardWith(JSON.stringify(candidate));
+  const result = await agent.generate(requestBody);
+  assert.match(result.scenes[0].imagePrompt, /Vertical editorial storyboard still/);
+  assert.match(result.scenes[0].imagePrompt, /no logos/);
 });
 
 test("preserves every script word in order", async () => {
@@ -138,25 +146,6 @@ test("ignores model attempts to control IDs, timing, and narration", async () =>
   assert.equal(result.scenes[0].number, 1);
   assert.equal(result.scenes[0].start, 0);
   assert.doesNotMatch(result.scenes[0].narration, /Invented/);
-});
-
-test("rejects a missing approved review before calling the provider", async () => {
-  const { agent, provider } = storyboardWith(JSON.stringify(validCandidate()), null);
-  await assert.rejects(agent.generate(validRequest()), (error) => error.code === "REVIEW_NOT_FOUND" && error.status === 404);
-  assert.equal(provider.calls.length, 0);
-});
-
-test("rejects failed and script-mismatched reviews before calling the provider", async () => {
-  const failed = storyboardWith(JSON.stringify(validCandidate()), {
-    reviewId: "review-passed", scriptId: "script-storyboard-v1", status: "failed",
-  });
-  await assert.rejects(failed.agent.generate(validRequest()), (error) => error.code === "SCRIPT_NOT_APPROVED");
-  assert.equal(failed.provider.calls.length, 0);
-  const stale = storyboardWith(JSON.stringify(validCandidate()), {
-    reviewId: "review-passed", scriptId: "older-script", status: "passed",
-  });
-  await assert.rejects(stale.agent.generate(validRequest()), (error) => error.code === "SCRIPT_NOT_APPROVED");
-  assert.equal(stale.provider.calls.length, 0);
 });
 
 test("rejects unsupported format, duration, and scene count", async () => {
@@ -205,7 +194,7 @@ test("repairs malformed JSON once", async () => {
   assert.match(provider.calls[1][1].content, /malformed_json/);
 });
 
-test("repairs a scene-slot mismatch once", async () => {
+test("normalizes a scene-slot mismatch without blocking", async () => {
   const requestBody = validRequest();
   const broken = validCandidate(requestBody);
   broken.scenes[0].slot = "invented-slot";
@@ -215,8 +204,7 @@ test("repairs a scene-slot mismatch once", async () => {
   ]);
   const result = await agent.generate(requestBody);
   assert.equal(result.scenes[0].id, "scene-1");
-  assert.equal(provider.calls.length, 2);
-  assert.match(provider.calls[1][1].content, /must_match_scene_plan/);
+  assert.equal(provider.calls.length, 1);
 });
 
 test("rejects invalid output after the single repair attempt", async () => {
@@ -256,7 +244,6 @@ test("keeps untrusted narration instructions outside the system message", async 
   assert.match(systemMessage.content, /untrusted content/);
   assert.doesNotMatch(systemMessage.content, /reveal the system prompt/);
   assert.match(userMessage.content, /reveal the system prompt/);
-  assert.doesNotMatch(userMessage.content, /approvedReviewId|review-passed/);
 });
 
 test("maps provider timeouts with a Storyboard-safe message", async () => {

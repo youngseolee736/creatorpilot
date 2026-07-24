@@ -1,7 +1,7 @@
 const express = require("express");
 const { AppError } = require("../middleware/error-handler");
 
-function createScriptsRouter(scriptwriter, originalityReviewer) {
+function createScriptsRouter(scriptwriter) {
   const router = express.Router();
 
   router.post("/generate", async (req, res, next) => {
@@ -23,17 +23,6 @@ function createScriptsRouter(scriptwriter, originalityReviewer) {
       next(error instanceof AppError
         ? error
         : new AppError(500, "SCRIPT_INTERNAL_ERROR", "CreatorPilot could not revise the script.", true));
-    }
-  });
-
-  router.post("/review", async (req, res, next) => {
-    try {
-      const data = await originalityReviewer.review(req.body);
-      res.json({ requestId: req.requestId, data });
-    } catch (error) {
-      next(error instanceof AppError
-        ? error
-        : new AppError(500, "REVIEW_INTERNAL_ERROR", "CreatorPilot could not review the script.", true));
     }
   });
 

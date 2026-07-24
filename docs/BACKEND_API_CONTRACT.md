@@ -12,10 +12,11 @@ Authentication: undecided; credentials and provider keys must never be shipped i
 - IDs are opaque strings. The client must not derive meaning from them.
 - Successful responses use `{ "requestId": "req_...", "data": ... }`.
 - Errors use the envelope below. `retryable` controls whether the existing Retry action should be offered.
-- `400`, `404`, and `422` are not retried automatically. One network failure, `429`, or `5xx` may be retried after user action. Rendering status polling is the only automatic retry loop.
-- Generation and render POSTs are idempotent within the running backend. The
-  Video Producer derives a canonical request fingerprint and sends it to the
-  provider as `Idempotency-Key`; this in-process retention resets on restart.
+- `400`, `404`, and `422` are not retried automatically. One network failure,
+  `429`, or `5xx` may be retried after user action.
+- Generation POSTs are idempotent within the running backend where the
+  corresponding agent stores a canonical request fingerprint. This in-process
+  retention resets on restart.
 
 ```json
 {
@@ -231,8 +232,9 @@ the abstract analysis before building the prompt. The model supplies the exact
 required claim, title, narration, and Fact Pack IDs used per section. The backend
 controls claim strategy, IDs, versions, ranges, and speaking-time estimates, and
 requires every narrative-case fact, at least two known facts, claim language in
-the narration, and a speaking estimate within two seconds of the requested
-duration. Identical in-flight requests are coalesced and successful identical
+the narration, and a speaking estimate near the requested duration. For demo
+stability, the current tolerance is at least twenty seconds or thirty-five percent of
+the requested duration, whichever is larger. Identical in-flight requests are coalesced and successful identical
 requests reuse the same result within the running process. Persistence across a
 server restart is not yet available.
 
@@ -293,69 +295,6 @@ Success (`201`):
 
 Errors: `400 INVALID_SCRIPT_BRIEF`; `429 LLM_RATE_LIMITED`; `500
 LLM_NOT_CONFIGURED` or `SCRIPT_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or
-`INVALID_LLM_RESPONSE`; `504 LLM_TIMEOUT`.
-
-## `POST /api/scripts/review`
-
-Purpose: estimate originality and production quality; it is not copyright clearance. Responsible agent: Originality Reviewer Agent. Consumed by: Originality Review screen.
-
-Implemented in Phase 4. The model provides evidence and score inputs only. The
-backend controls review and script identity, the weighted overall score,
-structure-risk bands, pass/fail thresholds, and the fixed non-legal disclaimer.
-Every reported phrase must be a short exact excerpt found in the submitted
-reference transcript or script. Identical requests are coalesced and successful
-results are cached for the running process.
-
-Required: `projectId`, `referenceAnalysis`, `referenceTranscript`, `script`. Optional: `thresholds`. Loading UI: “Comparing language and story structure.” Retry: user-triggered for transient failures; the same script version should return the same stored review when possible.
-
-Request:
-
-```json
-{
-  "projectId": "project_01JZ8P",
-  "referenceAnalysis": { "analysisId": "an_01JZ8R", "hookType": "Counter-intuitive claim" },
-  "referenceTranscript": { "transcriptId": "tr_01JZ8Q", "text": "Most people think the future..." },
-  "script": {
-    "scriptId": "sc_01JZ8S",
-    "title": "Why the United States cannot abandon Taiwan",
-    "version": 1,
-    "estimatedSeconds": 59,
-    "sections": [{ "id": "hook", "label": "Hook", "range": "0–5s", "text": "The most important line on a map may be the one ships cannot cross." }]
-  },
-  "thresholds": { "minimumOverall": 80, "maximumPhraseOverlapRisk": "medium" }
-}
-```
-
-Success (`200`):
-
-```json
-{
-  "requestId": "req_review_01",
-  "data": {
-    "reviewId": "rv_01JZ8T",
-    "scriptId": "sc_01JZ8S",
-    "status": "passed",
-    "overall": 91,
-    "originalityEstimate": 91,
-    "structureSimilarity": { "score": 34, "risk": "low", "note": "Only abstract pacing mechanics are shared." },
-    "scores": { "hook": 88, "structure": 84, "clarity": 94, "duration": 98 },
-    "summary": "The draft uses pacing discipline without repeating source language or examples.",
-    "overlaps": [
-      {
-        "reference": "The real breakthrough is not a single floating building.",
-        "generated": "Support is therefore not only a promise to one partner.",
-        "risk": "Low",
-        "note": "Shared contrast construction, but different wording and meaning."
-      }
-    ],
-    "instructions": ["Avoid distinctive examples from the reference."],
-    "disclaimer": "This similarity review is an originality estimate, not a copyright or legal determination."
-  }
-}
-```
-
-Errors: `400 INVALID_REVIEW_INPUT`; `429 LLM_RATE_LIMITED`; `500
-LLM_NOT_CONFIGURED` or `REVIEW_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or
 `INVALID_LLM_RESPONSE`; `504 LLM_TIMEOUT`.
 
 ## `POST /api/scripts/revise`
@@ -427,12 +366,10 @@ LLM_PROVIDER_ERROR` or `INVALID_LLM_RESPONSE`; `504 LLM_TIMEOUT`.
 
 Purpose: turn an approved script into timed scenes and production metadata. Responsible agent: Storyboard Agent. Consumed by: Storyboard/Production screen.
 
-Implemented in Phase 5. Required: `projectId`, `approvedReviewId`, `script`,
-`format`, and `targetDurationSeconds`. Optional: `sceneCount` and
-`visualConstraints`. The backend resolves the review from its running Reviewer
-registry and rejects missing, failed, or script-mismatched reviews before any
-model call. It preserves exact narration and controls IDs and the gap-free target
-timeline. Loading UI: “Planning scenes and visual evidence.” Retry:
+Required: `projectId`, `script`, `format`, and `targetDurationSeconds`.
+Optional: `sceneCount` and `visualConstraints`. The backend preserves exact
+narration and controls IDs and the gap-free target timeline. Loading UI:
+“Planning scenes and visual evidence.” Retry:
 user-triggered for transient failures.
 
 Request:
@@ -440,7 +377,6 @@ Request:
 ```json
 {
   "projectId": "project_01JZ8P",
-  "approvedReviewId": "rv_01JZ8T",
   "script": {
     "scriptId": "sc_01JZ8S",
     "version": 1,
@@ -471,109 +407,59 @@ Success (`201`):
       "caption": "The line ships cannot cross",
       "visual": "Animated maritime map with a narrow passage highlighted",
       "searchQuery": "map ocean shipping corridor aerial",
+      "imagePrompt": "Vertical documentary still of a maritime map, highlighted shipping corridor, no logos, no readable small text",
       "transition": "Fade up"
     }
   ]
 }
 ```
 
-Errors: `400 INVALID_STORYBOARD_INPUT`; `403 SCRIPT_NOT_APPROVED`; `404
-REVIEW_NOT_FOUND`; `429 LLM_RATE_LIMITED`; `500 LLM_NOT_CONFIGURED` or
+Errors: `400 INVALID_STORYBOARD_INPUT`; `429 LLM_RATE_LIMITED`; `500 LLM_NOT_CONFIGURED` or
 `STORYBOARD_INTERNAL_ERROR`; `502 LLM_PROVIDER_ERROR` or
 `INVALID_LLM_RESPONSE`; `504 LLM_TIMEOUT`.
 
-## `POST /api/videos/render`
+## `POST /api/images/generate`
 
-Purpose: start an asynchronous video render from an approved script/storyboard. Responsible agent/tool: Video Producer Agent plus rendering provider. Consumed by: Production screen.
+Purpose: generate an optional still image for a storyboard scene. Responsible
+service: AI Image Preview provider. Consumed by: Storyboard Preview screen after
+the user clicks “Generate key images.”
 
-Required: `projectId`, `approvedReviewId`, `storyboard`, `productionSettings`, `format`, `durationSeconds`. No optional fields are accepted in Phase 6. Loading UI: progress panel begins immediately. An identical retry reuses the in-process job and provider idempotency key.
+Required: one usable `imagePrompt`, or enough scene fields for the backend to
+build one from `visual`, `caption`, and `narration`. Optional: `projectId`,
+`sceneId`, `number`, `format`, `title`, and `aspectRatio`.
 
 Request:
 
 ```json
 {
   "projectId": "project_01JZ8P",
-  "approvedReviewId": "rv_01JZ8T",
-  "storyboard": [{ "id": "scene-1", "start": 0, "end": 5, "narration": "The most important line...", "visual": "Animated maritime map", "caption": "The line ships cannot cross", "searchQuery": "map ocean shipping corridor aerial", "transition": "Fade up" }],
-  "productionSettings": { "voice": "Min — Clear explainer", "captions": "Editorial high contrast", "music": false },
-  "format": "9:16",
-  "durationSeconds": 60
+  "sceneId": "scene-1",
+  "number": 1,
+  "aspectRatio": "16:9",
+  "caption": "The line ships cannot cross",
+  "visual": "Animated maritime map with a narrow passage highlighted",
+  "narration": "The most important line on a map may be the one ships cannot cross.",
+  "imagePrompt": "Vertical documentary still of a maritime map, highlighted shipping corridor, no logos"
 }
 ```
 
-Success (`202`):
+Success (`201`):
 
 ```json
 {
-  "requestId": "req_render_01",
+  "requestId": "req_image_01",
   "data": {
-    "renderId": "render_01JZ8W",
-    "status": "queued",
-    "stage": "Preparing production",
-    "progress": 2,
-    "completed": false,
-    "source": "provider",
-    "statusUrl": "/api/videos/render_01JZ8W/status"
+    "imageDataUrl": "data:image/png;base64,...",
+    "mediaType": "image/png",
+    "model": "google/gemini-3.1-flash-lite-image",
+    "prompt": "Vertical documentary still of a maritime map, highlighted shipping corridor, no logos"
   }
 }
 ```
 
-Errors: `400 INVALID_RENDER_INPUT`; `403 STORYBOARD_NOT_APPROVED`; `404
-REVIEW_NOT_FOUND`; `422 ASSET_OR_TIMELINE_INVALID`; `429
-RENDER_CAPACITY_LIMITED`; `500 RENDER_NOT_CONFIGURED`; `502
-RENDER_PROVIDER_ERROR` or `INVALID_RENDER_RESPONSE`; `504 RENDER_TIMEOUT`.
-
-## `GET /api/videos/:renderId/status`
-
-Purpose: report render progress and final deliverables. Responsible tool: rendering provider adapter. Consumed by: Production progress and result screens.
-
-Required path field: `renderId`. Loading: poll every 1.5 seconds in API mode while
-queued/running and stop on completed, failed, or the configured frontend poll
-limit. Provider diagnostics are never returned.
-
-Request: `GET /api/videos/render_01JZ8W/status`
-
-Success while running (`200`):
-
-```json
-{
-  "requestId": "req_status_01",
-  "data": { "renderId": "render_01JZ8W", "status": "running", "stage": "Creating captions", "progress": 66, "completed": false, "source": "provider", "updatedAt": "2026-07-18T05:20:10Z" }
-}
-```
-
-Success when complete (`200`):
-
-```json
-{
-  "requestId": "req_status_02",
-  "data": {
-    "renderId": "render_01JZ8W",
-    "status": "completed",
-    "stage": "Final video ready",
-    "progress": 100,
-    "completed": true,
-    "source": "provider",
-    "format": "9:16",
-    "duration": 60,
-    "voice": "Min — Clear explainer",
-    "captionStyle": "Editorial high contrast",
-    "music": false,
-    "completedAt": "2026-07-18T05:21:42Z",
-    "videoUrl": "https://media.example.test/renders/render_01JZ8W.mp4",
-    "productionPackageUrl": "https://media.example.test/renders/render_01JZ8W/package.json"
-  }
-}
-```
-
-`productionPackageUrl` is optional because composition providers such as
-Shotstack return the rendered media URL but not a public JSON-package URL.
-
-Errors: `404 RENDER_NOT_FOUND`; `429 RENDER_CAPACITY_LIMITED`; `500
-RENDER_NOT_CONFIGURED`; `502 RENDER_PROVIDER_ERROR` or
-`INVALID_RENDER_RESPONSE`; `504 RENDER_TIMEOUT`. A terminal provider failure is
-returned as `200` with `data.status: "failed"` and a safe structured error so
-polling stops deterministically.
+Errors: `400 INVALID_IMAGE_PROMPT`; `429 IMAGE_RATE_LIMITED`; `500
+IMAGE_NOT_CONFIGURED` or `IMAGE_INTERNAL_ERROR`; `502 IMAGE_PROVIDER_ERROR` or
+`INVALID_IMAGE_RESPONSE`; `504 IMAGE_TIMEOUT`.
 
 ## `POST /api/projects`
 
@@ -614,9 +500,9 @@ Success (`201`):
     "pipeline": {
       "transcript": { "status": "waiting", "detail": "Waiting for the previous stage" },
       "analyst": { "status": "waiting", "detail": "Waiting for the previous stage" },
+      "researcher": { "status": "waiting", "detail": "Waiting for the previous stage" },
       "writer": { "status": "waiting", "detail": "Waiting for the previous stage" },
-      "reviewer": { "status": "waiting", "detail": "Waiting for the previous stage" },
-      "producer": { "status": "waiting", "detail": "Waiting for the previous stage" }
+      "storyboard": { "status": "waiting", "detail": "Waiting for the previous stage" }
     }
   }
 }
@@ -628,9 +514,13 @@ Errors: `400 INVALID_PROJECT`; `409 CLIENT_PROJECT_ID_EXISTS`; `422 UNSUPPORTED_
 
 Purpose: restore the complete project/workflow after refresh or on another device. Responsible service: Project Service. Consumed by: every project route and Dashboard.
 
-Required path field: `projectId`. Optional query field: `include=transcript,analysis,script,review,storyboard,render`. Loading: project skeleton/agent status; current local-storage restore remains immediate. Retry: one user-triggered retry for transient failures; `404` returns project-unavailable UI.
+Required path field: `projectId`. Optional query field:
+`include=transcript,analysis,research,script,storyboard`. Loading: project
+skeleton/agent status; current local-storage restore remains immediate. Retry:
+one user-triggered retry for transient failures; `404` returns
+project-unavailable UI.
 
-Request: `GET /api/projects/project_01JZ8P?include=transcript,analysis,script,review,storyboard,render`
+Request: `GET /api/projects/project_01JZ8P?include=transcript,analysis,research,script,storyboard`
 
 Success (`200`):
 
@@ -645,17 +535,15 @@ Success (`200`):
     "language": "English",
     "duration": 60,
     "format": "9:16",
-    "status": "under_review",
+    "status": "storyboard_ready",
     "createdAt": "2026-07-18T05:10:00Z",
     "updatedAt": "2026-07-18T05:19:00Z",
     "transcript": { "transcriptId": "tr_01JZ8Q", "title": "Reference", "text": "...", "wordCount": 92, "estimatedDuration": 58 },
     "analysis": { "analysisId": "an_01JZ8R", "hookType": "Counter-intuitive claim", "structure": [] },
+    "research": { "researchId": "research_01JZ8R", "facts": [], "sources": [] },
     "generatedScript": { "scriptId": "sc_01JZ8S", "version": 1, "title": "Why the United States cannot abandon Taiwan", "estimatedSeconds": 59, "sections": [] },
-    "originalityReview": { "reviewId": "rv_01JZ8T", "status": "passed", "overall": 91, "scores": { "hook": 88, "structure": 84, "clarity": 94, "duration": 98 }, "overlaps": [], "instructions": [], "disclaimer": "This similarity review is an originality estimate, not a copyright or legal determination." },
     "storyboard": [],
-    "render": null,
-    "productionSettings": { "voice": "Sora — Warm documentary", "captions": "Editorial high contrast", "music": true },
-    "pipeline": { "transcript": { "status": "completed", "detail": "Transcript ready" }, "analyst": { "status": "completed", "detail": "Structure mapped" }, "writer": { "status": "completed", "detail": "Draft 1 ready" }, "reviewer": { "status": "completed", "detail": "Originality estimate passed" }, "producer": { "status": "waiting", "detail": "Awaiting approval" } }
+    "pipeline": { "transcript": { "status": "completed", "detail": "Transcript ready" }, "analyst": { "status": "completed", "detail": "Structure mapped" }, "researcher": { "status": "completed", "detail": "Fact Pack ready" }, "writer": { "status": "completed", "detail": "Draft 1 ready" }, "storyboard": { "status": "completed", "detail": "Storyboard preview ready" } }
   }
 }
 ```
@@ -664,9 +552,15 @@ Errors: `400 INVALID_PROJECT_ID`; `401 AUTHENTICATION_REQUIRED`; `403 PROJECT_AC
 
 ## `PATCH /api/projects/:projectId`
 
-Purpose: persist user edits, production settings, and allowed workflow metadata. Responsible service: Project Service. Consumed by: Script Editor, Production settings, and project title edits.
+Purpose: persist user edits and allowed workflow metadata. Responsible service:
+Project Service. Consumed by: Script Editor, Storyboard Preview, and project
+title edits.
 
-Required path field: `projectId`; request must contain at least one mutable field. Optional mutable fields: `title`, `generatedScript`, `productionSettings`, `expectedUpdatedAt`. Server-owned agent results/status must not be arbitrarily overwritten. Loading: optimistic local save with visible failure recovery. Retry: safe only with `expectedUpdatedAt` or an ETag/version precondition.
+Required path field: `projectId`; request must contain at least one mutable
+field. Optional mutable fields: `title`, `generatedScript`, `expectedUpdatedAt`.
+Server-owned agent results/status must not be arbitrarily overwritten. Loading:
+optimistic local save with visible failure recovery. Retry: safe only with
+`expectedUpdatedAt` or an ETag/version precondition.
 
 Request:
 
@@ -680,7 +574,6 @@ Request:
     "estimatedSeconds": 59,
     "sections": [{ "id": "hook", "label": "Hook", "range": "0–5s", "text": "A single shipping lane can change the balance of an entire region." }]
   },
-  "productionSettings": { "voice": "Min — Clear explainer", "captions": "Editorial high contrast", "music": false },
   "expectedUpdatedAt": "2026-07-18T05:19:00Z"
 }
 ```
@@ -695,7 +588,6 @@ Success (`200`):
     "title": "Why Taiwan matters to global trade",
     "status": "script_generated",
     "generatedScript": { "scriptId": "sc_01JZ8S", "version": 1, "title": "Why Taiwan matters to global trade", "estimatedSeconds": 59, "sections": [{ "id": "hook", "label": "Hook", "range": "0–5s", "text": "A single shipping lane can change the balance of an entire region." }] },
-    "productionSettings": { "voice": "Min — Clear explainer", "captions": "Editorial high contrast", "music": false },
     "updatedAt": "2026-07-18T05:25:00Z"
   }
 }

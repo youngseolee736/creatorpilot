@@ -1,9 +1,7 @@
 const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst");
-const { OriginalityReviewer } = require("../src/agents/originality-reviewer/originality-reviewer");
 const { Researcher } = require("../src/agents/researcher/researcher");
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
 const { StoryboardAgent } = require("../src/agents/storyboard/storyboard");
-const { VideoProducer } = require("../src/agents/video-producer/video-producer");
 const { createApp } = require("../src/app");
 
 const transcriptText = "The reference begins with a surprising question, introduces familiar context, compares several approaches, raises practical stakes, and resolves the opening idea near the ending. The presentation uses concise transitions and a final invitation for viewers to reflect on the topic.";
@@ -125,6 +123,8 @@ const researchProvider = {
     return {
       text: JSON.stringify({
         summary: "Son's case is strongest on selected impact measures, while Messi remains stronger on important creative measures.",
+        verdictStatus: "partially_supported",
+        recommendedFrame: "GOAT means the player whose arrival most changes what the league can become.",
         verdict: { status: "partially_supported", headline: "Son has a credible case, but not an uncontested one.", explanation: "The conclusion changes depending on whether the comparison prioritizes output, efficiency, availability, or creation." },
         narrativeCase: { mode: "reframe", recommendedFrame: "GOAT means the player whose arrival most changes what the league can become.", definition: "In this story, GOAT measures transformative league impact, not only the largest season total.", thesis: "Son can be called the MLS GOAT because his case rests on changing the league's reach, competitive identity, and expectations at once.", whyItProvesClaim: "This lens uses measurable impact and sourced context while making the evaluative definition explicit.", concession: "Messi still owns the stronger conventional statistical and career case.", supportFactNumbers: [1, 2, 3] },
         criteria: ["Goal contribution", "Per-90 efficiency", "Team influence"],
@@ -153,37 +153,6 @@ const researchProvider = {
   },
 };
 
-const reviewerProvider = {
-  async complete(messages) {
-    const payload = JSON.parse(messages[1].content.slice(messages[1].content.indexOf("{")));
-    const input = payload.originalReviewInput || payload;
-    const firstText = input.script.sections[0].text;
-    const finalText = input.script.sections[input.script.sections.length - 1].text;
-    return JSON.stringify({
-      originalityEstimate: 92,
-      structureSimilarity: {
-        score: 32,
-        note: "The draft shares only an abstract escalation-and-resolution arc with the reference.",
-      },
-      scores: { hook: 90, structure: 87, clarity: 94, duration: 96 },
-      summary: "The draft keeps the reference's pacing mechanics while using distinct language and subject-specific expression.",
-      overlaps: [{
-        reference: "raises practical stakes",
-        generated: firstText.slice(0, 160),
-        risk: "Low",
-        note: "Both escalate consequences, but the wording, topic, and narrative placement are distinct.",
-      }, {
-        reference: "resolves the opening idea near the ending",
-        generated: finalText.slice(0, 160),
-        risk: "Low",
-        note: "Both resolve the opening near the close, while the language and conclusion remain topic-specific.",
-      }],
-      instructions: ["Keep all supporting claims tied to reliable sources before production."],
-    });
-  },
-};
-
-const reviewer = new OriginalityReviewer({ provider: reviewerProvider });
 const storyboardProvider = {
   async complete(messages) {
     const payload = JSON.parse(messages[1].content.slice(messages[1].content.indexOf("{")));
@@ -207,49 +176,14 @@ const storyboardProvider = {
     });
   },
 };
-const storyboardAgent = new StoryboardAgent({
-  provider: storyboardProvider,
-  reviewResolver: (reviewId) => reviewer.findReview(reviewId),
-});
-const renderPolls = new Map();
-const renderProvider = {
-  async startRender(productionPackage) {
-    const jobId = `fixture-render-${productionPackage.projectId}`;
-    renderPolls.set(jobId, 0);
-    return { jobId, status: "queued", stage: "Preparing production", progress: 2 };
-  },
-  async getStatus(jobId) {
-    const stages = [
-      { status: "running", stage: "Planning scenes", progress: 10 },
-      { status: "running", stage: "Finding B-roll", progress: 28 },
-      { status: "running", stage: "Generating narration", progress: 48 },
-      { status: "running", stage: "Creating captions", progress: 66 },
-      { status: "running", stage: "Combining scenes", progress: 84 },
-      { status: "running", stage: "Rendering final video", progress: 96 },
-    ];
-    const poll = renderPolls.get(jobId) || 0;
-    renderPolls.set(jobId, poll + 1);
-    return stages[poll] || {
-      status: "completed",
-      completedAt: "2026-07-19T02:00:00Z",
-      videoUrl: `https://media.example.test/${jobId}.mp4`,
-      productionPackageUrl: `https://media.example.test/${jobId}.json`,
-    };
-  },
-};
+const storyboardAgent = new StoryboardAgent({ provider: storyboardProvider });
 
 const app = createApp({
   transcriptService,
   scriptAnalyst: new ScriptAnalyst({ provider }),
   researcher: new Researcher({ provider: researchProvider }),
   scriptwriter: new Scriptwriter({ provider: scriptProvider }),
-  originalityReviewer: reviewer,
   storyboardAgent,
-  videoProducer: new VideoProducer({
-    provider: renderProvider,
-    reviewResolver: (reviewId) => reviewer.findReview(reviewId),
-    storyboardResolver: (reviewId, scenes) => storyboardAgent.findStoryboard(reviewId, scenes),
-  }),
 });
 const port = Number(process.env.PORT || 8787);
 const server = app.listen(port, "127.0.0.1", () => {

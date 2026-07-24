@@ -1,5 +1,4 @@
 const assert = require("assert");
-const { OriginalityReviewer } = require("../src/agents/originality-reviewer/originality-reviewer");
 const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst");
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
 const { StoryboardAgent } = require("../src/agents/storyboard/storyboard");
@@ -7,7 +6,7 @@ const { TranscriptService } = require("../src/services/transcript-service");
 const { hasLLMConfiguration } = require("../src/services/llm");
 const { extractYouTubeVideo } = require("../src/utils/youtube-url");
 
-const missingVariables = ["ANALYST", "SCRIPTWRITER", "REVIEWER", "STORYBOARD"]
+const missingVariables = ["ANALYST", "SCRIPTWRITER", "STORYBOARD"]
   .filter((scope) => !hasLLMConfiguration(scope))
   .map((scope) => `${scope}_LLM_* (or shared LLM_*)`);
 if (!String(process.env.LIVE_SCRIPT_TOPIC || "").trim()) missingVariables.push("LIVE_SCRIPT_TOPIC");
@@ -39,17 +38,8 @@ if (!video) {
     referenceAnalysis: analysis,
     revisionInstructions: [],
   });
-  const reviewer = new OriginalityReviewer();
-  const review = await reviewer.review({ projectId, referenceTranscript: transcript, referenceAnalysis: analysis, script });
-  if (review.status !== "passed") {
-    console.log({ reviewId: review.reviewId, status: review.status, note: "SKIP: live script requires revision before Storyboard." });
-    return;
-  }
-  const storyboard = await new StoryboardAgent({
-    reviewResolver: (reviewId) => reviewer.findReview(reviewId),
-  }).generate({
+  const storyboard = await new StoryboardAgent().generate({
     projectId,
-    approvedReviewId: review.reviewId,
     script,
     format: "9:16",
     targetDurationSeconds,
@@ -62,7 +52,6 @@ if (!video) {
   assert.equal(storyboard.totalDuration, targetDurationSeconds);
   assert.equal(storyboard.scenes[storyboard.scenes.length - 1].end, targetDurationSeconds);
   console.log({
-    reviewId: review.reviewId,
     storyboardId: storyboard.storyboardId,
     scenes: storyboard.scenes.length,
     totalDuration: storyboard.totalDuration,

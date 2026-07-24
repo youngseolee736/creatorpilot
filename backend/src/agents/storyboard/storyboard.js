@@ -1,4 +1,3 @@
-const { AppError } = require("../../middleware/error-handler");
 const { createLLMProvider } = require("../../services/llm");
 const { mapLLMError } = require("../../services/llm/llm-errors");
 const {
@@ -23,9 +22,8 @@ class StoryboardAgent {
       agentLabel: "Storyboard Agent",
       unsupportedErrorCode: "STORYBOARD_INTERNAL_ERROR",
     });
-    this.reviewResolver = options.reviewResolver || (() => null);
     this.completed = new Map();
-    this.storyboardsByReview = new Map();
+    this.storyboards = [];
     this.inFlight = new Map();
     this.maxCompleted = Number(options.maxCompleted) || 100;
   }
@@ -43,30 +41,14 @@ class StoryboardAgent {
       const oldestKey = this.completed.keys().next().value;
       const oldest = this.completed.get(oldestKey);
       this.completed.delete(oldestKey);
-      if (oldest?.reviewId) {
-        const records = this.storyboardsByReview.get(oldest.reviewId) || [];
-        this.storyboardsByReview.set(oldest.reviewId, records.filter((record) => record.storyboard.storyboardId !== oldest.storyboardId));
-      }
+      this.storyboards = this.storyboards.filter((record) => record.storyboard.storyboardId !== oldest?.storyboardId);
     }
     this.completed.set(key, value);
-    const records = this.storyboardsByReview.get(value.reviewId) || [];
-    records.push({ storyboard: value, script });
-    this.storyboardsByReview.set(value.reviewId, records);
+    this.storyboards.push({ storyboard: value, script });
   }
 
-  findStoryboard(reviewId, scenes) {
-    const records = this.storyboardsByReview.get(String(reviewId || "")) || [];
-    return records.find((record) => JSON.stringify(record.storyboard.scenes) === JSON.stringify(scenes)) || null;
-  }
-
-  async authorize(input) {
-    const review = await this.reviewResolver(input.approvedReviewId);
-    if (!review) {
-      throw new AppError(404, "REVIEW_NOT_FOUND", "The approved review is not available on this server.", false);
-    }
-    if (review.status !== "passed" || review.scriptId !== input.script.scriptId) {
-      throw new AppError(403, "SCRIPT_NOT_APPROVED", "The current script does not have a matching passed review.", false);
-    }
+  findStoryboard(scenes) {
+    return this.storyboards.find((record) => JSON.stringify(record.storyboard.scenes) === JSON.stringify(scenes)) || null;
   }
 
   async generateCandidate(input, scenePlan, fingerprint) {
@@ -88,7 +70,6 @@ class StoryboardAgent {
 
   async generate(request) {
     const input = validateStoryboardRequest(request);
-    await this.authorize(input);
     const scenePlan = createScenePlan(input);
     const fingerprint = requestFingerprint(input);
     if (this.completed.has(fingerprint)) return this.completed.get(fingerprint);

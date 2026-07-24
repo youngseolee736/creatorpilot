@@ -14,9 +14,8 @@ import {
   extractTranscript,
   generateScript,
   generateStoryboard,
+  generateStoryboardImage,
   researchTopic,
-  renderVideo,
-  reviewOriginality,
   reviseScript,
   synthesizeReferences,
 } from "./service-client.mjs";
@@ -26,12 +25,12 @@ import { renderNewProject } from "./pages/new-project.mjs";
 import { renderAnalysis } from "./pages/analysis.mjs";
 import { renderResearch } from "./pages/research.mjs";
 import { renderScriptEditor } from "./pages/script-editor.mjs";
-import { renderReview } from "./pages/review.mjs";
 import { renderProduction } from "./pages/production.mjs";
 
 const app = document.querySelector("#app");
 const store = createStore();
 const runningTasks = new Set();
+const MAX_AI_STORYBOARD_IMAGES = 3;
 let newProjectError = null;
 let newProjectDraft = {};
 let lastRouteKey = "";
@@ -60,7 +59,6 @@ function pageFor(route, project) {
   if (route.name === "analysis") return renderAnalysis(project);
   if (route.name === "research") return renderResearch(project);
   if (route.name === "script") return renderScriptEditor(project);
-  if (route.name === "review") return renderReview(project);
   if (route.name === "production") return renderProduction(project);
   return renderDashboard(store.getState());
 }
@@ -215,7 +213,6 @@ async function ensureScript(project, { force = false } = {}) {
       const generatedScript = await generateScript(current);
       current = store.updateProject(project.id, {
         generatedScript,
-        originalityReview: null,
         status: "script_generated",
         pipeline: updatePipeline(current, "writer", "completed", `Draft ${generatedScript.version} ready for editing`),
       });
@@ -237,16 +234,14 @@ async function ensureResearch(project) {
         research: null,
         status: "researching",
         referenceBlueprint,
-        pipeline: resetResearchPipeline(current, "in_progress", current.analysisDepth === "deep" ? "Comparing two research cases with the Research Judge" : "Testing the claim with current evidence"),
+        pipeline: resetResearchPipeline(current, "in_progress", "Collecting a compact source-grounded evidence pack"),
       });
       render({ preserveFocus: true });
       const research = await researchTopic(current);
       current = store.updateProject(project.id, {
         research,
         generatedScript: null,
-        originalityReview: null,
-        storyboard: null,
-        render: null,
+        storyboard: [],
         status: "research_ready",
         pipeline: updatePipeline(current, "researcher", "completed", `${research.facts.length} story-ready findings`),
       });
@@ -261,8 +256,7 @@ function resetResearchPipeline(project, status, detail) {
   return {
     ...updatePipeline(project, "researcher", status, detail),
     writer: { status: "waiting", detail: "Waiting for the new research" },
-    reviewer: { status: "waiting", detail: "Waiting for the previous stage" },
-    producer: { status: "waiting", detail: "Waiting for the previous stage" },
+    producer: { status: "waiting", detail: "Waiting for the storyboard preview" },
   };
 }
 
@@ -297,7 +291,6 @@ async function ensureScriptRevision(project, revisionInstructions) {
       const generatedScript = await reviseScript(current, instructions);
       current = store.updateProject(project.id, {
         generatedScript,
-        originalityReview: null,
         pendingRevisionInstructions: null,
         status: "script_generated",
         pipeline: updatePipeline(current, "writer", "completed", `Draft ${generatedScript.version} ready for editing`),
@@ -305,30 +298,6 @@ async function ensureScriptRevision(project, revisionInstructions) {
       render({ preserveFocus: true });
     } catch (error) {
       failProject(current, "writer", error);
-    }
-  });
-}
-
-async function ensureReview(project) {
-  await runTask(`review:${project.id}`, async () => {
-    let current = store.getProject(project.id);
-    if (current.originalityReview) return;
-    try {
-      current = store.updateProject(project.id, {
-        error: null,
-        status: "under_review",
-        pipeline: updatePipeline(current, "reviewer", "in_progress", "Comparing language and story structure"),
-      });
-      render({ preserveFocus: true });
-      const originalityReview = await reviewOriginality(current);
-      current = store.updateProject(project.id, {
-        originalityReview,
-        status: originalityReview.status === "passed" ? "under_review" : "revision_required",
-        pipeline: updatePipeline(current, "reviewer", originalityReview.status === "passed" ? "completed" : "revision_required", originalityReview.status === "passed" ? "Originality estimate passed" : "Revision instructions ready"),
-      });
-      render({ preserveFocus: true });
-    } catch (error) {
-      failProject(current, "reviewer", error);
     }
   });
 }
@@ -346,8 +315,8 @@ async function ensureStoryboard(project) {
       const storyboard = await generateStoryboard(current);
       current = store.updateProject(project.id, {
         storyboard,
-        status: current.render?.completed ? "completed" : "under_review",
-        pipeline: updatePipeline(current, "producer", "waiting", `${storyboard.length} scenes ready — awaiting approval`),
+        status: "under_review",
+        pipeline: updatePipeline(current, "producer", "completed", `${storyboard.length} scene preview ready`),
       });
       render({ preserveFocus: true });
     } catch (error) {
@@ -356,33 +325,61 @@ async function ensureStoryboard(project) {
   });
 }
 
-async function startRender(project) {
-  await runTask(`render:${project.id}`, async () => {
+async function ensureStoryboardImages(project) {
+  await runTask(`storyboard-images:${project.id}`, async () => {
     let current = store.getProject(project.id);
-    try {
-      current = store.updateProject(project.id, {
-        error: null,
-        status: "video_rendering",
-        render: { stage: "Preparing production", progress: 2, completed: false },
-        pipeline: updatePipeline(current, "producer", "in_progress", "Preparing the vertical render"),
-      });
-      render({ preserveFocus: true });
-      const result = await renderVideo(current, (progress) => {
-        current = store.updateProject(project.id, {
-          render: { ...progress, completed: false },
-          pipeline: updatePipeline(current, "producer", "in_progress", progress.stage),
+    if (!current?.storyboard?.length) return;
+    const existingImages = current.storyboard.filter((scene) => scene.imageDataUrl).length;
+    const imageSlotsRemaining = Math.max(0, MAX_AI_STORYBOARD_IMAGES - existingImages);
+    const imageSceneIds = new Set(current.storyboard
+      .filter((scene) => !scene.imageDataUrl)
+      .slice(0, imageSlotsRemaining)
+      .map((scene) => scene.id));
+    if (!imageSceneIds.size) return;
+    current = store.updateProject(project.id, {
+      imagePreviewStatus: "in_progress",
+      storyboard: current.storyboard.map((scene) => !imageSceneIds.has(scene.id)
+        ? { ...scene, imageStatus: scene.imageDataUrl ? "completed" : scene.imageStatus }
+        : { ...scene, imageStatus: "in_progress", imageError: null }),
+    });
+    render({ preserveFocus: true });
+    let failures = 0;
+    for (const scene of current.storyboard) {
+      if (!imageSceneIds.has(scene.id)) continue;
+      try {
+        const image = await generateStoryboardImage(store.getProject(project.id), scene);
+        const latest = store.getProject(project.id);
+        store.updateProject(project.id, {
+          storyboard: latest.storyboard.map((item) => item.id === scene.id
+            ? {
+              ...item,
+              imageDataUrl: image.imageDataUrl,
+              imageSource: "ai",
+              imageModel: image.model,
+              imagePrompt: image.prompt || item.imagePrompt,
+              imageStatus: "completed",
+              imageError: null,
+            }
+            : item),
         });
-        render({ preserveFocus: true });
-      });
-      store.updateProject(project.id, {
-        render: result,
-        status: "completed",
-        pipeline: updatePipeline(current, "producer", "completed", "Vertical video ready"),
-      });
+      } catch (error) {
+        failures += 1;
+        const latest = store.getProject(project.id);
+        store.updateProject(project.id, {
+          storyboard: latest.storyboard.map((item) => item.id === scene.id
+            ? { ...item, imageStatus: "failed", imageError: error.message || "Image generation failed" }
+            : item),
+        });
+      }
       render({ preserveFocus: true });
-    } catch (error) {
-      failProject(current, "producer", error);
     }
+    const latest = store.getProject(project.id);
+    const completedCount = latest.storyboard.filter((scene) => scene.imageDataUrl).length;
+    store.updateProject(project.id, {
+      imagePreviewStatus: failures ? "failed" : "completed",
+      pipeline: updatePipeline(latest, "producer", failures ? "completed" : "completed", failures ? "Storyboard ready; some image previews failed" : `Storyboard ready; ${completedCount} key image previews ready`),
+    });
+    render({ preserveFocus: true });
   });
 }
 
@@ -392,13 +389,12 @@ function ensureRouteData(route, project) {
   if (route.name === "research" && !hasResearchStrategy(project.research)) ensureResearch(project);
   if (route.name === "script" && !hasResearchStrategy(project.research)) navigate(routeFor("research", project.id));
   else if (route.name === "script" && !project.generatedScript) ensureScript(project);
-  if (route.name === "review" && !project.originalityReview) ensureReview(project);
   if (route.name === "production" && !project.storyboard.length) ensureStoryboard(project);
 }
 
 function navigate(hash) {
-  if (location.hash === hash) render();
-  else location.hash = hash;
+  if (location.hash !== hash) location.hash = hash;
+  render();
 }
 
 function saveScriptForm(project) {
@@ -412,9 +408,7 @@ function saveScriptForm(project) {
   return store.updateProject(project.id, {
     generatedScript: { ...project.generatedScript, title, sections },
     title,
-    originalityReview: null,
     status: "script_generated",
-    pipeline: updatePipeline(project, "reviewer", "waiting", "Waiting for the updated script"),
   });
 }
 
@@ -428,11 +422,6 @@ function quietSaveScript(projectId) {
   }));
   const title = form.querySelector("#script-title").value.trim() || project.topic;
   const patch = { generatedScript: { ...project.generatedScript, title, sections }, title };
-  if (project.originalityReview) {
-    patch.originalityReview = null;
-    patch.status = "script_generated";
-    patch.pipeline = updatePipeline(project, "reviewer", "waiting", "Waiting for the updated script");
-  }
   store.updateProject(projectId, patch);
 }
 
@@ -479,7 +468,11 @@ app.addEventListener("submit", (event) => {
   if (event.target.id === "script-form") {
     const { project } = currentContext();
     const saved = saveScriptForm(project);
-    navigate(routeFor("review", saved.id));
+    const queued = store.updateProject(saved.id, {
+      pipeline: updatePipeline(saved, "producer", "in_progress", "Planning scenes and visual evidence"),
+    });
+    navigate(routeFor("production", queued.id));
+    ensureStoryboard(queued);
   }
 });
 
@@ -495,18 +488,6 @@ app.addEventListener("input", (event) => {
   const display = form.querySelector("#word-count");
   if (display) display.textContent = text.trim().split(/\s+/).filter(Boolean).length;
   scheduleScriptAutosave();
-});
-
-app.addEventListener("change", (event) => {
-  const setting = event.target.dataset.projectSetting;
-  if (!setting) return;
-  const { project } = currentContext();
-  if (!project) return;
-  const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
-  store.updateProject(project.id, {
-    productionSettings: { ...project.productionSettings, [setting]: value },
-  });
-  render({ preserveFocus: true });
 });
 
 app.addEventListener("click", async (event) => {
@@ -531,7 +512,6 @@ app.addEventListener("click", async (event) => {
       ...updatePipeline(project, "analyst", "waiting", "New analysis queued"),
       researcher: { status: "waiting", detail: "Waiting for the new analysis" },
       writer: { status: "waiting", detail: "Waiting for the previous stage" },
-      reviewer: { status: "waiting", detail: "Waiting for the previous stage" },
       producer: { status: "waiting", detail: "Waiting for the previous stage" },
     };
     store.updateProject(project.id, {
@@ -541,9 +521,7 @@ app.addEventListener("click", async (event) => {
       referenceBlueprint: null,
       research: null,
       generatedScript: null,
-      originalityReview: null,
-      storyboard: null,
-      render: null,
+      storyboard: [],
       pipeline,
     });
     render({ preserveFocus: true });
@@ -554,9 +532,7 @@ app.addEventListener("click", async (event) => {
       error: null,
       research: null,
       generatedScript: null,
-      originalityReview: null,
-      storyboard: null,
-      render: null,
+      storyboard: [],
       pipeline: resetResearchPipeline(project, "waiting", "New research queued"),
     });
     render({ preserveFocus: true });
@@ -566,7 +542,6 @@ app.addEventListener("click", async (event) => {
   if (action === "regenerate-script") {
     const saved = saveScriptForm(project);
     const instructions = saved.pendingRevisionInstructions
-      || saved.originalityReview?.instructions
       || ["Create a fresh version with distinct wording while preserving the brief and section functions."];
     ensureScriptRevision(saved, instructions);
   }
@@ -575,33 +550,26 @@ app.addEventListener("click", async (event) => {
     control.textContent = "Changes saved";
     setTimeout(() => render({ preserveFocus: true }), 700);
   }
-  if (action === "send-back-script") {
-    store.updateProject(project.id, {
-      status: "revision_required",
-      pendingRevisionInstructions: project.originalityReview?.instructions || [],
-      originalityReview: null,
-      pipeline: updatePipeline(project, "reviewer", "revision_required", "Returned with revision guidance"),
+  if (action === "approve-production") {
+    const saved = saveScriptForm(project);
+    const queued = store.updateProject(saved.id, {
+      pipeline: updatePipeline(saved, "producer", "in_progress", "Planning scenes and visual evidence"),
     });
-    navigate(routeFor("script", project.id));
+    navigate(routeFor("production", queued.id));
+    ensureStoryboard(queued);
   }
-  if (action === "approve-production") navigate(routeFor("production", project.id));
-  if (action === "render-video") startRender(project);
-  if (action === "regenerate-video") {
-    store.updateProject(project.id, { render: null, status: "under_review", pipeline: updatePipeline(project, "producer", "in_progress", "Storyboard ready for a new render") });
+  if (action === "regenerate-storyboard") {
+    const queued = store.updateProject(project.id, {
+      error: null,
+      storyboard: [],
+      status: "script_generated",
+      pipeline: updatePipeline(project, "producer", "in_progress", "Regenerating storyboard preview"),
+    });
     render({ preserveFocus: true });
+    ensureStoryboard(queued);
   }
-  if (action === "toggle-preview") {
-    control.classList.toggle("is-playing");
-    control.setAttribute("aria-label", control.classList.contains("is-playing") ? "Pause mock video preview" : "Play mock video preview");
-  }
-  if (action === "export-video") {
-    const payload = { ...project, note: "CreatorPilot mock production package — no media file generated" };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${project.id}-creatorpilot-package.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+  if (action === "generate-storyboard-images") {
+    ensureStoryboardImages(project);
   }
   if (action === "retry-analysis") {
     store.updateProject(project.id, {
@@ -610,14 +578,11 @@ app.addEventListener("click", async (event) => {
       referenceBlueprint: null,
       research: null,
       generatedScript: null,
-      originalityReview: null,
-      storyboard: null,
-      render: null,
+      storyboard: [],
       pipeline: {
         ...updatePipeline(project, project.references?.every((reference) => reference.transcript) ? "analyst" : "transcript", "waiting", "Retry queued"),
         researcher: { status: "waiting", detail: "Waiting for the new analysis" },
         writer: { status: "waiting", detail: "Waiting for the previous stage" },
-        reviewer: { status: "waiting", detail: "Waiting for the previous stage" },
         producer: { status: "waiting", detail: "Waiting for the previous stage" },
       },
     });
@@ -635,23 +600,14 @@ app.addEventListener("click", async (event) => {
     }
   }
   if (action === "retry-research") {
-    store.updateProject(project.id, { error: null, research: null, generatedScript: null, originalityReview: null, storyboard: null, render: null, pipeline: resetResearchPipeline(project, "waiting", "Retry queued") });
+    store.updateProject(project.id, { error: null, research: null, generatedScript: null, storyboard: [], pipeline: resetResearchPipeline(project, "waiting", "Retry queued") });
     render({ preserveFocus: true });
     ensureResearch(store.getProject(project.id));
-  }
-  if (action === "retry-review") {
-    store.updateProject(project.id, { error: null });
-    render({ preserveFocus: true });
-    ensureReview(store.getProject(project.id));
   }
   if (action === "retry-storyboard") {
     store.updateProject(project.id, { error: null });
     render({ preserveFocus: true });
     ensureStoryboard(store.getProject(project.id));
-  }
-  if (action === "retry-render") {
-    store.updateProject(project.id, { error: null });
-    startRender(store.getProject(project.id));
   }
   if (action === "delete-project") {
     const target = project || store.getProject(control.dataset.projectId);

@@ -193,17 +193,6 @@ export async function researchTopic(project = {}) {
     searchedAt: new Date().toISOString(),
     safety: { providerVerifiedSources: true, factualGuarantee: false },
   };
-  if (project.analysisDepth === "deep") {
-    result.ensemble = {
-      mode: "deep",
-      candidates: [
-        { id: "candidate-a", focus: "Direct evidence", summary: project.language === "Korean" ? "통계와 직접 비교를 중심으로 주장을 검증했습니다." : "Tests the claim through primary data and fair direct comparisons." },
-        { id: "candidate-b", focus: "Narrative case", summary: project.language === "Korean" ? "주장을 정직하게 살릴 수 있는 더 강한 관점을 찾았습니다." : "Finds the strongest truthful lens that can carry the requested claim." },
-      ],
-      judgment: { winner: "hybrid", reason: project.language === "Korean" ? "직접 비교 근거와 가장 강한 서사적 논리를 검증해 결합했습니다." : "Combined the strongest verified direct evidence with the strongest truthful narrative case.", confidence: 0.9 },
-      degraded: false,
-    };
-  }
   if (project.language !== "Korean") return result;
   return {
     ...result,
@@ -293,43 +282,6 @@ export async function reviseScript(project, revisionInstructions = []) {
   };
 }
 
-export async function reviewOriginality(project) {
-  await wait(500);
-  maybeFail("reviewOriginality");
-  const result = {
-    status: "passed",
-    overall: 91,
-    scores: { hook: 88, structure: 84, clarity: 94, duration: 98 },
-    summary: "The draft uses the reference's pacing discipline without repeating its language or subject-specific examples.",
-    overlaps: [
-      {
-        reference: "The real breakthrough is not a single floating building.",
-        generated: "Putting things off is not a character flaw; it is your brain dodging a feeling.",
-        risk: "Low",
-        note: "Shared contrast construction, but different wording, meaning, and placement.",
-      },
-      {
-        reference: "The cities that prepare now may not have to retreat later.",
-        generated: "Starting small feels pointless today, but it is exactly what makes tomorrow's work easier.",
-        risk: "Low",
-        note: "Both close on future consequences; revise only if a more distinct cadence is desired.",
-      },
-    ],
-    instructions: [
-      "Keep the evidence sequence, but avoid adding any distinctive examples from the reference.",
-      "Retain the final sentence because it resolves the new topic rather than the source story.",
-    ],
-    disclaimer: "This similarity review is an originality estimate, not a copyright or legal determination.",
-  };
-  if (project.language !== "Korean") return result;
-  return {
-    ...result,
-    summary: "초안은 참고 영상의 속도감만 활용하고 표현과 주제별 사례는 새롭게 구성했습니다.",
-    overlaps: result.overlaps.map((overlap, index) => ({ ...overlap, note: ["대조 구조는 비슷하지만 단어와 의미, 위치가 모두 다릅니다.", "미래의 결과로 끝나는 공통점이 있지만 문장 흐름과 주제는 구별됩니다."][index] })),
-    instructions: ["근거의 순서는 유지하되 참고 영상의 고유 사례는 사용하지 마세요.", "새 주제의 질문에 직접 답하는 마지막 문장은 유지하세요."],
-  };
-}
-
 export async function generateStoryboard(project) {
   await wait(540);
   maybeFail("generateStoryboard");
@@ -356,35 +308,30 @@ export async function generateStoryboard(project) {
     caption,
     visual,
     searchQuery: query,
+    imagePrompt: `Vertical editorial storyboard still of ${visual}. Documentary lighting, realistic composition, no logos, no readable small text.`,
     transition: index === 0 ? "Fade up" : index === scenes.length - 1 ? "Fade out" : "Match cut",
   }));
 }
 
-export async function renderVideo(project, onProgress = () => {}) {
-  maybeFail("renderVideo");
-  const stages = [
-    ["Planning scenes", 10],
-    ["Finding B-roll", 28],
-    ["Generating narration", 48],
-    ["Creating captions", 66],
-    ["Combining scenes", 84],
-    ["Rendering final video", 96],
-  ];
-  for (const [stage, progress] of stages) {
-    await wait(300);
-    maybeFail("renderVideo");
-    onProgress({ stage, progress });
-  }
-  await wait(240);
+export async function generateStoryboardImage(project = {}, scene = {}) {
+  await wait(320);
+  maybeFail("generateStoryboardImage");
+  const title = String(scene.caption || project.title || "Storyboard preview").slice(0, 72);
+  const visual = String(scene.visual || scene.imagePrompt || "AI generated image concept").slice(0, 120);
+  const hue = (Number(scene.number || 1) * 37) % 360;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+    <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="hsl(${hue} 42% 88%)"/><stop offset="1" stop-color="hsl(${(hue + 70) % 360} 36% 66%)"/></linearGradient></defs>
+    <rect width="1280" height="720" fill="url(#g)"/>
+    <circle cx="1010" cy="170" r="180" fill="rgba(255,255,255,.28)"/>
+    <rect x="86" y="92" width="1108" height="536" rx="34" fill="rgba(255,255,255,.58)" stroke="rgba(20,27,24,.28)" stroke-width="4"/>
+    <text x="120" y="176" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="34" font-weight="700" fill="#141b18">AI IMAGE PREVIEW</text>
+    <text x="120" y="350" font-family="Georgia, serif" font-size="58" font-weight="700" fill="#141b18">${title.replace(/[<>&]/g, "")}</text>
+    <text x="120" y="448" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="28" fill="#53615b">${visual.replace(/[<>&]/g, "")}</text>
+  </svg>`;
   return {
-    stage: "Final video ready",
-    progress: 100,
-    completed: true,
-    format: project.format,
-    duration: project.duration,
-    voice: project.productionSettings.voice,
-    captionStyle: project.productionSettings.captions,
-    music: project.productionSettings.music,
-    completedAt: new Date().toISOString(),
+    imageDataUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    mediaType: "image/svg+xml",
+    model: "mock/storyboard-preview",
+    prompt: scene.imagePrompt || scene.visual || "",
   };
 }

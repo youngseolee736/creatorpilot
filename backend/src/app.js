@@ -6,15 +6,14 @@ const { createAnalysisRouter } = require("./routes/analysis");
 const { createResearchRouter } = require("./routes/research");
 const { createScriptsRouter } = require("./routes/scripts");
 const { createStoryboardRouter } = require("./routes/storyboards");
+const { createImagesRouter } = require("./routes/images");
 const { createTranscriptRouter } = require("./routes/transcripts");
-const { createVideosRouter } = require("./routes/videos");
 const { ScriptAnalyst } = require("./agents/script-analyst/script-analyst");
-const { OriginalityReviewer } = require("./agents/originality-reviewer/originality-reviewer");
 const { Researcher } = require("./agents/researcher/researcher");
 const { Scriptwriter } = require("./agents/scriptwriter/scriptwriter");
 const { StoryboardAgent } = require("./agents/storyboard/storyboard");
+const { OpenRouterImageProvider } = require("./services/image/openrouter-image-provider");
 const { TranscriptService } = require("./services/transcript-service");
-const { VideoProducer } = require("./agents/video-producer/video-producer");
 const { createRequestId } = require("./utils/request-id");
 
 function createApp(options = {}) {
@@ -23,14 +22,8 @@ function createApp(options = {}) {
   const scriptAnalyst = options.scriptAnalyst || new ScriptAnalyst();
   const researcher = options.researcher || new Researcher();
   const scriptwriter = options.scriptwriter || new Scriptwriter();
-  const originalityReviewer = options.originalityReviewer || new OriginalityReviewer();
-  const storyboardAgent = options.storyboardAgent || new StoryboardAgent({
-    reviewResolver: (reviewId) => originalityReviewer.findReview?.(reviewId) || null,
-  });
-  const videoProducer = options.videoProducer || new VideoProducer({
-    reviewResolver: (reviewId) => originalityReviewer.findReview?.(reviewId) || null,
-    storyboardResolver: (reviewId, scenes) => storyboardAgent.findStoryboard?.(reviewId, scenes) || null,
-  });
+  const storyboardAgent = options.storyboardAgent || new StoryboardAgent();
+  const imageProvider = options.imageProvider || new OpenRouterImageProvider();
 
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -47,9 +40,9 @@ function createApp(options = {}) {
   app.use("/api/transcripts", createTranscriptRouter(transcriptService));
   app.use("/api/analysis", createAnalysisRouter(scriptAnalyst));
   app.use("/api/research", createResearchRouter(researcher));
-  app.use("/api/scripts", createScriptsRouter(scriptwriter, originalityReviewer));
+  app.use("/api/scripts", createScriptsRouter(scriptwriter));
   app.use("/api/storyboards", createStoryboardRouter(storyboardAgent));
-  app.use("/api/videos", createVideosRouter(videoProducer));
+  app.use("/api/images", createImagesRouter(imageProvider));
   app.use(express.static(path.join(__dirname, "..", "..", "frontend")));
   app.use(notFoundHandler);
   app.use(errorHandler);

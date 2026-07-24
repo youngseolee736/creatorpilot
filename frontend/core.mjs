@@ -5,8 +5,7 @@ export const PIPELINE_STEPS = [
   { id: "analyst", label: "Script Analyst", agent: "Structure and retention" },
   { id: "researcher", label: "Research Agent", agent: "Facts and sources" },
   { id: "writer", label: "Scriptwriter", agent: "Original narration" },
-  { id: "reviewer", label: "Originality Reviewer", agent: "Similarity review" },
-  { id: "producer", label: "Video Producer", agent: "Storyboard and render" },
+  { id: "producer", label: "Storyboard Preview", agent: "Scene planning" },
 ];
 
 export const STATUS_LABELS = {
@@ -15,9 +14,8 @@ export const STATUS_LABELS = {
   researching: "Researching",
   research_ready: "Research ready",
   script_generated: "Script generated",
-  under_review: "Under review",
+  under_review: "Storyboard ready",
   revision_required: "Revision required",
-  video_rendering: "Video rendering",
   completed: "Completed",
   waiting: "Waiting",
   in_progress: "In progress",
@@ -157,15 +155,8 @@ export function createProject(input = {}) {
     research: input.research || null,
     generatedScript: input.generatedScript || null,
     pendingRevisionInstructions: input.pendingRevisionInstructions || null,
-    originalityReview: input.originalityReview || null,
     storyboard: input.storyboard || [],
-    render: input.render || null,
-    finalVideoUrl: input.finalVideoUrl || null,
-    productionSettings: input.productionSettings || {
-      voice: "Sora — Warm documentary",
-      captions: "Editorial high contrast",
-      music: true,
-    },
+    render: null,
     pipeline: pipelineState(input.pipeline || {}),
     error: null,
   };
@@ -173,6 +164,12 @@ export function createProject(input = {}) {
 
 function initialState() {
   return { version: 1, projects: [], activeProjectId: null };
+}
+
+function stateForStorage(value) {
+  return JSON.parse(JSON.stringify(value, (key, fieldValue) => (
+    key === "imageDataUrl" || key === "imageUrl" ? undefined : fieldValue
+  )));
 }
 
 export function createStore(storage = globalThis.localStorage) {
@@ -192,7 +189,7 @@ export function createStore(storage = globalThis.localStorage) {
   }
 
   function save() {
-    if (storage) storage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (storage) storage.setItem(STORAGE_KEY, JSON.stringify(stateForStorage(state)));
   }
 
   function getState() {
@@ -287,7 +284,6 @@ export function routeFor(name, projectId = "") {
     analysis: `#/projects/${projectId}/analysis`,
     research: `#/projects/${projectId}/research`,
     script: `#/projects/${projectId}/script`,
-    review: `#/projects/${projectId}/review`,
     production: `#/projects/${projectId}/production`,
   };
   return routes[name] || routes.dashboard;
@@ -297,7 +293,7 @@ export function parseRoute(hash = globalThis.location?.hash || "") {
   const path = hash.replace(/^#/, "") || "/dashboard";
   if (path === "/dashboard") return { name: "dashboard" };
   if (path === "/projects/new") return { name: "new" };
-  const match = path.match(/^\/projects\/([^/]+)\/(analysis|research|script|review|production)$/);
+  const match = path.match(/^\/projects\/([^/]+)\/(analysis|research|script|production)$/);
   if (match) return { name: match[2], projectId: match[1] };
   return { name: "not-found" };
 }

@@ -19,7 +19,7 @@ function responseParts(payload) {
   const sources = [];
   let refusal = "";
   for (const item of payload?.output || []) {
-    if (item?.type === "web_search_call") {
+    if (item?.type === "web_search_call" || item?.type === "openrouter:web_search") {
       for (const source of item.action?.sources || []) {
         const valid = validHttpsSource(source);
         if (valid) sources.push(valid);
@@ -38,7 +38,15 @@ function responseParts(payload) {
     }
   }
   const unique = [...new Map(sources.map((source) => [source.url, source])).values()];
-  return { text: texts.join("\n").trim(), sources: unique, refusal };
+  const structuredText = [...texts].reverse().find((text) => {
+    try {
+      const value = JSON.parse(String(text).trim());
+      return value && typeof value === "object" && !Array.isArray(value);
+    } catch {
+      return false;
+    }
+  });
+  return { text: String(structuredText || texts[texts.length - 1] || "").trim(), sources: unique, refusal };
 }
 
 class OpenAIWebResearchProvider {
@@ -72,6 +80,7 @@ class OpenAIWebResearchProvider {
         ? [{
           type: "openrouter:web_search",
           parameters: {
+            engine: "exa",
             search_context_size: "medium",
             max_results: 5,
             max_total_results: 10,

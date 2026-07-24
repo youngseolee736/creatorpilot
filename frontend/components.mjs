@@ -6,14 +6,14 @@ function studioConnectionLabel() {
   const apiServices = Object.entries(services).filter(([, mode]) => mode === "api").map(([name]) => name);
   if (!apiServices.length) return { mode: "Mock studio", detail: "No AI backend connected" };
   if (services.transcript === "api" && services.analysis === "api") {
-    if (services.research === "api" && services.script === "api" && services.review === "api" && services.storyboard === "api" && services.video === "api") {
-      return { mode: "Provider studio", detail: "All 7 production services connected" };
+    if (services.research === "api" && services.script === "api" && services.storyboard === "api" && services.image === "api") {
+      return { mode: "Provider studio", detail: "All 6 creative services connected" };
     }
-    if (services.script === "api" && services.review === "api" && services.storyboard === "api") {
-      return { mode: "Hybrid studio", detail: "5 production services connected" };
+    if (services.research === "api" && services.script === "api" && services.storyboard === "api") {
+      return { mode: "Provider studio", detail: "All 5 core services connected" };
     }
-    if (services.script === "api" && services.review === "api") {
-      return { mode: "Hybrid studio", detail: "Transcript + analyst + writer + reviewer connected" };
+    if (services.script === "api" && services.storyboard === "api") {
+      return { mode: "Hybrid studio", detail: "4 production services connected" };
     }
     if (services.script === "api") {
       return { mode: "Hybrid studio", detail: "Transcript + analyst + scriptwriter connected" };
@@ -50,7 +50,6 @@ const PIPELINE_ROUTES = {
   analyst: "analysis",
   researcher: "research",
   writer: "script",
-  reviewer: "review",
   producer: "production",
 };
 
@@ -59,15 +58,14 @@ function pipelineStepAvailable(project, stepId, currentRoute) {
   if (["transcript", "analyst"].includes(stepId)) return true;
   if (stepId === "researcher") return Boolean(project.analysis);
   if (stepId === "writer") return Boolean(project.research);
-  if (stepId === "reviewer") return Boolean(project.generatedScript);
-  if (stepId === "producer") return Boolean(project.originalityReview?.status === "passed" || project.storyboard?.length || project.render);
+  if (stepId === "producer") return Boolean(project.generatedScript || project.storyboard?.length);
   return false;
 }
 
 export function pipeline(project, { compact = false, currentRoute = "" } = {}) {
   const currentStep = currentRoute === "analysis"
     ? (project.pipeline.transcript?.status === "in_progress" ? "transcript" : "analyst")
-    : ({ research: "researcher", script: "writer", review: "reviewer", production: "producer" })[currentRoute];
+    : ({ research: "researcher", script: "writer", production: "producer" })[currentRoute];
   return `<ol class="agent-pipeline${compact ? " pipeline-compact" : ""}" aria-label="Production pipeline">
     ${PIPELINE_STEPS.map((step, index) => {
       const state = project.pipeline[step.id] || { status: "waiting", detail: "Waiting" };
@@ -130,14 +128,7 @@ export function errorNotice(error, retryAction, agentLabel = "Script Analyst") {
     TRANSCRIPT_TOO_LARGE: "This transcript is too large to analyze.",
     TRANSCRIPT_NOT_ANALYZABLE: "This transcript cannot be analyzed reliably.",
     LLM_PROVIDER_ERROR: `The ${agentLabel} provider is unavailable.`,
-    REVIEW_NOT_FOUND: "The approved review is no longer available on this server.",
-    SCRIPT_NOT_APPROVED: "This script does not have a matching passed review.",
-    STORYBOARD_NOT_APPROVED: "This storyboard no longer matches the approved script.",
-    RENDER_NOT_CONFIGURED: "The render provider is not configured.",
-    RENDER_TIMEOUT: "The render provider took too long.",
-    RENDER_CAPACITY_LIMITED: "The render provider is currently at capacity.",
-    RENDER_PROVIDER_ERROR: "The render provider is unavailable.",
-    INVALID_RENDER_RESPONSE: "The render provider returned an invalid response.",
+    STORYBOARD_NOT_APPROVED: "This storyboard no longer matches the generated storyboard.",
   };
   const title = titles[error.code] || "The agent stopped before completing this stage.";
   const validationReason = error.details?.[0]?.reason;
@@ -151,9 +142,7 @@ export function errorNotice(error, retryAction, agentLabel = "Script Analyst") {
     required: "The model omitted one or more required analysis fields.",
     required_string: "A required analysis field was empty or invalid.",
     invalid_array: "A required analysis list or section list was incomplete.",
-    must_be_exact_source_excerpt: "The Reviewer proposed evidence that was not an exact excerpt from the submitted text.",
     out_of_range: "The model returned a score outside the accepted range.",
-    invalid_enum: "The model returned an unsupported review risk level.",
     must_match_required_claim: "The draft changed the user's required claim instead of answering it directly.",
     must_match_section_plan: "The draft did not follow the selected storytelling structure.",
     insufficient_fact_use: "The draft did not use enough verified facts.",

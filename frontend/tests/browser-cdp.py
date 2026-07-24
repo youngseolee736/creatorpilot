@@ -15,13 +15,11 @@ from pathlib import Path
 expect_api_transcript = os.environ.get("CREATORPILOT_EXPECT_API_TRANSCRIPT") == "1"
 expect_api_analysis = os.environ.get("CREATORPILOT_EXPECT_API_ANALYSIS") == "1"
 expect_api_script = os.environ.get("CREATORPILOT_EXPECT_API_SCRIPT") == "1"
-expect_api_review = os.environ.get("CREATORPILOT_EXPECT_API_REVIEW") == "1"
 expect_api_storyboard = os.environ.get("CREATORPILOT_EXPECT_API_STORYBOARD") == "1"
-expect_api_video = os.environ.get("CREATORPILOT_EXPECT_API_VIDEO") == "1"
 research_expectation = os.environ.get("CREATORPILOT_EXPECT_API_RESEARCH")
 expect_api_research = research_expectation == "1" or (
     research_expectation is None
-    and all((expect_api_transcript, expect_api_analysis, expect_api_script, expect_api_review, expect_api_storyboard, expect_api_video))
+    and all((expect_api_transcript, expect_api_analysis, expect_api_script, expect_api_storyboard))
 )
 expect_transcript_error = os.environ.get("CREATORPILOT_EXPECT_TRANSCRIPT_ERROR") == "1"
 test_youtube_url = os.environ.get(
@@ -135,9 +133,7 @@ api_expectations = {
     "analysis": expect_api_analysis,
     "research": expect_api_research,
     "script": expect_api_script,
-    "review": expect_api_review,
     "storyboard": expect_api_storyboard,
-    "video": expect_api_video,
 }
 if any(api_expectations.values()):
     service_modes = {
@@ -148,7 +144,7 @@ if any(api_expectations.values()):
         "source": "Object.defineProperty(window, 'CREATORPILOT_CONFIG', {"
         "configurable: false, get() { return Object.freeze({"
         f"services:{json.dumps(service_modes)},"
-        f"apiBaseUrl:{json.dumps(api_base_url)},renderPollIntervalMs:{250 if expect_api_video else 1500},renderPollLimit:20}}); }}, set() {{}} }});"
+        f"apiBaseUrl:{json.dumps(api_base_url)}}}); }}, set() {{}} }});"
     })
 browser.command("Emulation.setDeviceMetricsOverride", {
     "width": 1280, "height": 900, "deviceScaleFactor": 1, "mobile": False,
@@ -186,7 +182,7 @@ def wait_for(expression, label, timeout=4):
         "(() => {"
         "const stored = JSON.parse(localStorage.getItem('creatorpilot:v2') || 'null');"
         "return {hash: location.hash, text: document.body?.innerText?.slice(0, 800), "
-        "project: stored?.projects?.[0] ? {status: stored.projects[0].status, error: stored.projects[0].error, "
+        "project: stored?.projects?.[0] ? {status: stored.projects[0].status, storyboardLength: stored.projects[0].storyboard?.length, error: stored.projects[0].error, "
         "pipeline: stored.projects[0].pipeline} : null};"
         "})()"
     )
@@ -300,12 +296,10 @@ if expect_api_analysis:
     check(evaluate("document.body.textContent.includes('The story behind the video')"), "real story analysis renders")
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].analysis.analysisId.startsWith('synthesis_')"), "real normalized synthesis persists")
     check(not evaluate("document.body.textContent.includes('Return one JSON object only')"), "system prompt is not displayed")
-    if expect_api_research and expect_api_script and expect_api_review and expect_api_storyboard and expect_api_video:
-        connection_label = "All 7 production services connected"
+    if expect_api_research and expect_api_script and expect_api_storyboard:
+        connection_label = "All 5 core services connected"
     elif expect_api_storyboard:
-        connection_label = "5 production services connected"
-    elif expect_api_review:
-        connection_label = "Transcript + analyst + writer + reviewer connected"
+        connection_label = "4 production services connected"
     else:
         connection_label = "Transcript + analyst + scriptwriter connected" if expect_api_script else "Transcript + analyst connected"
     check(evaluate(f"document.body.textContent.includes({json.dumps(connection_label)})"), "hybrid service state is labeled accurately")
@@ -316,16 +310,14 @@ check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].
 click("[data-action='research-topic']")
 wait_for("document.querySelectorAll('.fact-card').length === 3", "Research Agent completes a three-claim Fact Pack")
 check(evaluate("location.hash.endsWith('/research')"), "workflow navigates to the Research page")
-check(evaluate("document.querySelector('.research-verdict').textContent.includes('Son has a credible case')"), "Research verdict qualifies the user's claim")
+check(evaluate("document.querySelector('.research-verdict').textContent.includes('GOAT means the player')"), "Research verdict qualifies the user's claim")
 check(evaluate("document.querySelector('.narrative-case')?.textContent.includes('GOAT means the player whose arrival most changes')"), "Research finds a stronger honest narrative for the claim")
-check(evaluate("document.querySelector('.narrative-case')?.textContent.includes('Messi still owns the stronger conventional')"), "Research preserves the strongest concession")
+check(evaluate("document.querySelector('.narrative-case')?.textContent.includes('Messi remains the stronger creator')"), "Research preserves the strongest concession")
 check(evaluate("document.querySelector('[data-action=\"rerun-research\"]') !== null"), "Research can be refreshed when the user wants a new narrative")
-check(evaluate("document.querySelectorAll('.comparison-list article').length === 2"), "fair player comparisons render")
 check(evaluate("document.querySelectorAll('.story-findings li').length === 3"), "research maps evidence into story roles")
 check(evaluate("document.querySelectorAll('.fact-list .fact-sources a').length === 3"), "Fact Pack keeps claim-level source links")
 check(evaluate("document.querySelectorAll('.source-list a').length === 3"), "Research page lists provider-verified sources")
-check(evaluate("document.querySelector('.ensemble-disclosure')?.textContent.includes('How the research models compared')"), "Deep research comparison is available")
-check(evaluate("document.querySelectorAll('.ensemble-candidates article').length === 2"), "two independent research candidates are preserved")
+check(evaluate("!document.body.textContent.includes('Research Judge')"), "Research remains a single lightweight pass in Deep mode")
 check(evaluate("document.querySelector('.page-heading a[href$=\"/analysis\"]')?.textContent.includes('Back to analysis')"), "Research page links back to Script Analyst")
 check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].pipeline.researcher.status === 'completed'"), "research pipeline stage completes")
 if expect_api_research:
@@ -373,69 +365,41 @@ if expect_api_script:
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].generatedScript.supersedesScriptId.startsWith('script_')"), "revision lineage persists")
 capture("script-1280")
 set_value("#section-hook", "A single shipping lane can change the balance of an entire region.")
-click("#script-form button[type='submit']")
+click("[data-action='approve-production']")
 
-wait_for("document.querySelectorAll('.score-card').length === 4", "originality review completes")
-check(evaluate("location.hash.endsWith('/review')"), "workflow navigates to Originality Review")
-capture("review-1280")
-check(evaluate("document.querySelectorAll('.comparison-item').length === 2"), "phrase comparison evidence renders")
-check(evaluate("document.body.textContent.includes('not a copyright or legal determination')"), "review includes non-legal disclaimer")
+wait_for("document.querySelectorAll('.storyboard-preview-card').length === 8", "storyboard preview generates eight scenes")
+check(evaluate("location.hash.endsWith('/production')"), "workflow navigates directly to Storyboard Preview")
 check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].generatedScript.sections[0].text.includes('shipping lane')"), "script edits persist")
-
-click("[data-action='send-back-script']")
-wait_for("Boolean(document.querySelector('#script-form'))", "review can return to the Scriptwriter")
-set_value(".script-section:nth-last-child(2) textarea", "The easier choice today can create the more dangerous crisis tomorrow.")
-click("#script-form button[type='submit']")
-wait_for("document.querySelectorAll('.score-card').length === 4", "revised script receives a fresh review")
 
 # Hash route and local project state survive a full browser refresh.
 project_hash = evaluate("location.hash")
 browser.command("Page.reload", {"ignoreCache": True})
-wait_for("document.querySelectorAll('.score-card').length === 4", "review survives a full browser refresh")
+wait_for("document.querySelectorAll('.storyboard-preview-card').length === 8", "storyboard preview survives a full browser refresh")
 check(evaluate("location.hash") == project_hash, "refresh preserves the active workflow route")
 check(evaluate("document.querySelector('#app').textContent.includes('CreatorPilot')"), "refresh restores the saved project")
 
-click("[data-action='approve-production']")
-wait_for("document.querySelectorAll('.scene-row').length === 8", "storyboard generates eight scenes")
-check(evaluate("location.hash.endsWith('/production')"), "workflow navigates to Storyboard and Video Producer")
 if expect_api_storyboard:
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].storyboard[0].searchQuery.includes('licensed geopolitical')"), "real Storyboard metadata persists")
     check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].storyboard.at(-1).end === 60"), "real Storyboard timeline reaches the target duration")
 capture("storyboard-1280")
-check(evaluate("document.body.textContent.includes('Search query')"), "storyboard includes production metadata")
-set_value("[data-project-setting='voice']", "Min — Clear explainer")
-click("[data-project-setting='music']")
-click("[data-action='render-video']")
-wait_for("Boolean(document.querySelector('.final-player'))", f"{'provider' if expect_api_video else 'mock'} video render reaches final result", timeout=8)
-if expect_api_video:
-    check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].render.source === 'provider'"), "provider render result persists")
-    check(evaluate("document.querySelectorAll('.delivery-actions a[href*=" + json.dumps("media.example.test") + "]').length === 2"), "provider delivery links are available")
-    check(not evaluate("document.body.textContent.includes('no real video file was generated')"), "provider result is not labeled as a mock")
-else:
-    check(evaluate("document.querySelector('[data-action=\"export-video\"]') !== null"), "export action is available")
-    evaluate("window.__exportDownload = null; HTMLAnchorElement.prototype.click = function () { window.__exportDownload = this.download; }")
-    click("[data-action='export-video']")
-    check(evaluate("window.__exportDownload.endsWith('-creatorpilot-package.json')"), "production package export is triggered")
-check(evaluate("document.querySelector('.delivery-panel').textContent.includes('Min — Clear explainer')"), "voice selection carries into the final package")
-check(evaluate("document.querySelector('.delivery-panel').textContent.includes('Off')"), "music setting carries into the final package")
-check(evaluate("document.querySelector('.pipeline-completed:last-child') !== null"), "producer pipeline stage completes")
-check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].status === 'completed'"), "project reaches completed status")
-check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].render.completed === true"), "final render state persists")
+check(evaluate("document.body.textContent.includes('Suggested B-roll')"), "storyboard includes B-roll guidance")
+check(evaluate("document.querySelector('[data-action=\"export-storyboard\"]') === null"), "storyboard export JSON action is removed")
+check(evaluate("document.querySelector('.pipeline-completed:last-child') !== null"), "storyboard pipeline stage completes")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].status === 'under_review'"), "project reaches storyboard preview status")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].storyboard.length === 8"), "storyboard state persists")
 check(evaluate("Object.values(JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].pipeline).every(step => step.status === 'completed')"), "every Phase 7 pipeline stage is complete")
 
 # Every completed stage can be revisited from the shared pipeline without losing work.
-check(evaluate("document.querySelectorAll('.agent-pipeline a.pipeline-link').length === 6"), "all completed pipeline stages are navigable")
-click("[aria-label='Open Script Analyst']")
+check(evaluate("document.querySelectorAll('.agent-pipeline a.pipeline-link').length === 5"), "all completed pipeline stages are navigable")
+evaluate("location.hash = `#/projects/${JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].id}/analysis`")
 wait_for("Boolean(document.querySelector('.story-snapshot'))", "pipeline returns from Production to Script Analyst")
-click("[aria-label='Open Research Agent']")
+evaluate("location.hash = `#/projects/${JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].id}/research`")
 wait_for("Boolean(document.querySelector('.research-verdict'))", "pipeline moves naturally to Research")
-click("[aria-label='Open Scriptwriter']")
+evaluate("location.hash = `#/projects/${JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].id}/script`")
 wait_for("Boolean(document.querySelector('#script-form'))", "pipeline moves naturally to Scriptwriter")
-click("[aria-label='Open Originality Reviewer']")
-wait_for("Boolean(document.querySelector('.review-hero'))", "pipeline moves naturally to Originality Reviewer")
-click("[aria-label='Open Video Producer']")
-wait_for("Boolean(document.querySelector('.final-player'))", "pipeline returns to completed Video Producer")
-check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].render.completed === true"), "stage navigation preserves completed work")
+evaluate("location.hash = `#/projects/${JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].id}/production`")
+wait_for("Boolean(document.querySelector('.storyboard-preview-grid'))", "pipeline returns to completed Storyboard Preview")
+check(evaluate("JSON.parse(localStorage.getItem('creatorpilot:v2')).projects[0].storyboard.length === 8"), "stage navigation preserves completed storyboard")
 
 # Responsive and accessibility checks on the completed workflow.
 for width, height, name in ((1280, 900, "desktop"), (768, 1024, "tablet"), (390, 844, "mobile")):

@@ -7,13 +7,10 @@ window.CREATORPILOT_CONFIG = Object.freeze({
     analysis: "api",
     research: "api",
     script: "api",
-    review: "api",
     storyboard: "api",
-    video: "api",
+    image: "api",
   },
   // Local dev serves the frontend from port 4173 and calls the backend on 8787.
   // When the backend serves the frontend itself (e.g. Render), use same-origin.
   apiBaseUrl: window.location.port === "4173" ? "http://127.0.0.1:8787" : "",
-  renderPollIntervalMs: 1500,
-  renderPollLimit: 240,
 });

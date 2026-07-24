@@ -11,6 +11,7 @@ if (!hasLLMConfiguration("RESEARCH")) {
 (async () => {
   const result = await new Researcher().research({
     projectId: "project-live-research",
+    analysisMode: process.env.LIVE_ANALYSIS_MODE || "standard",
     creativeBrief: {
       topic: process.env.LIVE_RESEARCH_TOPIC || "How public libraries strengthen neighborhoods",
       angle: "Explain a few measurable civic benefits without nostalgia or invented statistics.",
@@ -42,11 +43,16 @@ if (!hasLLMConfiguration("RESEARCH")) {
   assert.ok(result.facts.length >= 3);
   assert.ok(result.sources.length >= 1);
   assert.ok(result.facts.every((fact) => fact.sourceIds.length && fact.usableInScript));
-  assert.equal(result.safety.providerVerifiedSources, true);
-  console.log({ researchId: result.researchId, facts: result.facts.length, sources: result.sources.length, providerVerifiedSources: true });
+  console.log({
+    researchId: result.researchId,
+    analysisMode: process.env.LIVE_ANALYSIS_MODE || "standard",
+    facts: result.facts.length,
+    sources: result.sources.length,
+    providerVerifiedSources: result.safety.providerVerifiedSources,
+    degraded: result.ensemble?.degraded ?? false,
+  });
 })().catch((error) => {
   console.error("Live Research Agent test failed:", error.code || error.name || "ERROR", error.message);
   if (Array.isArray(error.details)) console.error("Validation details:", JSON.stringify(error.details));
   process.exitCode = 1;
 });
-

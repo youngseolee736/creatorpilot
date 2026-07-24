@@ -23,10 +23,14 @@ function invalid(path, reason) {
 
 function parseAnalysisJSON(value) {
   if (typeof value !== "string") throw invalid(null, "not_json_text");
-  const trimmed = value.trim();
-  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) throw invalid(null, "malformed_json");
+  const trimmed = value.trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "");
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start < 0 || end <= start) throw invalid(null, "malformed_json");
   try {
-    const parsed = JSON.parse(trimmed);
+    const parsed = JSON.parse(trimmed.slice(start, end + 1));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not object");
     return parsed;
   } catch {

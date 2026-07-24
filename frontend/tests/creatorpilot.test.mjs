@@ -17,16 +17,14 @@ import {
   extractTranscript,
   generateScript,
   generateStoryboard,
-  renderVideo,
+  generateStoryboardImage,
   researchTopic,
-  reviewOriginality,
   synthesizeReferences,
 } from "../mock-services.mjs";
 import { createServices, getServiceConfig } from "../service-client.mjs";
 import { errorNotice, pipeline } from "../components.mjs";
 import { renderDashboard } from "../pages/dashboard.mjs";
 import { renderAnalysis } from "../pages/analysis.mjs";
-import { renderReview } from "../pages/review.mjs";
 import { renderProduction } from "../pages/production.mjs";
 import { renderResearch } from "../pages/research.mjs";
 import { renderScriptEditor } from "../pages/script-editor.mjs";
@@ -119,16 +117,15 @@ test("deep mock synthesis exposes a concise model comparison", async () => {
   assert.match(html, /Combined decision/);
 });
 
-test("deep mode continues through Research and Scriptwriter comparisons", async () => {
+test("deep mode keeps Research lightweight while Scriptwriter compares drafts", async () => {
   const project = createProject({ id: "project-deep-pipeline", topic: "Why a surprising contender can be the best", language: "English", analysisDepth: "deep" });
   project.research = await researchTopic(project);
   project.generatedScript = await generateScript(project);
   const researchHtml = renderResearch(project);
   const scriptHtml = renderScriptEditor(project);
-  assert.equal(project.research.ensemble.candidates.length, 2);
+  assert.equal(Object.prototype.hasOwnProperty.call(project.research, "ensemble"), false);
   assert.equal(project.generatedScript.ensemble.candidates.length, 2);
-  assert.match(researchHtml, /How the research models compared/);
-  assert.match(researchHtml, /Research Judge/);
+  assert.doesNotMatch(researchHtml, /How the research models compared|Research Judge/);
   assert.match(scriptHtml, /How the writing models compared/);
   assert.match(scriptHtml, /Writing Judge/);
 });
@@ -138,11 +135,9 @@ test("Korean target language localizes generated mock content", async () => {
   project.analysis = await analyzeReference(project);
   project.research = await researchTopic(project);
   project.generatedScript = await generateScript(project);
-  project.originalityReview = await reviewOriginality(project);
   assert.match(project.analysis.summary, /예상|근거/);
   assert.match(project.research.summary, /근거|비교/);
   assert.match(project.generatedScript.sections[0].text, /최고|기준/);
-  assert.match(project.originalityReview.summary, /초안|참고/);
 });
 
 test("the local store adds and updates projects", () => {
@@ -152,6 +147,30 @@ test("the local store adds and updates projects", () => {
   store.updateProject(project.id, { status: "analyzing" });
   assert.equal(store.getProject(project.id).status, "analyzing");
   assert.equal(store.getState().activeProjectId, project.id);
+});
+
+test("the local store does not persist generated image data URLs", () => {
+  const storage = memoryStorage();
+  const store = createStore(storage);
+  const project = store.addProject(createProject({ id: "project-image-storage", topic: "Keep storage small" }));
+  store.updateProject(project.id, {
+    storyboard: [{
+      id: "scene-1",
+      number: 1,
+      start: 0,
+      end: 7,
+      duration: 7,
+      narration: "Narration",
+      caption: "Caption",
+      visual: "Visual",
+      searchQuery: "Query",
+      imagePrompt: "Prompt",
+      imageDataUrl: "data:image/png;base64," + "a".repeat(1000),
+      transition: "Cut",
+    }],
+  });
+  assert.equal(store.getProject(project.id).storyboard[0].imageDataUrl.startsWith("data:image/png"), true);
+  assert.equal(storage.getItem("creatorpilot:v2").includes("imageDataUrl"), false);
 });
 
 test("the local store deletes a single project", () => {
@@ -190,10 +209,8 @@ test("the workspace pipeline links every available stage and disables future wor
   assert.match(html, /aria-disabled="true" title="Complete the previous stage first">.*Scriptwriter/s);
   project.research = { ready: true };
   project.generatedScript = { ready: true };
-  project.originalityReview = { ready: true, status: "passed" };
-  html = pipeline(project, { currentRoute: "review" });
+  html = pipeline(project, { currentRoute: "production" });
   assert.match(html, /href="#\/projects\/project-pipeline-nav\/script"/);
-  assert.match(html, /href="#\/projects\/project-pipeline-nav\/review"/);
   assert.match(html, /href="#\/projects\/project-pipeline-nav\/production"/);
   assert.match(html, /pipeline-step pipeline-waiting is-current/);
 });
@@ -204,11 +221,11 @@ test("missing transcript metadata preserves the existing reference title", () =>
 });
 
 test("hash routes round-trip project workspaces", () => {
-  assert.equal(routeFor("review", "project-42"), "#/projects/project-42/review");
-  assert.deepEqual(parseRoute("#/projects/project-42/review"), { name: "review", projectId: "project-42" });
+  assert.equal(routeFor("production", "project-42"), "#/projects/project-42/production");
+  assert.deepEqual(parseRoute("#/projects/project-42/production"), { name: "production", projectId: "project-42" });
 });
 
-test("the complete mock service chain returns a production package", async () => {
+test("the complete mock service chain returns a storyboard preview", async () => {
   const project = createProject({
     topic: "Why procrastination is not laziness",
     referenceUrl: "https://youtube.com/watch?v=example",
@@ -219,21 +236,15 @@ test("the complete mock service chain returns a production package", async () =>
   project.referenceBlueprint = referenceBlueprintFromAnalysis(project.analysis);
   project.research = await researchTopic(project);
   project.generatedScript = await generateScript(project);
-  project.originalityReview = await reviewOriginality(project);
   project.storyboard = await generateStoryboard(project);
-  const updates = [];
-  project.render = await renderVideo(project, (progress) => updates.push(progress));
   assert.equal(project.analysis.structure.length, 6);
   assert.equal(project.research.facts.length, 3);
   assert.equal(project.generatedScript.sections.length, 7);
   assert.equal(project.generatedScript.claim, project.topic);
   assert.deepEqual(project.generatedScript.usedFactIds, ["fact_1", "fact_2", "fact_3"]);
   assert.ok(wordCount(project.generatedScript) > 60);
-  assert.equal(project.originalityReview.status, "passed");
   assert.equal(project.storyboard.length, 8);
-  assert.equal(updates.length, 6);
-  assert.equal(project.render.progress, 100);
-  assert.equal(project.render.completed, true);
+  assert.equal(project.storyboard[0].searchQuery.length > 0, true);
   assert.equal(project.analysis.safety.longSourceExcerptsIncluded, false);
   assert.ok(project.analysis.confidence > 0 && project.analysis.confidence <= 1);
   assert.match(project.referenceBlueprint.narrativeEngine, /system-level possibility/);
@@ -263,8 +274,7 @@ test("every agent error screen keeps its previous-stage navigation", () => {
   assert.match(renderAnalysis(project), /href="#\/dashboard"[^>]*>← Back to projects/);
   assert.match(renderResearch(project), /href="#\/projects\/project-back-navigation\/analysis"[^>]*>← Back to analysis/);
   assert.match(renderScriptEditor(project), /href="#\/projects\/project-back-navigation\/research"[^>]*>← Back to research/);
-  assert.match(renderReview(project), /href="#\/projects\/project-back-navigation\/script"[^>]*>← Back to Scriptwriter/);
-  assert.match(renderProduction(project), /href="#\/projects\/project-back-navigation\/review"[^>]*>← Back to review/);
+  assert.match(renderProduction(project), /href="#\/projects\/project-back-navigation\/script"[^>]*>← Back to script/);
 });
 
 test("story analysis presents simple storytelling logic without a timeline", async () => {
@@ -309,13 +319,10 @@ test("service configuration defaults safely to mock mode", () => {
       analysis: "mock",
       research: "mock",
       script: "mock",
-      review: "mock",
       storyboard: "mock",
-      video: "mock",
+      image: "mock",
     },
     apiBaseUrl: "",
-    renderPollIntervalMs: 1500,
-    renderPollLimit: 240,
   });
 });
 
@@ -375,7 +382,7 @@ test("mixed mode calls only transcript through the API", async () => {
   const calls = [];
   const services = createServices(
     {
-      services: { transcript: "api", analysis: "mock", script: "mock", review: "mock", storyboard: "mock", video: "mock" },
+      services: { transcript: "api", analysis: "mock", script: "mock", storyboard: "mock" },
       apiBaseUrl: "http://127.0.0.1:8787",
     },
     async (url) => {
@@ -393,11 +400,53 @@ test("mixed mode calls only transcript through the API", async () => {
   assert.equal(analysis.structure.length, 6);
 });
 
+test("Storyboard Preview shows an image prompt and AI image action", async () => {
+  const project = createProject({ id: "project-storyboard-image-ui", topic: "A topic", language: "English" });
+  project.generatedScript = await generateScript(project);
+  project.storyboard = await generateStoryboard(project);
+  const html = renderProduction(project);
+  assert.match(html, /Generate key images/);
+  assert.match(html, /🖼 Image Prompt/);
+  assert.match(html, /storyboard-preview-body/);
+  assert.match(html, /Vertical editorial storyboard still/);
+});
+
+test("mock storyboard image generation returns a renderable image preview", async () => {
+  const project = createProject({ id: "project-mock-image", topic: "A topic", language: "English" });
+  project.generatedScript = await generateScript(project);
+  project.storyboard = await generateStoryboard(project);
+  const image = await generateStoryboardImage(project, project.storyboard[0]);
+  assert.match(image.imageDataUrl, /^data:image\/svg\+xml/);
+  assert.equal(image.model, "mock/storyboard-preview");
+});
+
+test("Image API maps storyboard previews to the documented endpoint", async () => {
+  let call;
+  const services = createServices({ services: { image: "api" }, apiBaseUrl: "https://api.example.test" }, async (url, options) => {
+    call = { url, body: JSON.parse(options.body) };
+    return { ok: true, json: async () => ({ data: { imageDataUrl: "data:image/png;base64,cG5n", model: "google/gemini-3.1-flash-lite-image" } }) };
+  });
+  const project = createProject({ id: "project-image-api", topic: "A topic", format: "9:16" });
+  const scene = {
+    id: "scene-1",
+    number: 1,
+    narration: "Everyone thinks this is obvious.",
+    caption: "The obvious answer",
+    visual: "A vertical city skyline.",
+    imagePrompt: "A safe vertical preview image.",
+  };
+  const image = await services.generateStoryboardImage(project, scene);
+  assert.equal(call.url, "https://api.example.test/api/images/generate");
+  assert.equal(call.body.aspectRatio, "16:9");
+  assert.equal(call.body.imagePrompt, scene.imagePrompt);
+  assert.equal(image.model, "google/gemini-3.1-flash-lite-image");
+});
+
 test("Phase 2 mixed mode uses API transcript and analysis while later agents stay mocked", async () => {
   const calls = [];
   const services = createServices(
     {
-      services: { transcript: "api", analysis: "api", script: "mock", review: "mock", storyboard: "mock", video: "mock" },
+      services: { transcript: "api", analysis: "api", script: "mock", storyboard: "mock" },
       apiBaseUrl: "http://127.0.0.1:8787",
     },
     async (url, options) => {
@@ -476,7 +525,7 @@ test("Scriptwriter API receives the tailored brief, compact blueprint, and Fact 
   const calls = [];
   const services = createServices(
     {
-      services: { transcript: "mock", analysis: "mock", script: "api", review: "mock", storyboard: "mock", video: "mock" },
+      services: { transcript: "mock", analysis: "mock", script: "api", storyboard: "mock" },
       apiBaseUrl: "http://127.0.0.1:8787",
     },
     async (url, options) => {
@@ -510,7 +559,7 @@ test("Scriptwriter revision sends version lineage, instructions, and stable-ID p
   let call;
   const services = createServices(
     {
-      services: { transcript: "mock", analysis: "mock", script: "api", review: "mock", storyboard: "mock", video: "mock" },
+      services: { transcript: "mock", analysis: "mock", script: "api", storyboard: "mock" },
       apiBaseUrl: "http://127.0.0.1:8787",
     },
     async (url, options) => {
@@ -545,78 +594,11 @@ test("Scriptwriter revision sends version lineage, instructions, and stable-ID p
   assert.equal(revised.version, 2);
 });
 
-test("Phase 4 mixed mode sends the exact reference and script to the Reviewer", async () => {
+test("Storyboard mode sends the script, duration, and constraints", async () => {
   let call;
   const services = createServices(
     {
-      services: { transcript: "mock", analysis: "mock", script: "mock", review: "api", storyboard: "mock", video: "mock" },
-      apiBaseUrl: "http://127.0.0.1:8787",
-    },
-    async (url, options) => {
-      call = { url, body: JSON.parse(options.body) };
-      return { ok: true, json: async () => ({ data: {
-        reviewId: "review_api",
-        scriptId: "script_api",
-        status: "passed",
-        overall: 91,
-        originalityEstimate: 92,
-        structureSimilarity: { score: 32, risk: "low", note: "Abstract mechanics only." },
-        scores: { hook: 90, structure: 87, clarity: 94, duration: 96 },
-        summary: "Distinct wording and subject expression.",
-        overlaps: [],
-        instructions: ["Verify factual claims."],
-        disclaimer: "This similarity review is an originality estimate, not a copyright or legal determination.",
-      } }) };
-    },
-  );
-  const project = createProject({ id: "project-phase-4", topic: "A new topic", language: "English" });
-  project.transcript = { transcriptId: "transcript_api", text: "The exact reference wording used for comparison." };
-  project.analysis = await analyzeReference(project);
-  project.generatedScript = {
-    scriptId: "script_api",
-    title: "A new script",
-    version: 1,
-    estimatedSeconds: 59,
-    sections: [{ id: "hook", label: "Hook", range: "0–60s", text: "The exact generated narration." }],
-  };
-  const review = await services.reviewOriginality(project);
-  assert.equal(call.url, "http://127.0.0.1:8787/api/scripts/review");
-  assert.equal(call.body.referenceTranscript.text, project.transcript.text);
-  assert.equal(call.body.referenceAnalysis.analysisId, project.analysis.analysisId);
-  assert.equal(call.body.script.scriptId, project.generatedScript.scriptId);
-  assert.equal(call.body.script.sections[0].text, "The exact generated narration.");
-  assert.equal(review.reviewId, "review_api");
-});
-
-test("the review screen distinguishes medium and high overlap risks", () => {
-  const project = createProject();
-  project.originalityReview = {
-    status: "failed",
-    overall: 70,
-    scores: { hook: 80, structure: 70, clarity: 90, duration: 95 },
-    summary: "Revision is required.",
-    overlaps: [
-      { reference: "Reference one", generated: "Draft one", risk: "Medium", note: "Review this cadence." },
-      { reference: "Reference two", generated: "Draft two", risk: "High", note: "Rewrite this phrase." },
-    ],
-    instructions: ["Rewrite the flagged phrase."],
-    disclaimer: "This similarity review is an originality estimate, not a copyright or legal determination.",
-  };
-  const html = renderReview(project);
-  assert.match(html, /class="risk-medium"/);
-  assert.match(html, /class="risk-high"/);
-  assert.equal((html.match(/class="score-card /g) || []).length, 4);
-  assert.match(html, /aria-label="Hook strength 80 out of 100"/);
-  assert.match(html, /Four practical writing checks/);
-  assert.doesNotMatch(html, /score-ring/);
-  assert.doesNotMatch(html, /class="risk-low">Medium/);
-});
-
-test("Phase 5 mixed mode sends approval, duration, and constraints to Storyboard", async () => {
-  let call;
-  const services = createServices(
-    {
-      services: { transcript: "mock", analysis: "mock", script: "mock", review: "mock", storyboard: "api", video: "mock" },
+      services: { transcript: "mock", analysis: "mock", script: "mock", storyboard: "api" },
       apiBaseUrl: "http://127.0.0.1:8787",
     },
     async (url, options) => {
@@ -643,10 +625,8 @@ test("Phase 5 mixed mode sends approval, duration, and constraints to Storyboard
     estimatedSeconds: 59,
     sections: [{ id: "hook", label: "Hook", range: "0–60s", text: "Exact narration." }],
   };
-  project.originalityReview = { reviewId: "review-approved", scriptId: "script-approved", status: "passed" };
   const scenes = await services.generateStoryboard(project);
   assert.equal(call.url, "http://127.0.0.1:8787/api/storyboards/generate");
-  assert.equal(call.body.approvedReviewId, "review-approved");
   assert.equal(call.body.script.scriptId, "script-approved");
   assert.equal(call.body.targetDurationSeconds, 60);
   assert.equal(call.body.sceneCount, 8);
@@ -654,68 +634,9 @@ test("Phase 5 mixed mode sends approval, duration, and constraints to Storyboard
   assert.equal(scenes[0].id, "scene-1");
 });
 
-test("Phase 6 mixed mode starts and polls a provider render", async () => {
-  const calls = [];
-  const updates = [];
-  const services = createServices(
-    {
-      services: { transcript: "mock", analysis: "mock", script: "mock", review: "mock", storyboard: "mock", video: "api" },
-      apiBaseUrl: "http://127.0.0.1:8787",
-      renderPollIntervalMs: 1,
-      renderPollLimit: 2,
-    },
-    async (url, options = {}) => {
-      calls.push({ url, options });
-      if (options.method === "POST") return { ok: true, json: async () => ({ data: {
-        renderId: "render_api", status: "queued", stage: "Planning scenes", progress: 5, completed: false, source: "provider",
-      } }) };
-      return { ok: true, json: async () => ({ data: {
-        renderId: "render_api", status: "completed", stage: "Rendering final video", progress: 100, completed: true, source: "provider",
-        videoUrl: "https://media.example.test/render.mp4", productionPackageUrl: "https://media.example.test/package.json",
-        format: "9:16", duration: 60, voice: "Sora — Warm documentary", captionStyle: "Editorial high contrast", music: true,
-      } }) };
-    },
-  );
-  const project = createProject({ id: "project-phase-6", duration: 60, format: "9:16" });
-  project.originalityReview = { reviewId: "review-approved", status: "passed" };
-  project.storyboard = [{
-    id: "scene-1", number: 1, start: 0, end: 60, duration: 60,
-    narration: "Exact narration.", caption: "Exact evidence", visual: "Vertical evidence.", searchQuery: "licensed evidence", transition: "Fade up",
-  }];
-  const render = await services.renderVideo(project, (progress) => updates.push(progress));
-  assert.equal(calls[0].url, "http://127.0.0.1:8787/api/videos/render");
-  assert.equal(JSON.parse(calls[0].options.body).approvedReviewId, "review-approved");
-  assert.equal(JSON.parse(calls[0].options.body).storyboard[0].id, "scene-1");
-  assert.equal(calls[1].url, "http://127.0.0.1:8787/api/videos/render_api/status");
-  assert.equal(updates.length, 2);
-  assert.equal(render.source, "provider");
-  assert.equal(render.videoUrl, "https://media.example.test/render.mp4");
-});
-
-test("Phase 6 polling stops at the configured status deadline", async () => {
-  const services = createServices(
-    {
-      services: { transcript: "mock", analysis: "mock", script: "mock", review: "mock", storyboard: "mock", video: "api" },
-      apiBaseUrl: "http://127.0.0.1:8787",
-      renderPollIntervalMs: 1,
-      renderPollLimit: 1,
-    },
-    async (_url, options = {}) => ({ ok: true, json: async () => ({ data: {
-      renderId: "render_slow", status: options.method === "POST" ? "queued" : "running", stage: "Combining scenes", progress: 80, completed: false, source: "provider",
-    } }) }),
-  );
-  const project = createProject({ id: "project-slow-render" });
-  project.originalityReview = { reviewId: "review-approved", status: "passed" };
-  project.storyboard = [{ id: "scene-1", number: 1, start: 0, end: 60, duration: 60 }];
-  await assert.rejects(
-    services.renderVideo(project),
-    (error) => error.code === "RENDER_STATUS_TIMEOUT" && error.retryable === true,
-  );
-});
-
-test("the production board identifies the Storyboard Agent before rendering", () => {
+test("the production board is a Storyboard Preview rather than a render screen", () => {
   const project = createProject();
-  project.originalityReview = { status: "passed" };
+  project.generatedScript = { scriptId: "script-ready", sections: [] };
   const loading = renderProduction(project);
   assert.match(loading, /Storyboard Agent/);
   project.storyboard = [{
@@ -723,42 +644,11 @@ test("the production board identifies the Storyboard Agent before rendering", ()
     narration: "Narration", caption: "Caption", visual: "Visual", searchQuery: "Query", transition: "Fade up",
   }];
   const ready = renderProduction(project);
-  assert.match(ready, /Storyboard Agent · Plan ready/);
-});
-
-test("the completed production screen exposes provider delivery without mock claims", () => {
-  const project = createProject();
-  project.storyboard = [{
-    id: "scene-1", number: 1, start: 0, end: 60, duration: 60,
-    narration: "Narration", caption: "Caption", visual: "Visual", searchQuery: "Query", transition: "Fade up",
-  }];
-  project.render = {
-    renderId: "render-provider", source: "provider", status: "completed", completed: true, progress: 100,
-    videoUrl: "https://media.example.test/render.mp4", productionPackageUrl: "https://media.example.test/package.json",
-    format: "9:16", duration: 60, voice: "Sora — Warm documentary", captionStyle: "Editorial high contrast", music: true,
-  };
-  const html = renderProduction(project);
-  assert.match(html, /Open rendered video/);
-  assert.match(html, /https:\/\/media\.example\.test\/package\.json/);
-  assert.doesNotMatch(html, /no real video file was generated/i);
-  assert.doesNotMatch(html, /data-action="export-video"/);
-});
-
-test("provider delivery remains usable when no package URL is supplied", () => {
-  const project = createProject();
-  project.storyboard = [{
-    id: "scene-1", number: 1, start: 0, end: 60, duration: 60,
-    narration: "Narration", caption: "Caption", visual: "Visual", searchQuery: "Query", transition: "Fade up",
-  }];
-  project.render = {
-    source: "provider", status: "completed", completed: true, progress: 100,
-    videoUrl: "https://cdn.shotstack.io/render.mp4", format: "9:16", duration: 60,
-    voice: "Sora — Warm documentary", captionStyle: "Editorial high contrast", music: false,
-  };
-  const html = renderProduction(project);
-  assert.match(html, /Open rendered video/);
-  assert.doesNotMatch(html, /Production package<\/a>/);
-  assert.doesNotMatch(html, /href="undefined"/);
+  assert.match(ready, /Preview Storyboard/);
+  assert.match(ready, /Visual Preview/);
+  assert.match(ready, /Suggested B-roll/);
+  assert.doesNotMatch(ready, /Export JSON|data-action="export-storyboard"/);
+  assert.doesNotMatch(ready, /render-video|Open rendered video/i);
 });
 
 test("analysis errors distinguish permanent configuration failures from retryable failures", () => {

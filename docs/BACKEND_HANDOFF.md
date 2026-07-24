@@ -1,7 +1,7 @@
 # CreatorPilot Backend Handoff Map
 
-Status: Phase 7 transcript extraction, Script Analyst, Research Agent, Scriptwriter, Originality
-Reviewer, Storyboard, and Video Producer boundaries implemented.
+Status: transcript extraction, Script Analyst, lightweight Research Agent,
+Scriptwriter, and Storyboard Preview boundaries implemented.
 
 ## Runtime boundary
 
@@ -19,7 +19,6 @@ Example development configuration:
 window.CREATORPILOT_CONFIG = Object.freeze({
   useMockServices: true,
   apiBaseUrl: "",
-  renderPollIntervalMs: 1500,
 });
 ```
 
@@ -30,30 +29,25 @@ window.CREATORPILOT_CONFIG = Object.freeze({
   services: {
     transcript: "api",
     analysis: "api",
+    research: "api",
     script: "api",
-    review: "api",
     storyboard: "api",
-    video: "api",
+    image: "api",
   },
   apiBaseUrl: "http://127.0.0.1:8787",
-  renderPollIntervalMs: 1500,
-  renderPollLimit: 240,
 });
 ```
 
 The backend selects `LLM_PROVIDER=openai-compatible`. `LLM_API_BASE_URL`,
 `LLM_API_KEY`, and `LLM_MODEL` are required when a real analysis, Scriptwriter,
-Reviewer, or Storyboard endpoint is called. `LLM_TIMEOUT_MS` defaults to 30000.
+or Storyboard endpoint is called. `LLM_TIMEOUT_MS` defaults to 30000.
 Each Agent first reads its `ANALYST_LLM_*`, `RESEARCH_LLM_*`, `SCRIPTWRITER_LLM_*`,
-`REVIEWER_LLM_*`, or `STORYBOARD_LLM_*` override and falls back field-by-field
-to the shared `LLM_*` values. These variables are server-only. Video API mode is
-deliberately isolated from all LLM settings and requires `RENDER_API_BASE_URL`,
-`RENDER_API_KEY`, and optionally `RENDER_TIMEOUT_MS` for the generic adapter.
-Set `RENDER_PROVIDER=shotstack` to use `SHOTSTACK_API_URL`,
-`SHOTSTACK_API_KEY`, and `SHOTSTACK_TIMEOUT_MS` instead. The Shotstack Stage
-adapter currently produces a real watermarked, caption-card MP4 from the
-approved timeline without invoking paid AI assets; media and TTS acquisition
-remain separate upstream responsibilities.
+`STORYBOARD_LLM_*` override and falls back field-by-field
+to the shared `LLM_*` values. These variables are server-only. Video rendering
+provider configuration has been removed; the final artifact is the Storyboard
+Preview JSON and UI. Optional storyboard still images use `/api/images/generate`
+and default to `IMAGE_MODEL=google/gemini-3.1-flash-lite-image`; blank image keys
+reuse the shared OpenRouter LLM key.
 
 ## Service summary
 
@@ -63,9 +57,8 @@ remain separate upstream responsibilities.
 | `analyzeReference(project)` | same | `POST /api/analysis/reference` | `app.js#ensureAnalysis`, `pages/analysis.mjs` | Mapping hook, pacing, and structure | Retry for transient model errors; invalid/short transcript requires new source | No | Cache by transcript content hash + analyzer version |
 | `researchTopic(project)` | same | `POST /api/research/topic` | `app.js#ensureResearch`, `pages/research.mjs` | Testing the claim against current sources and fair comparisons | Retry transient web-search errors; never promote uncited facts, comparisons, or counterpoints | No | Cache by exact brief + blueprint within the running backend |
 | `generateScript(project)` | same | `POST /api/scripts/generate` | `app.js#ensureScript`, `pages/script-editor.mjs` | Turning verified findings into a claim-led narration / Writing a new version; allow up to five minutes per model call | Retry without duplicate versions; reject claim drift and unknown Fact IDs | No | Do not shared-cache creative output; store immutable result per project/version |
-| `reviewOriginality(project)` | same | `POST /api/scripts/review` | `app.js#ensureReview`, `pages/review.mjs` | Comparing language and story structure | Retry; never convert an unavailable review into a pass | No | Cache by reference hash + exact script hash + reviewer version |
-| `generateStoryboard(project)` | same | `POST /api/storyboards/generate` | `app.js#ensureStoryboard`, `pages/production.mjs` | Planning scenes and visual evidence | Retry; reject non-passed or stale review | No | Store by approved script/review ID; invalidate when script changes |
-| `renderVideo(project, onProgress)` | same | `POST /api/videos/render`, then `GET /api/videos/:renderId/status` | `app.js#startRender`, `pages/production.mjs` | Preparing, staged progress, final result | Retry start/status separately; preserve `renderId`; terminal provider failure must stop polling | Yes, 1.5 s default | Never HTTP-cache live status; persist final render metadata and use signed media URLs |
+| `generateStoryboard(project)` | same | `POST /api/storyboards/generate` | `app.js#ensureStoryboard`, `pages/production.mjs` | Planning scenes and visual evidence | Retry transient provider failures and reject invalid scripts | No | Store by script and scene content; invalidate when script changes |
+| `generateStoryboardImage(project, scene)` | same | `POST /api/images/generate` | `app.js#ensureStoryboardImages`, `pages/production.mjs` | Generating still previews only after user action | Keep storyboard usable if an image fails; show scene-level error | No | Store generated data URL in local project state |
 
 ## Exact mock shapes and replacement notes
 
@@ -170,47 +163,18 @@ Current response:
 ```
 
 The implemented backend adds `scriptId`, derives section IDs/ranges and duration,
-and makes up to two targeted repair attempts for invalid JSON, claim coverage,
-evidence use, structure, or length. Identical requests are
+and favors demo-stable normalization over strict rejection. It still repairs
+malformed JSON, but minor claim wording, fact ID, section slot, and length
+problems are normalized so the workflow can continue. Identical requests are
 coalesced/cached within the running process, so retries do not silently create a
 new version. This cache is not durable across restarts. User edits invalidate
-`project.originalityReview`.
-
-### `reviewOriginality(project)`
-
-Current input: transcript, abstract analysis, and current edited script embedded in the project. API mode sends those explicitly.
-
-Current response:
-
-```json
-{
-  "status": "passed",
-  "overall": 91,
-  "scores": { "hook": 88, "structure": 84, "clarity": 94, "duration": 98 },
-  "summary": "The draft uses the reference's pacing discipline without repeating its language or subject-specific examples.",
-  "overlaps": [
-    { "reference": "The real breakthrough is not a single floating building.", "generated": "Support is therefore not only a promise to one partner.", "risk": "Low", "note": "Shared contrast construction, but different wording, meaning, and placement." },
-    { "reference": "The cities that prepare now may not have to retreat later.", "generated": "Walking away might look simpler today, but it would make every future crisis harder.", "risk": "Low", "note": "Both close on future consequences; revise only if a more distinct cadence is desired." }
-  ],
-  "instructions": ["Keep the evidence sequence, but avoid adding any distinctive examples from the reference.", "Retain the final sentence because it resolves the new topic rather than the source story."],
-  "disclaimer": "This similarity review is an originality estimate, not a copyright or legal determination."
-}
-```
-
-The implemented response also includes `reviewId`, `scriptId`,
-`originalityEstimate`, and `structureSimilarity`. The backend validates every
-phrase against the submitted texts, derives the weighted overall score and
-structure-risk band, and applies the configured thresholds. `status` is `passed`
-or `failed`; the UI only exposes production approval when passed. Failure to run
-the reviewer is an agent error, never a review failure and never a pass.
-Identical completed requests are cached in memory by their normalized exact
-input; durable persistence remains future work.
+the current storyboard and any generated image previews.
 
 ### `generateStoryboard(project)`
 
 Mock mode reads the topic and generated script sections. API mode sends the
-approved review ID, exact script, format, target duration, requested scene count,
-and visual constraints.
+exact script, format, target duration, requested scene count, and visual
+constraints.
 
 Current response (eight items; one shown):
 
@@ -231,56 +195,12 @@ Current response (eight items; one shown):
 ]
 ```
 
-The production screen consumes all fields and expects a non-empty array. The
-implemented backend resolves `approvedReviewId` from the in-process Reviewer
-registry, requires a passed review for the exact script, preserves every script
-word in order, and derives a gap-free timeline ending at the target duration.
+The Storyboard Preview screen consumes all fields and expects a non-empty array. The
+implemented backend preserves every script word in order and derives a gap-free
+timeline ending at the target duration.
 The model cannot control narration, IDs, or timing. Search queries remain
 unlicensed proposals. A regenerated or edited script invalidates the storyboard.
-Review lookup and completed storyboard caching are not durable across restarts.
-
-### `renderVideo(project, onProgress)`
-
-Mock mode reads `format`, `duration`, and `productionSettings` and reports six
-progress callbacks. API mode submits the review ID, exact Storyboard, settings,
-format, and duration to the implemented Video Producer.
-
-Current progress callbacks:
-
-```json
-[
-  { "stage": "Planning scenes", "progress": 10 },
-  { "stage": "Finding B-roll", "progress": 28 },
-  { "stage": "Generating narration", "progress": 48 },
-  { "stage": "Creating captions", "progress": 66 },
-  { "stage": "Combining scenes", "progress": 84 },
-  { "stage": "Rendering final video", "progress": 96 }
-]
-```
-
-Current final response:
-
-```json
-{
-  "stage": "Final video ready",
-  "progress": 100,
-  "completed": true,
-  "format": "9:16",
-  "duration": 60,
-  "voice": "Min — Clear explainer",
-  "captionStyle": "Editorial high contrast",
-  "music": false,
-  "completedAt": "2026-07-18T05:21:42.000Z"
-}
-```
-
-API mode starts with POST and polls the returned `renderId`. The backend resolves
-the passed review and exact stored Storyboard before submitting one idempotent
-provider job. The frontend forwards normalized statuses to the progress UI,
-stops on `completed` or `failed`, and displays signed `videoUrl` and
-`productionPackageUrl` links only for provider completion. Mock completion keeps
-the local JSON export. Registries and job idempotency are in process and reset on
-server restart.
+Completed storyboard caching is not durable across restarts.
 
 ## Project persistence handoff
 
@@ -296,12 +216,10 @@ A project-list endpoint is still required before the dashboard can become fully 
 
 ## Revision handoff
 
-“Send back to Scriptwriter” preserves reviewer instructions locally before
-clearing the stale review. “Write new version” saves current editor changes and
-calls `reviseScript(project, revisionInstructions)`. Reviewer instructions are
-used when available; otherwise the UI sends a neutral request for distinct
-wording while preserving the brief and section functions. Successful revisions
-increment the version, link `supersedesScriptId`, and preserve section IDs.
+“Write new version” saves current editor changes and calls
+`reviseScript(project, revisionInstructions)`. Successful revisions increment
+the version, link `supersedesScriptId`, preserve section IDs, and invalidate the
+previous Storyboard.
 
 ## Error and loading behavior already available
 
@@ -326,8 +244,8 @@ increment the version, link `supersedesScriptId`, and preserve section IDs.
 
 1. Implement the endpoint envelopes and exact field names in `BACKEND_API_CONTRACT.md`.
 2. Validate all agent inputs/outputs against `AGENT_DATA_CONTRACTS.md` before persistence.
-3. Enforce passed-review/script-version matching on storyboard and render endpoints.
-4. Return stable IDs for transcript, analysis, script, review, storyboard, and render records.
+3. Enforce script-version matching on storyboard endpoints.
+4. Return stable IDs for transcript, analysis, script, and storyboard records.
 5. Confirm authentication, idempotency, retention, project-list, and concurrency decisions.
 6. Run the frontend in API mode against a non-production environment without adding secrets to the browser.
 7. Preserve mock mode for deterministic demos and browser tests.

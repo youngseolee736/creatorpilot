@@ -1,7 +1,6 @@
 const assert = require("assert");
 const http = require("http");
 const AbortController = require("abort-controller");
-const { OriginalityReviewer } = require("../src/agents/originality-reviewer/originality-reviewer");
 const { ScriptAnalyst } = require("../src/agents/script-analyst/script-analyst");
 const { Scriptwriter } = require("../src/agents/scriptwriter/scriptwriter");
 const { StoryboardAgent } = require("../src/agents/storyboard/storyboard");
@@ -516,7 +515,7 @@ test("each LLM Agent selects its own scoped provider configuration", () => {
   const environment = {
     LLM_PROVIDER: "openrouter", LLM_API_BASE_URL: "https://openrouter.ai/api/v1", LLM_API_KEY: "shared-key", LLM_MODEL: "shared-model",
     ANALYST_LLM_MODEL: "analyst-model", SCRIPTWRITER_LLM_MODEL: "writer-model",
-    REVIEWER_LLM_MODEL: "reviewer-model", STORYBOARD_LLM_MODEL: "storyboard-model",
+    STORYBOARD_LLM_MODEL: "storyboard-model",
     ANALYST_A_LLM_MODEL: "vendor-a/analyst-model", ANALYST_B_LLM_MODEL: "vendor-b/analyst-model", ANALYST_JUDGE_LLM_MODEL: "vendor-c/judge-model",
     SCRIPTWRITER_A_LLM_MODEL: "vendor-a/writer-model", SCRIPTWRITER_B_LLM_MODEL: "vendor-b/writer-model", SCRIPTWRITER_JUDGE_LLM_MODEL: "vendor-c/judge-model",
   };
@@ -533,7 +532,6 @@ test("each LLM Agent selects its own scoped provider configuration", () => {
   assert.equal(writer.candidateBProvider.model, "vendor-b/writer-model");
   assert.equal(writer.judgeProvider.model, "vendor-c/judge-model");
   assert.equal(writer.judgeProvider.apiBaseUrl, "https://openrouter.ai/api/v1");
-  assert.equal(new OriginalityReviewer({ llmOptions }).provider.model, "reviewer-model");
   assert.equal(new StoryboardAgent({ llmOptions }).provider.model, "storyboard-model");
 });
 

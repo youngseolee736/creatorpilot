@@ -13,10 +13,14 @@ function invalid(path, reason) {
 
 function parseStoryboardJSON(value) {
   if (typeof value !== "string") throw invalid(null, "not_json_text");
-  const trimmed = value.trim();
-  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) throw invalid(null, "malformed_json");
+  const trimmed = value.trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "");
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start < 0 || end <= start) throw invalid(null, "malformed_json");
   try {
-    const parsed = JSON.parse(trimmed);
+    const parsed = JSON.parse(trimmed.slice(start, end + 1));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not object");
     return parsed;
   } catch {
@@ -25,10 +29,23 @@ function parseStoryboardJSON(value) {
 }
 
 function stringField(value, path, maxLength) {
-  if (typeof value !== "string" || !value.trim() || value.trim().length > maxLength) {
-    throw invalid(path, "required_string");
-  }
-  return value.replace(/\s+/g, " ").trim();
+  const normalized = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+  if (!normalized) throw invalid(path, "required_string");
+  return normalized.slice(0, maxLength);
+}
+
+function optionalStringField(value, path, maxLength) {
+  if (value == null || value === "") return null;
+  return stringField(value, path, maxLength);
+}
+
+function fallbackImagePrompt(scene, caption) {
+  return [
+    "Vertical editorial storyboard still, cinematic but realistic",
+    scene.visual,
+    `clear subject, simple background, no logos, no readable small text`,
+    caption ? `caption concept: ${caption}` : "",
+  ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 }
 
 function narrationTokens(input) {
@@ -62,17 +79,29 @@ function requestFingerprint(input) {
 }
 
 function normalizeStoryboard(raw, input, scenePlan, fingerprint = requestFingerprint(input)) {
-  if (!Array.isArray(raw.scenes) || raw.scenes.length !== scenePlan.length) {
-    throw invalid("scenes", "must_match_scene_plan");
-  }
-  const proposals = raw.scenes.map((scene, index) => {
-    if (!scene || typeof scene !== "object" || Array.isArray(scene)) throw invalid(`scenes.${index}`, "invalid_object");
-    if (scene.slot !== scenePlan[index].slot) throw invalid(`scenes.${index}.slot`, "must_match_scene_plan");
+  const rawScenes = Array.isArray(raw.scenes) ? raw.scenes : [];
+  const proposals = scenePlan.map((planned, index) => {
+    const scene = rawScenes[index] && typeof rawScenes[index] === "object" && !Array.isArray(rawScenes[index])
+      ? rawScenes[index]
+      : {};
+    const visual = typeof scene.visual === "string" && scene.visual.trim()
+      ? stringField(scene.visual, `scenes.${index}.visual`, 600)
+      : `Visualize this narration beat: ${planned.narration}`.slice(0, 600);
+    const caption = typeof scene.caption === "string" && scene.caption.trim()
+      ? stringField(scene.caption, `scenes.${index}.caption`, 120)
+      : planned.narration.slice(0, 120);
+    const searchQuery = typeof scene.searchQuery === "string" && scene.searchQuery.trim()
+      ? stringField(scene.searchQuery, `scenes.${index}.searchQuery`, 240)
+      : visual.slice(0, 120);
+    const transition = typeof scene.transition === "string" && scene.transition.trim()
+      ? stringField(scene.transition, `scenes.${index}.transition`, 100)
+      : "Cut";
     return {
-      caption: stringField(scene.caption, `scenes.${index}.caption`, 120),
-      visual: stringField(scene.visual, `scenes.${index}.visual`, 600),
-      searchQuery: stringField(scene.searchQuery, `scenes.${index}.searchQuery`, 240),
-      transition: stringField(scene.transition, `scenes.${index}.transition`, 100),
+      caption,
+      visual,
+      searchQuery,
+      imagePrompt: optionalStringField(scene.imagePrompt, `scenes.${index}.imagePrompt`, 1200),
+      transition,
     };
   });
   const totalWeight = scenePlan.reduce((sum, scene) => sum + scene.weight, 0);
@@ -91,12 +120,12 @@ function normalizeStoryboard(raw, input, scenePlan, fingerprint = requestFingerp
       duration: Math.round((timelineEnd - start) * 10) / 10,
       narration: planned.narration,
       ...proposals[index],
+      imagePrompt: proposals[index].imagePrompt || fallbackImagePrompt(proposals[index], proposals[index].caption),
     };
   });
   return {
     storyboardId: `storyboard_${fingerprint.slice(0, 20)}`,
     scriptId: input.script.scriptId,
-    reviewId: input.approvedReviewId,
     totalDuration: input.targetDurationSeconds,
     format: input.format,
     scenes,
@@ -105,6 +134,7 @@ function normalizeStoryboard(raw, input, scenePlan, fingerprint = requestFingerp
 
 module.exports = {
   createScenePlan,
+  fallbackImagePrompt,
   invalid,
   narrationTokens,
   normalizeStoryboard,

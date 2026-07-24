@@ -28,16 +28,20 @@ YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboar
   storytelling structure but is filled with your topic and the researched
   facts. It also handles revision requests.
 - **Storyboard Agent** — turns the approved script into timed scenes with
-  captions, visual direction, transitions, and suggested B-roll queries. This is
-  the final project artifact instead of an actual MP4 render.
+  captions, visual direction, AI image prompts, transitions, and suggested
+  B-roll queries. This is the final project artifact instead of an actual MP4
+  render.
+- **AI Image Preview** — optionally generates still storyboard images with
+  OpenRouter's image API, so the board can be presented visually without a
+  video-rendering pipeline.
 
 ### Deep Research mode
 
 Deep mode upgrades the Script Analyst and Scriptwriter into an ensemble of
-three models — Claude, Gemini, and GPT. Each model researches or writes
-independently, and then a Judge step compares their outputs and picks the
-strongest one as the final result. It costs more and takes longer, but produces
-higher-quality analysis and scripts.
+multiple models, currently GPT and Gemini through OpenRouter. The Research
+Agent stays lightweight so it does not bottleneck the workflow. The Judge step
+compares competing analysis or writing outputs and picks the strongest one as
+the final result.
 
 ## What I learned
 
@@ -51,6 +55,6 @@ quality. That shift — from one big prompt to many small, constrained ones — 
 the most meaningful lesson.
 
 Working with OpenRouter was also a new experience. Being able to route
-different agents to different models (Claude, Gemini, GPT) through a single
+different agents to different models, such as GPT and Gemini, through a single
 API opened my eyes to how much model choice affects the result — and made the
 Deep Research mode's judge-based ensemble possible in the first place.

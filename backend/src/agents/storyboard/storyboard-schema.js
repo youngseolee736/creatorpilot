@@ -5,7 +5,6 @@ const MAX_TARGET_DURATION = 180;
 const MAX_SCRIPT_CHARACTERS = 30000;
 const TOP_LEVEL_FIELDS = new Set([
   "projectId",
-  "approvedReviewId",
   "script",
   "format",
   "targetDurationSeconds",
@@ -94,7 +93,6 @@ function validateStoryboardRequest(request) {
   if (!["9:16", "1:1", "16:9"].includes(format)) invalid("format", "unsupported");
   return {
     projectId: requiredString(request.projectId, "projectId", { max: 128 }),
-    approvedReviewId: requiredString(request.approvedReviewId, "approvedReviewId", { max: 160 }),
     script,
     format,
     targetDurationSeconds,

@@ -19,7 +19,7 @@ export function renderResearch(project) {
     return `${pageHeading("Research Agent", "Topic research paused.", "Your analysis and tailored brief remain saved.", backToAnalysis)}${errorNotice(project.error, "retry-research", "Research Agent")}`;
   }
   if (!project.research) {
-    return `${pageHeading("Research Agent", "Testing the claim against the evidence.", "The agent is defining fair criteria, comparing relevant peers, and checking both sides of the premise.", backToAnalysis)}${loadingPanel("Research Agent", "Searching current sources and building a fair comparison. This can take a few minutes—keep this tab open.")}`;
+    return `${pageHeading("Research Agent", "Collecting the strongest usable evidence.", "The agent is finding a small set of current sources, key facts, and one fair counterpoint.", backToAnalysis)}${loadingPanel("Research Agent", "Searching current sources and building a compact evidence pack. Keep this tab open.")}`;
   }
   const research = project.research;
   const brief = project.creativeBrief;
@@ -32,16 +32,23 @@ export function renderResearch(project) {
   const openQuestions = list(research.openQuestions);
   const verdict = research.verdict || { status: "insufficient_evidence", headline: research.summary, explanation: "Review the sourced findings before writing." };
   const narrativeCase = research.narrativeCase;
-  const ensemble = research.ensemble;
   const sourceLinks = (sourceIds, label) => `<div class="fact-sources" aria-label="${escapeHtml(label)}">${list(sourceIds).map((sourceId) => { const source = sources.find((item) => item.sourceId === sourceId); return source ? `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.domain)} ${icon("external", 13)}</a>` : ""; }).join("")}</div>`;
+  const narrativeModeLabel = narrativeCase?.mode === "direct" ? "Direct evidence" : narrativeCase?.mode === "reframe" ? "Stronger narrative lens" : "No honest route yet";
+  const supportFactLabels = list(narrativeCase?.supportFactIds).map((factId) => escapeHtml(factId.replace("fact_", "Fact "))).join(" · ");
   return `${pageHeading("Research Agent · Complete", "What the evidence says.", "See the verdict, the strongest narrative case, and the facts that can carry your story.", `<div class="button-row"><a class="button button-secondary" href="${routeFor("analysis", project.id)}">← Back to analysis</a><button class="button button-secondary" type="button" data-action="rerun-research">${icon("retry")}Research again</button><button class="button button-primary" type="button" data-action="generate-script">Write from research ${icon("arrow")}</button></div>`)}
     <div class="research-layout">
       <section class="research-main">
-        <div class="research-summary research-verdict"><div class="verdict-meta"><p class="eyebrow">Research verdict</p><span class="verdict-status verdict-${escapeHtml(verdict.status)}">${verdictLabel(verdict.status)}</span></div><h2>${escapeHtml(verdict.headline)}</h2><p>${escapeHtml(verdict.explanation)}</p><small>${facts.length} usable findings · ${sources.length} verified sources</small></div>
+        <div class="research-summary research-verdict">
+          <div class="summary-card-header"><div><p class="eyebrow">Research verdict</p><h2>Summary</h2></div><span class="verdict-status verdict-${escapeHtml(verdict.status)}">${verdictLabel(verdict.status)}</span></div>
+          <p class="summary-lead">${escapeHtml(verdict.headline)}</p>
+          <ul class="summary-bullets">
+            <li><strong>Main read:</strong> ${escapeHtml(verdict.explanation)}</li>
+            <li><strong>Evidence base:</strong> ${facts.length} usable findings from ${sources.length} verified sources.</li>
+            <li><strong>Use carefully:</strong> Treat this as a sourced editorial brief, not a final factual guarantee.</li>
+          </ul>
+        </div>
 
-        ${ensemble?.mode === "deep" ? `<section class="ensemble-disclosure"><details><summary><span><strong>How the research models compared</strong><small>Deep analysis · ${Math.round((ensemble.judgment?.confidence || 0) * 100)}% confidence</small></span>${icon("arrow", 16)}</summary><div class="ensemble-candidates">${list(ensemble.candidates).map((candidate) => `<article><p>${escapeHtml(candidate.focus)}</p><h3>${escapeHtml(candidate.id === "candidate-a" ? "Research Candidate A" : "Research Candidate B")}</h3><span>${escapeHtml(candidate.summary)}</span></article>`).join("")}</div><div class="ensemble-decision"><p class="eyebrow">Research Judge</p><strong>${escapeHtml(ensemble.judgment?.winner === "hybrid" ? "Combined evidence decision" : "Best available research")}</strong><p>${escapeHtml(ensemble.judgment?.reason || "The strongest validated Fact Pack was selected.")}</p>${ensemble.degraded ? `<small>One role was unavailable, so CreatorPilot continued with a completed validated result.</small>` : ""}</div></details></section>` : ""}
-
-        ${narrativeCase ? `<section class="narrative-case"><div><p class="eyebrow">Best way to prove the claim</p><span>${narrativeCase.mode === "direct" ? "Direct evidence" : narrativeCase.mode === "reframe" ? "Stronger narrative lens" : "No honest route yet"}</span></div><h2>${escapeHtml(narrativeCase.recommendedFrame)}</h2><blockquote>${escapeHtml(narrativeCase.thesis)}</blockquote><dl><div><dt>What the claim means</dt><dd>${escapeHtml(narrativeCase.definition)}</dd></div><div><dt>Why this case works</dt><dd>${escapeHtml(narrativeCase.whyItProvesClaim)}</dd></div><div><dt>Concede briefly</dt><dd>${escapeHtml(narrativeCase.concession)}</dd></div></dl><small>${list(narrativeCase.supportFactIds).map((factId) => escapeHtml(factId.replace("fact_", "Fact "))).join(" · ")}</small></section>` : ""}
+        ${narrativeCase ? `<section class="narrative-case"><div class="summary-card-header"><div><p class="eyebrow">Best way to prove the claim</p><h2>Main points</h2></div><span>${narrativeModeLabel}</span></div><p class="summary-lead">${escapeHtml(narrativeCase.recommendedFrame)}</p><ul class="summary-bullets"><li><strong>Thesis:</strong> ${escapeHtml(narrativeCase.thesis)}</li><li><strong>What the claim means:</strong> ${escapeHtml(narrativeCase.definition)}</li><li><strong>Why this case works:</strong> ${escapeHtml(narrativeCase.whyItProvesClaim)}</li><li><strong>Concede briefly:</strong> ${escapeHtml(narrativeCase.concession)}</li></ul>${supportFactLabels ? `<small>${supportFactLabels}</small>` : ""}</section>` : ""}
 
         <section class="research-frame" aria-labelledby="research-frame-heading">
           <div class="section-bar"><div><p class="eyebrow">How the claim was tested</p><h2 id="research-frame-heading">A fair comparison</h2></div></div>

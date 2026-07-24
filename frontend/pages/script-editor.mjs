@@ -27,8 +27,8 @@ export function renderScriptEditor(project) {
         <section class="claim-lock"><div><p class="eyebrow">Claim lock</p><span class="claim-mode">${escapeHtml(strategyLabels[strategy.mode] || "Evidence-led")}</span></div><h2>${escapeHtml(script.claim || project.topic)}</h2>${strategy.frame ? `<blockquote>${escapeHtml(strategy.frame)}</blockquote>` : ""}<p>${escapeHtml(strategy.explanation)}</p><small>${script.usedFactIds?.length || 0} research findings used</small></section>
         <section class="editor-score"><p class="eyebrow">Speaking estimate</p><div><strong>${script.estimatedSeconds}s</strong><span>Target ${project.duration}s</span></div><progress max="${project.duration}" value="${script.estimatedSeconds}">${script.estimatedSeconds} seconds</progress><small>Estimated at a clear documentary pace.</small></section>
         <section><p class="eyebrow">Section map</p><nav class="section-nav" aria-label="Script sections">${script.sections.map((section, index) => `<a href="#section-${escapeHtml(section.id)}"><span>0${index + 1}</span>${escapeHtml(section.label)}<small>${escapeHtml(section.range)}</small></a>`).join("")}</nav></section>
-        <section class="editor-principle"><p class="eyebrow">Originality guardrail</p><p>The next agent compares potential phrase overlap and structural similarity. It provides an estimate, not legal clearance.</p></section>
+        <section class="editor-principle"><p class="eyebrow">Next step</p><p>Approve the edited narration to generate a timed visual storyboard.</p></section>
       </aside>
-      <div class="editor-actions"><button class="button button-secondary" type="button" data-action="save-script">Save changes</button><button class="button button-primary" type="submit">Check originality ${icon("arrow")}</button></div>
+      <div class="editor-actions"><button class="button button-secondary" type="button" data-action="save-script">Save changes</button><button class="button button-primary" type="button" data-action="approve-production">Create storyboard ${icon("arrow")}</button></div>
     </form>`;
 }
