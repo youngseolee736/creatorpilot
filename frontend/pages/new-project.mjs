@@ -7,22 +7,30 @@ function referenceRows(draft) {
     return `<div class="reference-url-row">
       <div class="reference-url-meta"><span class="reference-number">${String(position).padStart(2, "0")}</span><span class="requirement-label">${required ? "Required" : "Optional"}</span></div>
       <div class="field-group">
-        <label for="reference-url-${position}">YouTube URL ${position}</label>
-        <input class="field-input" id="reference-url-${position}" name="referenceUrl${position}" type="url" inputmode="url" autocomplete="url" ${required ? "required" : ""} aria-describedby="reference-set-hint" value="${escapeHtml(draft[`referenceUrl${position}`] || (position === 1 ? draft.referenceUrl || "" : ""))}" placeholder="https://youtube.com/watch?v=..." />
+        <label for="reference-title-${position}">Reference title ${position}</label>
+        <input class="field-input" id="reference-title-${position}" name="referenceTitle${position}" type="text" value="${escapeHtml(draft[`referenceTitle${position}`] || "")}" placeholder="Reference video ${position}" />
+      </div>
+      <div class="field-group">
+        <label for="reference-url-${position}">YouTube URL ${position} <small>(optional)</small></label>
+        <input class="field-input" id="reference-url-${position}" name="referenceUrl${position}" type="url" inputmode="url" autocomplete="url" value="${escapeHtml(draft[`referenceUrl${position}`] || (position === 1 ? draft.referenceUrl || "" : ""))}" placeholder="https://youtube.com/watch?v=..." />
+      </div>
+      <div class="field-group field-span">
+        <label for="reference-transcript-${position}">Transcript ${position}</label>
+        <textarea class="field-textarea" id="reference-transcript-${position}" name="referenceTranscript${position}" ${required ? "required" : ""} aria-describedby="reference-set-hint" placeholder="Paste the transcript for this reference video here.">${escapeHtml(draft[`referenceTranscript${position}`] || "")}</textarea>
       </div>
     </div>`;
   }).join("");
 }
 
 export function renderNewProject(draft = {}, error = null) {
-  return `${pageHeading("New production", "Define the story only you should make.", "CreatorPilot compares several references' storytelling mechanics, researches your exact angle, then writes from a source-grounded creative brief.")}
+  return `${pageHeading("New production", "Define the story only you should make.", "CreatorPilot compares several reference transcripts, researches your exact angle, then writes from a source-grounded creative brief.")}
     ${error ? `<div class="notice notice-error" role="alert"><strong>Check the project details.</strong><p>${escapeHtml(error)}</p></div>` : ""}
     <form class="reference-form" id="reference-form" novalidate>
       <div class="form-primary">
         <section class="form-section reference-set-section" aria-labelledby="reference-heading">
-          <div class="section-index">01</div><div><h2 id="reference-heading">Reference set</h2><p>Add three references. Two more can strengthen the comparison.</p></div>
+          <div class="section-index">01</div><div><h2 id="reference-heading">Reference set</h2><p>Paste three reference transcripts. Two more can strengthen the comparison.</p></div>
           <div class="field-span reference-set-fields">
-            <div class="reference-set-intro" id="reference-set-hint"><strong>3 required · up to 5 total</strong><span>Each video is analyzed separately before CreatorPilot combines the storytelling patterns.</span></div>
+            <div class="reference-set-intro" id="reference-set-hint"><strong>3 required · up to 5 total</strong><span>Each transcript is analyzed separately before CreatorPilot combines the storytelling patterns. You can still add the YouTube URL as a reference, but the pasted transcript is what drives the analysis.</span></div>
             ${referenceRows(draft)}
             <details class="transcript-preview-placeholder"><summary>Reference analysis preview <span>Available after analysis</span></summary><p>Each transcript and story analysis stays attached to its own video. CreatorPilot combines only abstract story mechanics.</p></details>
           </div>
@@ -64,6 +72,6 @@ export function renderNewProject(draft = {}, error = null) {
         </section>
       </div>
       <aside class="form-aside"><div class="ethics-note"><span class="note-mark">CP</span><p class="eyebrow">Tailored by design</p><h2>Structure, facts, and intent stay separate.</h2><p>The Analyst extracts only story mechanics. The Research Agent finds current sources for your exact angle. The Scriptwriter receives both, plus your creative decisions.</p><ul><li>${icon("check", 16)}Target audience comes from you, not the reference</li><li>${icon("check", 16)}Claims stay attached to verifiable sources</li><li>${icon("check", 16)}You approve the final script before scene planning</li></ul></div></aside>
-      <div class="form-submit"><a class="button button-secondary" href="#/dashboard">Cancel</a><button class="button button-primary" type="submit">Analyze references ${icon("arrow")}</button></div>
+      <div class="form-submit"><a class="button button-secondary" href="#/dashboard">Cancel</a><button class="button button-primary" type="submit">Analyze transcripts ${icon("arrow")}</button></div>
     </form>`;
 }

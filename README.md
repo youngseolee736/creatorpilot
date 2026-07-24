@@ -1,19 +1,19 @@
 # CreatorPilot
 
 CreatorPilot is an AI project I made for YouTube script writing and storyboard
-planning. Instead of starting from nothing, the idea is to learn from a
-successful reference video, research the topic, write a new script, and then
-turn that into a storyboard.
+planning. Instead of starting from nothing, the idea is to learn from strong
+reference transcripts, research the topic, write a new script, and then turn
+that into a storyboard.
 
 ## What it does
 
 ```text
-YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboard Agent
+Reference transcript → Script Analyst → Research Agent → Scriptwriter → Storyboard Agent
 ```
 
-- **Script Analyst**: looks at a reference video and pulls out the hook, pacing,
-  and overall structure
-  (YouTube transcript extraction + OpenRouter chat models)
+- **Script Analyst**: looks at a reference transcript and pulls out the hook,
+  pacing, and overall structure
+  (manual transcript input + OpenRouter chat models)
 - **Research Agent**: makes a simple fact pack from web sources
   (OpenRouter Responses API + `openrouter:web_search`)
 - **Scriptwriter:** writes a new script based on the structure and research
@@ -23,14 +23,14 @@ YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboar
 - **AI Image Preview:** can optionally generate storyboard still images
   (OpenRouter Images API)
 
-If transcript extraction fails, the user can also paste the reference
-transcript manually and continue the workflow without starting over.
+To keep this free, I changed the workflow so the user can paste reference
+transcripts directly instead of depending on paid transcript APIs.
 
-For transcript extraction, I used the unofficial youtube-transcript Node.js
-package: https://www.npmjs.com/package/youtube-transcript
+I also tested the unofficial youtube-transcript Node.js package:
+https://www.npmjs.com/package/youtube-transcript
 
-Most other transcript APIs I looked at would add extra cost, so I decided not
-to depend on them for this project.
+But most hosted transcript APIs I looked at would add extra cost, so I decided
+to keep the main workflow based on manual transcript input.
 
 ## Deep Research mode
 

@@ -444,17 +444,18 @@ app.addEventListener("submit", (event) => {
   if (event.target.id === "reference-form") {
     const values = Object.fromEntries(new FormData(event.target));
     newProjectDraft = values;
+    const transcripts = [1, 2, 3, 4, 5].map((position) => values[`referenceTranscript${position}`]?.trim()).filter(Boolean);
+    const requiredTranscripts = [1, 2, 3].map((position) => values[`referenceTranscript${position}`]?.trim()).filter(Boolean);
     const urls = [1, 2, 3, 4, 5].map((position) => values[`referenceUrl${position}`]?.trim()).filter(Boolean);
-    const requiredUrls = [1, 2, 3].map((position) => values[`referenceUrl${position}`]?.trim()).filter(Boolean);
     const videoIds = urls.map(youtubeVideoId);
     const validUrl = videoIds.every(Boolean);
     const uniqueUrls = new Set(videoIds).size === videoIds.length;
     const missingBrief = !values.topic?.trim();
-    if (requiredUrls.length < 3 || !validUrl || !uniqueUrls || missingBrief) {
-      newProjectError = requiredUrls.length < 3
-        ? "Add all three required YouTube references."
+    if (requiredTranscripts.length < 3 || !validUrl || !uniqueUrls || missingBrief) {
+      newProjectError = requiredTranscripts.length < 3
+        ? "Paste all three required reference transcripts."
         : !validUrl
-          ? "Use valid YouTube URLs for every reference."
+          ? "If you add YouTube URLs, use valid ones for every reference."
           : !uniqueUrls
             ? "Each reference must use a different YouTube URL."
             : "Describe the new video topic so the result can be tailored.";

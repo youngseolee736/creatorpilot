@@ -60,9 +60,18 @@ export function normalizeReferences(input = {}) {
   const supplied = Array.isArray(input.references)
     ? input.references
     : [1, 2, 3, 4, 5]
-      .map((position) => input[`referenceUrl${position}`])
-      .filter((url) => typeof url === "string" && url.trim())
-      .map((url, index) => ({ url, position: index + 1 }));
+      .map((position) => ({
+        url: input[`referenceUrl${position}`],
+        title: input[`referenceTitle${position}`],
+        transcriptText: input[`referenceTranscript${position}`],
+        position,
+      }))
+      .filter((reference) => {
+        const url = typeof reference.url === "string" && reference.url.trim();
+        const transcriptText = typeof reference.transcriptText === "string" && reference.transcriptText.trim();
+        const title = typeof reference.title === "string" && reference.title.trim();
+        return Boolean(url || transcriptText || title);
+      });
   const legacy = supplied.length ? supplied : input.referenceUrl
     ? [{
       url: input.referenceUrl,
@@ -79,6 +88,7 @@ export function normalizeReferences(input = {}) {
     url: String(reference.url || "").trim(),
     title: reference.title || reference.transcript?.title || `Reference ${index + 1}`,
     transcript: reference.transcript || null,
+    transcriptText: typeof reference.transcriptText === "string" ? reference.transcriptText : "",
     analysis: reference.analysis || null,
   }));
 }
@@ -146,11 +156,26 @@ export function referenceBlueprintFromAnalysis(analysis = {}) {
 
 export function createProject(input = {}) {
   const now = new Date().toISOString();
+  const projectId = input.id || `project-${Date.now()}`;
   const creativeBrief = creativeBriefFromProject(input);
-  const references = normalizeReferences(input);
+  const references = normalizeReferences(input).map((reference) => {
+    if (reference.transcript) return reference;
+    if (!reference.transcriptText?.trim()) return reference;
+    return {
+      ...reference,
+      transcript: manualTranscriptFromText({
+        projectId,
+        referenceId: reference.referenceId,
+        title: reference.title,
+        language: input.language || "Korean",
+        text: reference.transcriptText,
+        estimatedDuration: Number(input.duration || 60),
+      }),
+    };
+  });
   const firstReference = references[0] || null;
   return {
-    id: input.id || `project-${Date.now()}`,
+    id: projectId,
     title: input.topic || "Untitled short",
     references,
     referenceUrl: firstReference?.url || input.referenceUrl || "",
