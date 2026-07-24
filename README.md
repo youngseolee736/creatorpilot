@@ -4,22 +4,28 @@ Live website: https://creatorpilot-95k2.onrender.com
 
 CreatorPilot is an AI project I made to help plan YouTube videos of different
 lengths. Instead of trying to make the full video automatically, the main idea is
-to study strong reference transcripts, research the topic, write a new script,
+to study strong reference videos, research the topic, write a new script,
 and give guidance on the flow of the video, like the hook, structure, and
 conclusion.
+
+The workflow is not limited to 15–20-minute videos. Users can plan videos
+starting at 60 seconds and choose longer target durations.
 
 ## What it does
 
 ```text
-Reference transcript → Script Analysis → Research → Script Draft → Storyboard
+YouTube URLs → Transcript extraction → Script Analysis → Research → Script Draft → Storyboard
 ```
 
-- **Script Analysis**: looks at a reference transcript and pulls out the hook,
-  pacing, and overall structure
-  (manual transcript input + OpenRouter models: `openai/gpt-5-mini` and
-  `google/gemini-2.5-flash-lite`)
+- **Transcript extraction:** takes three to five YouTube URLs and automatically
+  retrieves timestamped captions through TranscriptAPI. If caption extraction
+  fails, the user can still paste a transcript manually and continue.
+- **Script Analysis:** analyzes every reference separately, then combines the
+  strongest reusable storytelling patterns without copying the source wording
+  (OpenRouter models: `openai/gpt-5-mini` and
+  `google/gemini-2.5-flash-lite`).
 - **Research**: makes a simple fact pack from web sources
-  (OpenRouter Responses API + `openrouter:web_search` + `google/gemini-2.5-flash-lite`)
+  (OpenRouter Responses API + `openrouter:web_search`).
 - **Script Draft:** writes a new script based on the structure and research
   (OpenRouter models: `openai/gpt-5-mini` and `google/gemini-2.5-flash-lite`)
 - **Storyboard:** turns the script into a clearer scene-by-scene plan with
@@ -28,31 +34,34 @@ Reference transcript → Script Analysis → Research → Script Draft → Story
 - **AI Image Preview:** can optionally generate storyboard still images
   (OpenRouter Images API + `google/gemini-3.1-flash-lite-image`)
 
-To keep this free, I changed the workflow so the user can paste reference
-transcripts directly instead of depending on paid transcript APIs.
+I originally used manual transcript input because most hosted transcript
+services added extra cost. Later, I found TranscriptAPI and received enough
+starter credits to restore the simpler URL-based workflow. The API key stays on
+the backend, successful responses are cached during the server process, and
+failed transcript requests do not consume a transcript credit.
 
-I also tested the unofficial youtube-transcript Node.js package:
-https://www.npmjs.com/package/youtube-transcript
+## Standard and Deep modes
 
-But most hosted transcript APIs I looked at would add extra cost, so I decided
-to keep the main workflow based on manual transcript input.
+Standard mode uses one model for each step. Each reference still needs its own
+analysis, followed by one synthesis call, but there is no candidate comparison
+or Judge.
 
-## Deep Research mode
-
-Deep Research mode uses multiple models through OpenRouter for analysis and
-writing. Right now I am mainly using GPT and Gemini in that comparison flow.
-The research step is still kept lightweight because I did not want it to slow
-everything down too much. I also used Claude earlier, but I took it out because
-the API cost was getting too high.
+Deep mode uses multiple models through OpenRouter for reference synthesis and
+script writing. GPT and Gemini create separate candidates, then a Judge creates
+the final result. Research and Storyboard stay single-model so the workflow does
+not become unnecessarily slow or expensive. I also tested Claude earlier, but
+removed it because the extra API cost was too high.
 
 ## How to use it
 
 1. Open the live website.
-2. Paste 3 to 5 reference transcripts.
+2. Add 3 to 5 public YouTube URLs.
 3. Enter the topic for the new video you want to plan.
-4. Run the analysis and review the research results.
-5. Read the generated script draft.
-6. Review the storyboard to see the suggested hook, flow, visuals, and ending.
+4. Choose a target duration of 60 seconds or longer, plus the language, format,
+   and Standard or Deep mode.
+5. Let CreatorPilot fetch and analyze each transcript.
+6. Review the research results and generated script draft.
+7. Review the storyboard for the suggested flow, visuals, captions, and ending.
 
 ## Why I built it
 
@@ -66,12 +75,14 @@ job.
 
 - Smaller, more focused agents worked better than one huge vague prompt
 - Model choice mattered more than I expected
+- Provider failures, retries, caching, and environment configuration mattered
+  just as much as the model prompts
 - A polished storyboard ended up being a better final output for this project
   than trying to generate a full video
 
 ## Update After Demo Day
 
-After professor feedback, I added Deep Research mode so multiple models could
+After professor feedback, I added Deep mode so multiple models could
 compare and judge each other's outputs and then choose a stronger final answer.
 Originally, this part only used GPT.
 
