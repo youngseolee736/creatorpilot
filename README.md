@@ -2,10 +2,11 @@
 
 Live website: https://creatorpilot-95k2.onrender.com
 
-CreatorPilot is an AI project I made for YouTube script writing and storyboard
-planning. Instead of starting from nothing, the idea is to learn from strong
-reference transcripts, research the topic, write a new script, and then turn
-that into a storyboard.
+CreatorPilot is an AI project I made to help plan a 10-15 minute YouTube
+video. Instead of trying to make the full video automatically, the main idea is
+to study strong reference transcripts, research the topic, write a new script,
+and give guidance on the flow of the video, like the hook, structure, and
+conclusion.
 
 ## What it does
 
@@ -20,8 +21,8 @@ Reference transcript → Script Analysis → Research → Script Draft → Story
   (OpenRouter Responses API + `openrouter:web_search`)
 - **Script Draft:** writes a new script based on the structure and research
   (OpenRouter models)
-- **Storyboard:** turns the script into timed scenes, captions, visuals,
-  B-roll ideas, and AI image prompts (OpenRouter models)
+- **Storyboard:** turns the script into a clearer scene-by-scene plan with
+  captions, visuals, B-roll ideas, and AI image prompts (OpenRouter models)
 - **AI Image Preview:** can optionally generate storyboard still images
   (OpenRouter Images API)
 
@@ -42,11 +43,22 @@ The research step is still kept lightweight because I did not want it to slow
 everything down too much. I also used Claude earlier, but I took it out because
 the API cost was getting too high.
 
+## How to use it
+
+1. Open the live website.
+2. Paste 3 to 5 reference transcripts.
+3. Enter the topic for the new video you want to plan.
+4. Run the analysis and review the research results.
+5. Read the generated script draft.
+6. Review the storyboard to see the suggested hook, flow, visuals, and ending.
+
 ## Why I built it
 
 I built this because I wanted something that could help beginner creators learn
-from videos that already work. The main idea was to break one big creative task
-into smaller agent roles and let each one focus on one job.
+from videos that already work. I liked the idea of making a tool that feels
+more like a creative planning assistant than a chatbot. The main idea was to
+break one big creative task into smaller stages and let each one focus on one
+job.
 
 ## What I learned
 
