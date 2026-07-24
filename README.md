@@ -1,6 +1,6 @@
 # CreatorPilot
 
-Live website: https://creatorpilot-plum.vercel.app
+Live website: [https://creatorpilot-plum.vercel.app](https://creatorpilot-plum.vercel.app)
 
 CreatorPilot is an AI project I made to help plan YouTube videos of different
 lengths. Instead of trying to make the full video automatically, the main idea is
