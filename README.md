@@ -11,16 +11,16 @@ turn that into a storyboard.
 YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboard Agent
 ```
 
-- Script Analyst: looks at a reference video and pulls out the hook, pacing,
+- **Script Analyst**: looks at a reference video and pulls out the hook, pacing,
   and overall structure
   (YouTube transcript extraction + OpenRouter chat models)
-- Research Agent: makes a simple fact pack from web sources
+- **Research Agent**: makes a simple fact pack from web sources
   (OpenRouter Responses API + `openrouter:web_search`)
-- Scriptwriter: writes a new script based on the structure and research
+- **Scriptwriter:** writes a new script based on the structure and research
   (OpenRouter models)
-- Storyboard Agent: turns the script into timed scenes, captions, visuals,
+- **Storyboard Agent:** turns the script into timed scenes, captions, visuals,
   B-roll ideas, and AI image prompts (OpenRouter models)
-- AI Image Preview: can optionally generate storyboard still images
+- **AI Image Preview:** can optionally generate storyboard still images
   (OpenRouter Images API)
 
 ## Deep Research mode
