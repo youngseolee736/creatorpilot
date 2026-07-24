@@ -41,3 +41,9 @@ roles with clear responsibilities, then let each role do one job well.
 - Smaller, tightly scoped agents produce better results than one vague prompt
 - Model choice matters, especially when comparing multiple writing strategies
 - A polished storyboard can be a stronger final artifact than full video render
+
+## Update After Demo Day
+
+- Deep Research mode: after professor feedback, I changed the system so
+  multiple models compare and judge each other's outputs to produce a stronger
+  final response. Originally, this part used only GPT.
