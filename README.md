@@ -44,6 +44,13 @@ roles with clear responsibilities, then let each role do one job well.
 
 ## Update After Demo Day
 
-- Deep Research mode: after professor feedback, I changed the system so
-  multiple models compare and judge each other's outputs to produce a stronger
-  final response. Originally, this part used only GPT.
+After professor feedback, I changed Deep Research mode so multiple models
+compare and judge each other's outputs to produce a stronger final response.
+Originally, this part used only GPT.
+
+## What honestly I am not sure
+
+I still think there is room to improve how much value the multi-model judging
+system adds compared with its cost and latency. It produces better-looking
+results in many cases, but I am not fully sure yet how often that improvement
+is large enough to justify the extra API usage in a real production setting.
