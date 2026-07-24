@@ -1,9 +1,9 @@
 # CreatorPilot
 
-CreatorPilot is an AI multi-agent YouTube script and storyboard studio.
-Instead of starting from a blank page, it studies a successful reference video,
-researches the topic, writes a new script, and turns it into a production-ready
-storyboard.
+CreatorPilot is an AI project I made for YouTube script writing and storyboard
+planning. Instead of starting from nothing, the idea is to learn from a
+successful reference video, research the topic, write a new script, and then
+turn that into a storyboard.
 
 ## What it does
 
@@ -11,52 +11,54 @@ storyboard.
 YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboard Agent
 ```
 
-- Script Analyst: extracts hook, pacing, and structure from a reference video
+- Script Analyst: looks at a reference video and pulls out the hook, pacing,
+  and overall structure
   (YouTube transcript extraction + OpenRouter chat models)
-- Research Agent: builds a lightweight fact pack from web sources
+- Research Agent: makes a simple fact pack from web sources
   (OpenRouter Responses API + `openrouter:web_search`)
-- Scriptwriter: writes a new script based on the structure and evidence
+- Scriptwriter: writes a new script based on the structure and research
   (OpenRouter models)
-- Storyboard Agent: converts the script into timed scenes, captions, visuals,
+- Storyboard Agent: turns the script into timed scenes, captions, visuals,
   B-roll ideas, and AI image prompts (OpenRouter models)
-- AI Image Preview: optionally generates storyboard stills
+- AI Image Preview: can optionally generate storyboard still images
   (OpenRouter Images API)
 
 ## Deep Research mode
 
-Deep mode uses multiple models through OpenRouter for analysis and writing.
-Right now, the comparison flow is centered on GPT and Gemini. The lightweight
-research step stays simple to avoid becoming a bottleneck, and the judge picks
-the strongest result. Claude was part of the ensemble earlier, but I removed it
-to keep API costs lower.
+Deep Research mode uses multiple models through OpenRouter for analysis and
+writing. Right now I am mainly using GPT and Gemini in that comparison flow.
+The research step is still kept lightweight because I did not want it to slow
+everything down too much. I also used Claude earlier, but I took it out because
+the API cost was getting too high.
 
 ## Why I built it
 
-I wanted a system that helps beginner creators learn from videos that already
-work. The main idea is simple: break one big creative task into smaller agent
-roles with clear responsibilities, then let each role do one job well.
+I built this because I wanted something that could help beginner creators learn
+from videos that already work. The main idea was to break one big creative task
+into smaller agent roles and let each one focus on one job.
 
 ## What I learned
 
-- Smaller, tightly scoped agents produce better results than one vague prompt
-- Model choice matters, especially when comparing multiple writing strategies
-- A polished storyboard can be a stronger final artifact than full video render
+- Smaller, more focused agents worked better than one huge vague prompt
+- Model choice mattered more than I expected
+- A polished storyboard ended up being a better final output for this project
+  than trying to generate a full video
 
 ## Update After Demo Day
 
-After professor feedback, I changed Deep Research mode so multiple models
-compare and judge each other's outputs to produce a stronger final response.
-Originally, this part used only GPT.
+After professor feedback, I changed Deep Research mode so multiple models could
+compare and judge each other's outputs and then choose a stronger final answer.
+Originally, this part only used GPT.
 
 ## What honestly I am not sure
 
-I still think there is room to improve how much value the multi-model judging
-system adds compared with its cost and latency. It produces better-looking
-results in many cases, but I am not fully sure yet how often that improvement
-is large enough to justify the extra API usage in a real production setting.
+I still think I need to figure out whether the multi-model judging system is
+really worth the extra cost and waiting time. Sometimes the result looks
+better, but I am not fully sure yet if the difference is big enough every time
+to make that extra API cost feel worth it.
 
-The hardest part for me was the contract layer. I was not always sure how
-strict the agent output format should be. When I made it too strict,
-validation errors happened too often. When I relaxed it too much, the output
-quality and consistency dropped. I still think this is the part I understand
-the least, and I would want to improve it more.
+The hardest part for me was the contract layer. I was never really sure how
+strict the agent output format should be. If I made it too strict, errors kept
+happening. If I made it too loose, the output got messy and less consistent. I
+still feel like this is the part I understand the least, and it is the part I
+would want to improve more if I keep working on this project.
