@@ -27,7 +27,8 @@ YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboar
 Deep mode uses multiple models through OpenRouter for analysis and writing.
 Right now, the comparison flow is centered on GPT and Gemini. The lightweight
 research step stays simple to avoid becoming a bottleneck, and the judge picks
-the strongest result.
+the strongest result. Claude was part of the ensemble earlier, but I removed it
+to keep API costs lower.
 
 ## Why I built it
 
