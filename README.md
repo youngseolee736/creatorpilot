@@ -12,11 +12,15 @@ YouTube URL → Script Analyst → Research Agent → Scriptwriter → Storyboar
 ```
 
 - Script Analyst: extracts hook, pacing, and structure from a reference video
-- Research Agent: builds a lightweight fact pack from web sources
-- Scriptwriter: writes a new script based on the structure and evidence
+  using YouTube transcript extraction plus OpenRouter chat models for analysis
+- Research Agent: builds a lightweight fact pack from web sources using the
+  OpenRouter Responses API with `openrouter:web_search`
+- Scriptwriter: writes a new script based on the structure and evidence using
+  OpenRouter models for drafting and revision
 - Storyboard Agent: converts the script into timed scenes, captions, visuals,
-  B-roll ideas, and AI image prompts
-- AI Image Preview: optionally generates storyboard stills through OpenRouter
+  B-roll ideas, and AI image prompts using OpenRouter models
+- AI Image Preview: optionally generates storyboard stills using the
+  OpenRouter Images API
 
 ## Deep Research mode
 
