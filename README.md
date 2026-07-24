@@ -16,15 +16,17 @@ Reference transcript → Script Analysis → Research → Script Draft → Story
 
 - **Script Analysis**: looks at a reference transcript and pulls out the hook,
   pacing, and overall structure
-  (manual transcript input + OpenRouter chat models)
+  (manual transcript input + OpenRouter models: `openai/gpt-5-mini` and
+  `google/gemini-2.5-flash-lite`)
 - **Research**: makes a simple fact pack from web sources
-  (OpenRouter Responses API + `openrouter:web_search`)
+  (OpenRouter Responses API + `openrouter:web_search` + `google/gemini-2.5-flash-lite`)
 - **Script Draft:** writes a new script based on the structure and research
-  (OpenRouter models)
+  (OpenRouter models: `openai/gpt-5-mini` and `google/gemini-2.5-flash-lite`)
 - **Storyboard:** turns the script into a clearer scene-by-scene plan with
-  captions, visuals, B-roll ideas, and AI image prompts (OpenRouter models)
+  captions, visuals, B-roll ideas, and AI image prompts
+  (OpenRouter models, with image preview using `google/gemini-3.1-flash-lite-image`)
 - **AI Image Preview:** can optionally generate storyboard still images
-  (OpenRouter Images API)
+  (OpenRouter Images API + `google/gemini-3.1-flash-lite-image`)
 
 To keep this free, I changed the workflow so the user can paste reference
 transcripts directly instead of depending on paid transcript APIs.
