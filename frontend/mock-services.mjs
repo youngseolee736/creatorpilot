@@ -255,7 +255,7 @@ export async function generateScript(project) {
     version: (project.generatedScript?.version || 0) + 1,
     estimatedSeconds: 60,
     sections: [
-      { id: "hook", label: "Hook", range: "0–5s", text: `${project.topic} sounds surprising—until we define what “best” actually means.`, factIds: ["fact_1"] },
+      { id: "hook", label: "Hook", range: "0–5s", text: `${project.topic} sounds surprising, until we define what “best” actually means.`, factIds: ["fact_1"] },
       { id: "context", label: "Context", range: "5–15s", text: "The fair comparison uses current impact, efficiency, availability, and team role instead of fame alone.", factIds: ["fact_1"] },
       { id: "argument-1", label: "Main argument 1", range: "15–27s", text: "The strongest evidence supports the claim on the measures that connect most directly to match-winning impact.", factIds: ["fact_2"] },
       { id: "argument-2", label: "Main argument 2", range: "27–40s", text: "The rival still leads an important category, and acknowledging that counterpoint makes the comparison more credible.", factIds: ["fact_3"] },

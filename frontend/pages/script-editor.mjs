@@ -5,7 +5,7 @@ export function renderScriptEditor(project) {
   const backToResearch = `<a class="button button-secondary" href="${routeFor("research", project.id)}">← Back to research</a>`;
   if (project.error) return `${pageHeading("Scriptwriter Agent", "Script generation paused.", "Retry without losing the completed reference analysis or current draft.", backToResearch)}${errorNotice(project.error, "retry-script", "Scriptwriter")}`;
   if (!project.generatedScript) {
-    return `${pageHeading("Scriptwriter Agent", "Building the case.", "The reference logic shapes the story while verified findings support the claim.", backToResearch)}${loadingPanel("Scriptwriter Agent", "Turning verified findings into a full-duration, claim-led narration. This can take a few minutes—keep this tab open.")}`;
+    return `${pageHeading("Scriptwriter Agent", "Building the case.", "The reference logic shapes the story while verified findings support the claim.", backToResearch)}${loadingPanel("Scriptwriter Agent", "Turning verified findings into a full-duration, claim-led narration. This can take a few minutes. Keep this tab open.")}`;
   }
   const script = project.generatedScript;
   const count = wordCount(script);
