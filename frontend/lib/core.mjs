@@ -169,7 +169,7 @@ export function createProject(input = {}) {
         title: reference.title,
         language: input.language || "Korean",
         text: reference.transcriptText,
-        estimatedDuration: Number(input.duration || 720),
+        estimatedDuration: Number(input.duration || 60),
       }),
     };
   });
@@ -182,7 +182,7 @@ export function createProject(input = {}) {
     referenceTitle: firstReference?.title || input.referenceTitle || "Reference video",
     topic: input.topic || "",
     language: input.language || "Korean",
-    duration: Number(input.duration || 720),
+    duration: Number(input.duration || 60),
     format: input.format || "9:16",
     analysisDepth: input.analysisDepth === "deep" ? "deep" : "standard",
     creativeBrief,

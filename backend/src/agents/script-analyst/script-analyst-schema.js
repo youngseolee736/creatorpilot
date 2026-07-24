@@ -1,9 +1,9 @@
 const { AppError } = require("../../middleware/error-handler");
 
-const MIN_TRANSCRIPT_WORDS = 8;
+const MIN_TRANSCRIPT_WORDS = 1;
 const MAX_TRANSCRIPT_CHARACTERS = 100000;
-const MIN_TARGET_DURATION = 15;
-const MAX_TARGET_DURATION = 180;
+const MIN_TARGET_DURATION = 1;
+const MAX_TARGET_DURATION = 7200;
 
 function detail(field, reason) {
   return [{ field, reason }];

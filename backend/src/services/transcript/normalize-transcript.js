@@ -85,7 +85,7 @@ function normalizeTranscript(payload, context) {
   return {
     transcriptId: `tr_${context.videoId}`,
     source: "youtube_captions",
-    title: cleanText(candidate.title || candidate.videoTitle || candidate.video_title) || null,
+    title: cleanText(candidate.title || candidate.videoTitle || candidate.video_title || candidate.metadata?.title) || null,
     text,
     language: languageCode(candidate.language || candidate.languageCode || candidate.lang || segmentCandidates[0]?.lang),
     wordCount,

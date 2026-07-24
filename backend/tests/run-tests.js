@@ -5,6 +5,7 @@ const { createApp } = require("../src/app");
 const { TranscriptService } = require("../src/services/transcript");
 const { LocalYouTubeTranscriptProvider } = require("../src/services/transcript/local-youtube-transcript-provider");
 const { HostedTranscriptProvider } = require("../src/services/transcript/hosted-transcript-provider");
+const { TranscriptApiProvider } = require("../src/services/transcript/transcriptapi-provider");
 const { normalizeSegments } = require("../src/services/transcript/normalize-transcript");
 const { AppError } = require("../src/middleware/error-handler");
 const { extractYouTubeVideo } = require("../src/utils/youtube-url");
@@ -186,6 +187,86 @@ test("normalizes a successful provider transcript into the CreatorPilot contract
   assert.equal(result.headers["access-control-allow-origin"], "http://127.0.0.1:4173");
 });
 
+test("fetches TranscriptAPI captions with server-side authentication and caches the result", async () => {
+  const calls = [];
+  const provider = new TranscriptApiProvider({
+    apiKey: "test-transcriptapi-key",
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return response(200, {
+        video_id: "jNQXAC9IVRw",
+        language: "en",
+        metadata: { title: "Me at the zoo" },
+        transcript: [
+          { start: 0, duration: 2.4, text: "All right, so here we are." },
+          { start: 2.4, duration: 3.6, text: "These elephants have long trunks." },
+        ],
+      });
+    },
+    AbortControllerImpl: AbortController,
+  });
+  const context = {
+    videoId: "jNQXAC9IVRw",
+    canonicalUrl: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+  };
+
+  const [first, concurrent] = await Promise.all([provider.extract(context), provider.extract(context)]);
+  const second = await provider.extract(context);
+  const requestUrl = new URL(calls[0].url);
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(concurrent, first);
+  assert.deepEqual(second, first);
+  assert.equal(calls[0].options.method, "GET");
+  assert.equal(calls[0].options.headers.Authorization, "Bearer test-transcriptapi-key");
+  assert.equal(requestUrl.origin + requestUrl.pathname, "https://transcriptapi.com/api/v2/youtube/transcript");
+  assert.equal(requestUrl.searchParams.get("video_url"), context.canonicalUrl);
+  assert.equal(requestUrl.searchParams.get("include_timestamp"), "true");
+  assert.equal(requestUrl.searchParams.get("send_metadata"), "true");
+  assert.equal(requestUrl.searchParams.has("language"), false);
+  assert.equal(first.title, "Me at the zoo");
+  assert.equal(first.estimatedDuration, 6);
+});
+
+test("passes an explicit preferred caption language to TranscriptAPI", async () => {
+  let requestUrl;
+  const provider = new TranscriptApiProvider({
+    apiKey: "test-key",
+    fetchImpl: async (url) => {
+      requestUrl = new URL(url);
+      return response(200, { transcript: [{ start: 0, duration: 2, text: "한국어 자막 추출 테스트입니다." }] });
+    },
+    AbortControllerImpl: AbortController,
+  });
+  await provider.extract({
+    videoId: "jNQXAC9IVRw",
+    canonicalUrl: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    preferredCaptionLanguage: "Korean",
+  });
+  assert.equal(requestUrl.searchParams.get("language"), "ko");
+});
+
+test("maps TranscriptAPI configuration, credit, and rate-limit failures", async () => {
+  const context = { videoId: "jNQXAC9IVRw", canonicalUrl: validRequest.youtubeUrl };
+  await assert.rejects(
+    new TranscriptApiProvider({ apiKey: "" }).extract(context),
+    (error) => error.code === "TRANSCRIPT_PROVIDER_NOT_CONFIGURED" && error.retryable === false,
+  );
+  for (const [status, code, retryable] of [
+    [402, "TRANSCRIPT_CREDITS_EXHAUSTED", false],
+    [404, "TRANSCRIPT_UNAVAILABLE", false],
+    [429, "PROVIDER_RATE_LIMITED", true],
+    [503, "TRANSCRIPT_PROVIDER_ERROR", true],
+  ]) {
+    const provider = new TranscriptApiProvider({
+      apiKey: "test-key",
+      fetchImpl: async () => response(status, { detail: "provider detail must not leak" }),
+      AbortControllerImpl: AbortController,
+    });
+    await assert.rejects(provider.extract(context), (error) => error.code === code && error.retryable === retryable);
+  }
+});
+
 test("rejects a browser origin outside the configured frontend", async () => {
   const app = createApp({ transcriptService: serviceWith(async () => response(200, {})), frontendOrigin: "http://127.0.0.1:4173" });
   const result = await request(app, "/api/transcripts/extract", validRequest, { Origin: "https://untrusted.example" });
@@ -276,9 +357,11 @@ test("selects the configured transcript provider", async () => {
   const calls = [];
   const localProvider = { extract: async () => { calls.push("local"); return { source: "local" }; } };
   const hostedProvider = { extract: async () => { calls.push("hosted"); return { source: "hosted" }; } };
-  assert.deepEqual(await new TranscriptService({ providerName: "local", localProvider, hostedProvider }).extract({}), { source: "local" });
-  assert.deepEqual(await new TranscriptService({ providerName: "hosted", localProvider, hostedProvider }).extract({}), { source: "hosted" });
-  assert.deepEqual(calls, ["local", "hosted"]);
+  const transcriptApiProvider = { extract: async () => { calls.push("transcriptapi"); return { source: "transcriptapi" }; } };
+  assert.deepEqual(await new TranscriptService({ providerName: "local", localProvider, hostedProvider, transcriptApiProvider }).extract({}), { source: "local" });
+  assert.deepEqual(await new TranscriptService({ providerName: "hosted", localProvider, hostedProvider, transcriptApiProvider }).extract({}), { source: "hosted" });
+  assert.deepEqual(await new TranscriptService({ providerName: "transcriptapi", localProvider, hostedProvider, transcriptApiProvider }).extract({}), { source: "transcriptapi" });
+  assert.deepEqual(calls, ["local", "hosted", "transcriptapi"]);
 });
 
 test("keeps hosted fallback disabled by default", async () => {

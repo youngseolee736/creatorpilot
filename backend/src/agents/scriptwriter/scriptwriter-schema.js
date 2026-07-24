@@ -2,8 +2,8 @@ const { AppError } = require("../../middleware/error-handler");
 const { normalizeCreativeBrief, normalizeReferenceBlueprint, plainObject } = require("../../contracts/creative-input");
 const { validLanguage } = require("../script-analyst/script-analyst-schema");
 
-const MIN_TARGET_DURATION = 15;
-const MAX_TARGET_DURATION = 180;
+const MIN_TARGET_DURATION = 1;
+const MAX_TARGET_DURATION = 7200;
 const MAX_SCRIPT_CHARACTERS = 30000;
 const TOP_LEVEL_FIELDS = new Set(["projectId", "creativeBrief", "referenceBlueprint", "factPack", "targetLanguage", "targetDurationSeconds", "currentScript", "revisionInstructions", "preserveSectionIds", "analysisMode"]);
 

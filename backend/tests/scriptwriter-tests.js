@@ -223,7 +223,7 @@ test("rejects raw transcript input at the Scriptwriter boundary", async () => {
 });
 
 test("rejects an unsupported duration and unsafe language value", async () => {
-  const duration = await endpointResult("/api/scripts/generate", validRequest({ targetDurationSeconds: 10 }), "{}");
+  const duration = await endpointResult("/api/scripts/generate", validRequest({ targetDurationSeconds: 0 }), "{}");
   assert.equal(duration.body.error.code, "INVALID_SCRIPT_BRIEF");
   const language = await endpointResult("/api/scripts/generate", validRequest({ targetLanguage: "<script>" }), "{}");
   assert.equal(language.body.error.code, "INVALID_SCRIPT_BRIEF");

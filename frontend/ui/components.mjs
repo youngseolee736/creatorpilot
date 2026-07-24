@@ -127,6 +127,12 @@ export function errorNotice(error, retryAction, agentLabel = "Script Analyst") {
     INVALID_RESEARCH_BRIEF: "The tailored research brief is incomplete.",
     TRANSCRIPT_TOO_LARGE: "This transcript is too large to analyze.",
     TRANSCRIPT_NOT_ANALYZABLE: "This transcript cannot be analyzed reliably.",
+    TRANSCRIPT_UNAVAILABLE: "This video has no available transcript.",
+    TRANSCRIPT_PROVIDER_NOT_CONFIGURED: "Transcript extraction is not configured.",
+    TRANSCRIPT_CREDITS_EXHAUSTED: "Transcript credits have run out.",
+    TRANSCRIPT_TIMEOUT: "Transcript extraction took too long.",
+    PROVIDER_RATE_LIMITED: "Transcript extraction is temporarily busy.",
+    TRANSCRIPT_PROVIDER_ERROR: "The transcript provider is unavailable.",
     LLM_PROVIDER_ERROR: `The ${agentLabel} provider is unavailable.`,
     STORYBOARD_NOT_APPROVED: "This storyboard no longer matches the generated storyboard.",
   };

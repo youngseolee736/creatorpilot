@@ -62,6 +62,7 @@ test("new production intake shows three required and two optional references", (
   assert.match(html, /Paste three reference transcripts/);
   assert.match(html, /Deep analysis/);
   assert.match(html, /Two independent candidates \+ final Judge/);
+  assert.match(html, /name="duration" type="number" min="1" max="7200" value="60"/);
 });
 
 test("project state preserves three to five independent references", () => {

@@ -2,19 +2,19 @@
 
 ## Transcript provider limitations
 
-CreatorPilot uses the unofficial `youtube-transcript` package from the backend
-only. It reads YouTube caption endpoints without an official YouTube API
-contract, so upstream markup, response formats, blocking behavior, and
-transcript availability can change without notice. Some public, private,
-age-restricted, or caption-disabled videos do not expose transcripts.
-Auto-generated captions may contain transcription and timing errors. The local
-adapter currently returns `null` for the video title because caption extraction
-does not provide title metadata.
+Production uses TranscriptAPI from the backend. Each successful transcript
+response consumes one provider credit; failed requests do not. CreatorPilot
+caches successful results only for the lifetime of the server process, so a
+restart or a different server instance can consume another credit for the same
+video. TranscriptAPI is an independent external dependency and can change its
+availability, response contract, pricing, or retention practices.
 
-CreatorPilot can also use a hosted transcript fallback when explicitly enabled.
-That may improve success rate for some videos, but it adds an extra external
-dependency, extra waiting time, and possibly extra cost depending on the
-endpoint you use.
+The unofficial local `youtube-transcript` adapter remains available for
+development. It reads YouTube caption endpoints without an official YouTube API
+contract, so upstream markup, blocking behavior, and transcript availability
+can change without notice. Some public, private, age-restricted, or
+caption-disabled videos do not expose transcripts. Auto-generated captions may
+contain transcription and timing errors.
 
 Access public transcripts responsibly and do not treat transcript availability
 as permission to republish source text.

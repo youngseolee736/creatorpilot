@@ -576,7 +576,7 @@ test("keeps prompt injection text inside the untrusted transcript boundary", asy
 });
 
 test("rejects unsupported duration and invalid language values", async () => {
-  const durationResult = await endpointResult(validRequest({ targetDurationSeconds: 10 }), JSON.stringify(validAnalysis()));
+  const durationResult = await endpointResult(validRequest({ targetDurationSeconds: 0 }), JSON.stringify(validAnalysis()));
   assert.equal(durationResult.body.error.code, "INVALID_ANALYSIS_REQUEST");
   const languageResult = await endpointResult(validRequest({ analysisLanguage: "<script>" }), JSON.stringify(validAnalysis()));
   assert.equal(languageResult.body.error.code, "INVALID_ANALYSIS_REQUEST");
