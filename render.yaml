@@ -19,6 +19,12 @@ services:
         value: 300000
       - key: OPENROUTER_APP_TITLE
         value: CreatorPilot
+      - key: TRANSCRIPT_TIMEOUT_MS
+        value: 10000
+      - key: TRANSCRIPT_PROVIDER
+        value: local
+      - key: TRANSCRIPT_HTTP_FALLBACK_ENABLED
+        value: "false"
       - key: ANALYST_A_LLM_MODEL
         sync: false
       - key: ANALYST_B_LLM_MODEL
@@ -36,6 +42,4 @@ services:
       - key: SCRIPTWRITER_B_LLM_MODEL
         sync: false
       - key: SCRIPTWRITER_JUDGE_LLM_MODEL
-        sync: false
-      - key: SHOTSTACK_API_KEY
         sync: false
