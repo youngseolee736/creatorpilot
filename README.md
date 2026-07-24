@@ -54,3 +54,9 @@ I still think there is room to improve how much value the multi-model judging
 system adds compared with its cost and latency. It produces better-looking
 results in many cases, but I am not fully sure yet how often that improvement
 is large enough to justify the extra API usage in a real production setting.
+
+The hardest part for me was the contract layer. I was not always sure how
+strict the agent output format should be. When I made it too strict,
+validation errors happened too often. When I relaxed it too much, the output
+quality and consistency dropped. I still think this is the part I understand
+the least, and I would want to improve it more.
